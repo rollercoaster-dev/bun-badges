@@ -1,5 +1,6 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { createSecretKey } from 'crypto';
+import { nanoid } from 'nanoid';
 
 // In production, these should be loaded from environment variables
 const JWT_SECRET = 'development-secret-key-change-me-in-production';
@@ -27,42 +28,62 @@ export interface JWTPayload {
   jti?: string; // JWT ID
 }
 
-export async function generateToken(username: string, type: 'access' | 'refresh' = 'access'): Promise<string> {
-  const secretKey = createSecretKey(Buffer.from(JWT_SECRET));
-  const expiresIn = type === 'access' ? JWT_EXPIRES_IN : REFRESH_TOKEN_EXPIRES_IN;
+// Secret key for JWT signing
+const SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'default-secret-change-me');
+
+// Token types and their expiration times (in seconds)
+const TOKEN_EXPIRATION = {
+  access: 60 * 60, // 1 hour
+  refresh: 30 * 24 * 60 * 60, // 30 days
+  registration: 7 * 24 * 60 * 60, // 7 days
+  verification: 10 * 60, // 10 minutes
+};
+
+// Generate a JWT token
+export async function generateToken(payload: {
+  sub: string;
+  type: keyof typeof TOKEN_EXPIRATION;
+  scope?: string;
+}): Promise<string> {
+  const jwtId = nanoid();
+  const expiration = TOKEN_EXPIRATION[payload.type];
   
-  const token = await new SignJWT({ sub: username, type })
+  return new SignJWT({
+    ...payload,
+    jti: jwtId,
+  })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime(expiresIn)
-    .setJti(crypto.randomUUID()) // Add unique identifier
-    .sign(secretKey);
-    
-  return token;
+    .setExpirationTime(Math.floor(Date.now() / 1000) + expiration)
+    .setIssuer('bun-badges')
+    .setAudience('bun-badges-clients')
+    .sign(SECRET);
 }
 
-export async function verifyToken(token: string, expectedType?: 'access' | 'refresh'): Promise<JWTPayload> {
-  const secretKey = createSecretKey(Buffer.from(JWT_SECRET));
-  
+// Verify a JWT token
+export async function verifyToken(token: string): Promise<{
+  sub: string;
+  type: string;
+  scope?: string;
+  jti: string;
+  exp: number;
+  iat: number;
+}> {
   try {
-    // Check if token is revoked
-    if (revokedTokens.has(token)) {
-      throw new Error('Token has been revoked');
-    }
-
-    const { payload } = await jwtVerify(token, secretKey);
-    const jwtPayload = payload as JWTPayload;
-
-    // Verify token type if expected type is provided
-    if (expectedType && jwtPayload.type !== expectedType) {
-      throw new Error(`Invalid token type: expected ${expectedType}`);
-    }
-
-    return jwtPayload;
+    const { payload } = await jwtVerify(token, SECRET, {
+      issuer: 'bun-badges',
+      audience: 'bun-badges-clients',
+    });
+    
+    return {
+      sub: payload.sub as string,
+      type: payload.type as string,
+      scope: payload.scope as string | undefined,
+      jti: payload.jti as string,
+      exp: payload.exp as number,
+      iat: payload.iat as number,
+    };
   } catch (error) {
-    if (error instanceof Error) {
-      throw error;
-    }
     throw new Error('Invalid token');
   }
 }
