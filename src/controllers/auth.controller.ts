@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { generateCode, isCodeExpired, isValidCodeFormat } from '@utils/auth/codeGenerator';
 import { RateLimiter } from '@utils/auth/rateLimiter';
+import { generateToken, getTokenExpirySeconds } from '@utils/auth/jwt';
 
 type CodeRequestBody = {
   username: string;
@@ -77,10 +78,20 @@ export class AuthController {
     // TODO: Verify code from database
     // For development, we'll just return success
     // In production, this should verify against stored codes
-    return c.json({
-      message: 'Code verified successfully',
-      // TODO: Return JWT token here
-      token: 'dummy-token',
-    }, 200);
+    
+    try {
+      const token = await generateToken(body.username);
+      const expiresIn = getTokenExpirySeconds();
+      
+      return c.json({
+        message: 'Code verified successfully',
+        token,
+        expiresIn,
+      }, 200);
+    } catch (error) {
+      return c.json({
+        error: 'Failed to generate token',
+      }, 500);
+    }
   }
 } 

@@ -3,6 +3,7 @@ import { Context } from 'hono';
 import { AuthController } from '@controllers/auth.controller';
 import { RateLimiter } from '@utils/auth/rateLimiter';
 import { AUTH_ROUTES } from '@routes/aliases';
+import { verifyToken, getTokenExpirySeconds } from '@utils/auth/jwt';
 
 type AuthResponse = {
   message?: string;
@@ -174,10 +175,11 @@ describe('Auth Controller', () => {
       expect(body.retryAfter).toBeGreaterThan(0);
     });
 
-    test('returns token on successful verification', async () => {
+    test('returns valid JWT token on successful verification', async () => {
       const controller = new AuthController();
+      const username = 'test@example.com';
       const ctx = createMockContext({ 
-        username: 'test@example.com',
+        username,
         code: '123456'
       });
 
@@ -186,6 +188,27 @@ describe('Auth Controller', () => {
       expect(response.status).toBe(200);
       expect(body.message).toBe('Code verified successfully');
       expect(body.token).toBeDefined();
+      expect(body.expiresIn).toBe(getTokenExpirySeconds());
+
+      // Verify the token is a valid JWT with correct payload
+      const payload = await verifyToken(body.token!);
+      expect(payload.sub).toBe(username);
+      expect(payload.iat).toBeDefined();
+      expect(payload.exp).toBeDefined();
+      expect(payload.exp! - payload.iat!).toBe(getTokenExpirySeconds());
+    });
+
+    test('handles token generation failure', async () => {
+      const controller = new AuthController();
+      const ctx = createMockContext({ 
+        username: '',  // Invalid username should cause token generation to fail
+        code: '123456'
+      });
+
+      const response = await controller.verifyCode(ctx);
+      const body = await response.json() as AuthResponse;
+      expect(response.status).toBe(400);
+      expect(body.error).toBe('Username and code are required');
     });
   });
 }); 
