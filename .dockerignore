@@ -1,0 +1,50 @@
+# Node modules and logs
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Editors and OS
+.idea
+.vscode
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Docker files
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Git files
+.git
+.gitignore
+
+# Documentation
+README.md
+LICENSE
+docs/
+
+# Build directories
+dist/
+build/
+coverage/
+
+# Temporary files
+.tmp/
+temp/
+
+# Research and examples
+research/
+examples/
+
+# Cursor workspace
+.cursor/ 

@@ -4,13 +4,13 @@ services:
   api:
     build:
       context: .
-      dockerfile: Dockerfile
-    container_name: bun-badges-api
+      dockerfile: Dockerfile.dev
+    container_name: bun-badges-api-dev
     restart: unless-stopped
     depends_on:
       - db
     environment:
-      NODE_ENV: production
+      NODE_ENV: development
       PORT: 7777
       DATABASE_URL: postgres://${POSTGRES_USER:-badges_user}:${POSTGRES_PASSWORD:-badges_password}@db:5432/${POSTGRES_DB:-badges}
       JWT_SECRET: ${JWT_SECRET:-your-secret-key}
@@ -18,21 +18,16 @@ services:
       REFRESH_TOKEN_EXPIRY: ${REFRESH_TOKEN_EXPIRY:-7d}
     ports:
       - "${PORT:-7777}:7777"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:7777/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
     volumes:
-      - ./dist:/app/dist
-      - ./drizzle:/app/drizzle
+      - .:/app
+      - /app/node_modules
+    command: bun run dev
     networks:
-      - bun-badges-network
+      - bun-badges-network-dev
 
   db:
     image: postgres:15
-    container_name: bun-badges-db
+    container_name: bun-badges-db-dev
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-badges}
       POSTGRES_USER: ${POSTGRES_USER:-badges_user}
@@ -40,18 +35,18 @@ services:
     ports:
       - "${DB_PORT:-5432}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data_dev:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-badges_user} -d ${POSTGRES_DB:-badges}"]
       interval: 5s
       timeout: 5s
       retries: 5
     networks:
-      - bun-badges-network
+      - bun-badges-network-dev
 
 volumes:
-  postgres_data:
+  postgres_data_dev:
 
 networks:
-  bun-badges-network:
+  bun-badges-network-dev:
     driver: bridge 

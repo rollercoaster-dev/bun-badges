@@ -1,0 +1,21 @@
+# Use the official Bun image
+FROM oven/bun:1
+
+WORKDIR /app
+
+# Copy package.json and install dependencies
+COPY package.json bun.lock* ./
+RUN bun install
+
+# Copy the rest of the application code
+COPY . .
+
+# Set development environment
+ENV NODE_ENV=development
+ENV PORT=7777
+
+# Expose the port the app will run on
+EXPOSE 7777
+
+# Start the app with hot reloading
+CMD ["bun", "run", "dev"] 
