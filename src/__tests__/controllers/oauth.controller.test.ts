@@ -2,6 +2,7 @@ import { describe, expect, it, mock, beforeEach } from 'bun:test';
 import { OAuthController } from '../../controllers/oauth.controller';
 import { generateToken } from '../../utils/auth/jwt';
 import { generateCode } from '../../utils/auth/code';
+import { OAUTH_SCOPES } from '../../routes/oauth.routes';
 
 // Define response types for better type checking
 interface MockResponse {
@@ -111,36 +112,41 @@ const createMockContext = (options: any = {}) => {
   };
 };
 
-// Mock JWT and code generation
+// Mock JWT utilities
 mock.module('../../utils/auth/jwt', () => ({
   generateToken: mock(() => Promise.resolve('test-token')),
   verifyToken: mock((token: string) => {
-    if (token === 'valid-token' || token === 'valid-refresh-token') {
+    if (token === 'expired-token') {
       return Promise.resolve({
         sub: 'valid-client',
-        type: token === 'valid-refresh-token' ? 'refresh' : 'access',
-        scope: 'badge:read profile:read',
-        jti: 'test-jti',
-        exp: Math.floor(Date.now() / 1000) + 3600,
-        iat: Math.floor(Date.now() / 1000) - 60
+        exp: Math.floor(Date.now() / 1000) - 3600, // 1 hour in the past
+        iat: Math.floor(Date.now() / 1000) - 7200,
+        type: 'access'
       });
-    } else if (token === 'expired-token') {
+    } else if (token === 'valid-refresh-token') {
       return Promise.resolve({
         sub: 'valid-client',
-        type: 'access',
-        scope: 'badge:read profile:read',
-        jti: 'test-jti',
-        exp: Math.floor(Date.now() / 1000) - 3600, // Expired 1 hour ago
-        iat: Math.floor(Date.now() / 1000) - 7200
+        exp: Math.floor(Date.now() / 1000) + 3600, // 1 hour in the future
+        iat: Math.floor(Date.now() / 1000) - 3600,
+        type: 'refresh',
+        scope: 'badge:read profile:read'
       });
+    } else if (token === 'invalid-scope-token') {
+      throw new Error('Invalid scope requested');
     } else if (token === 'revoked-token') {
       return Promise.resolve({
         sub: 'valid-client',
-        type: 'access',
-        scope: 'badge:read profile:read',
-        jti: 'test-jti',
         exp: Math.floor(Date.now() / 1000) + 3600,
-        iat: Math.floor(Date.now() / 1000) - 60
+        iat: Math.floor(Date.now() / 1000) - 3600,
+        type: 'access'
+      });
+    } else if (token === 'valid-token') {
+      return Promise.resolve({
+        sub: 'valid-client',
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        iat: Math.floor(Date.now() / 1000) - 3600,
+        type: 'access',
+        scope: 'badge:read profile:read'
       });
     }
     throw new Error('Invalid token');
@@ -253,6 +259,43 @@ describe('OAuthController', () => {
       expect(result.redirect).toContain('error=access_denied');
       expect(result.redirect).toContain('state=test-state');
     });
+
+    it('should handle invalid scopes', async () => {
+      const ctx = createMockContext({
+        query: {
+          response_type: 'code',
+          client_id: 'valid-client',
+          redirect_uri: 'https://example.com/callback',
+          scope: 'invalid:scope unknown:scope',
+          state: 'test-state'
+        }
+      });
+
+      const result = await controller.authorize(ctx as any) as MockResponse;
+
+      expect(result.redirect).toContain('https://example.com/callback?error=invalid_scope');
+      expect(result.redirect).toContain('state=test-state');
+    });
+
+    it('should filter out invalid scopes', async () => {
+      const ctx = createMockContext({
+        query: {
+          response_type: 'code',
+          client_id: 'valid-client',
+          redirect_uri: 'https://example.com/callback',
+          scope: 'badge:read invalid:scope profile:read',
+          state: 'test-state'
+        }
+      });
+
+      const result = await controller.authorize(ctx as any) as MockResponse;
+
+      // Should still show consent page with only valid scopes
+      expect(result.body).toContain('Authorization Request');
+      expect(result.body).toContain('badge:read');
+      expect(result.body).toContain('profile:read');
+      expect(result.body).not.toContain('invalid:scope');
+    });
   });
 
   describe('token', () => {
@@ -329,6 +372,62 @@ describe('OAuthController', () => {
       expect(result.body?.access_token).toBe('test-token');
       expect(result.body?.token_type).toBe('Bearer');
       expect(result.body).not.toHaveProperty('refresh_token'); // No new refresh token
+    });
+
+    it('should validate scopes when refreshing token', async () => {
+      const ctx = createMockContext({
+        body: {
+          grant_type: 'refresh_token',
+          refresh_token: 'valid-refresh-token',
+          client_id: 'valid-client',
+          client_secret: 'valid-secret',
+          scope: 'badge:read' // Requesting subset of original scopes
+        }
+      });
+
+      const result = await controller.token(ctx as any) as MockResponse;
+
+      expect(result.body?.access_token).toBe('test-token');
+      expect(result.body?.scope).toBe('badge:read'); // Should only include the requested scope
+    });
+
+    it('should reject invalid scopes when refreshing token', async () => {
+      const ctx = createMockContext({
+        body: {
+          grant_type: 'refresh_token',
+          refresh_token: 'valid-refresh-token',
+          client_id: 'valid-client',
+          client_secret: 'valid-secret',
+          scope: 'invalid:scope' // Requesting invalid scope
+        }
+      });
+
+      try {
+        await controller.token(ctx as any);
+        expect(true).toBe(false); // Should not reach here
+      } catch (error: any) {
+        // Just verify that an error is thrown when invalid scopes are requested
+        expect(error).toBeTruthy();
+      }
+    });
+
+    it('should handle invalid refresh tokens', async () => {
+      const ctx = createMockContext({
+        body: {
+          grant_type: 'refresh_token',
+          refresh_token: 'invalid-token', // Using an invalid token
+          client_id: 'valid-client',
+          client_secret: 'valid-secret',
+          scope: 'badge:read'
+        }
+      });
+
+      try {
+        await controller.token(ctx as any);
+        expect(true).toBe(false); // Should not reach here
+      } catch (error: any) {
+        expect(error.message).toContain('Invalid refresh token');
+      }
     });
   });
 

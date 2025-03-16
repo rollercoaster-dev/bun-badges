@@ -1,8 +1,8 @@
 ---
 title: "04: OAuth 2.0 Implementation"
 created_at: "2023-06-15T10:00:00Z"
-updated_at: "2023-06-15T19:30:00Z"
-status: "in_progress"
+updated_at: "2023-06-15T20:30:00Z"
+status: "completed"
 priority: "high"
 research_progress: "100%"
 ---
@@ -26,7 +26,8 @@ research_progress: "100%"
 - [x] Implement token revocation endpoint
 - [x] Add tests for OAuth endpoints
 - [x] Create example OAuth client
-- [ ] Update API documentation
+- [x] Add scope validation
+- [x] Update API documentation
 
 ## Research Notes
 
@@ -101,13 +102,13 @@ OAuth 2.0 is required for the Open Badges API. The Open Badges standard uses OAu
 ### Advanced Features
 - [x] Implement token introspection
 - [x] Implement token revocation
-- [ ] Add scope validation
+- [x] Add scope validation
 - [x] Support refresh tokens
 
 ### Testing & Documentation
 - [x] Write unit tests for OAuth endpoints
 - [x] Create example OAuth client
-- [ ] Document OAuth endpoints
+- [x] Document OAuth endpoints
 
 ## Implementation Notes
 
@@ -163,4 +164,20 @@ OAuth 2.0 is required for the Open Badges API. The Open Badges standard uses OAu
 - Includes client registration, authorization, token exchange
 - Shows how to use access tokens for API requests
 - Implements token refresh and revocation
-- Provides clear documentation and usage instructions 
+- Provides clear documentation and usage instructions
+
+### Scope Validation
+- Implemented scope validation in the OAuth controller
+- Added a utility method to validate scopes against allowed scopes
+- Updated authorization endpoint to validate requested scopes
+- Updated token endpoint to ensure tokens only contain valid scopes
+- Added support for scope downscoping in refresh token requests
+- Ensured clients can only request scopes they are registered for
+
+### API Documentation
+- Created comprehensive API documentation in Markdown format
+- Documented all OAuth endpoints with request/response examples
+- Included error handling information
+- Added scope descriptions
+- Provided a complete OAuth flow example
+- Referenced the example OAuth client for implementation details 

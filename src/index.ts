@@ -4,10 +4,16 @@ import { logger } from 'hono/logger';
 import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
 import auth from './routes/auth.routes';
-import { oauth } from './routes/oauth.routes';
+import { createOAuthRouter } from './routes/oauth.routes';
+import { OAuthController } from './controllers/oauth.controller';
 import { errorHandler } from './middleware/error-handler';
+import { DatabaseService } from './services/db.service';
 
 const app = new Hono();
+
+// Initialize services and controllers
+const db = new DatabaseService();
+const oauthController = new OAuthController(db);
 
 // Middleware
 app.use('*', logger());
@@ -17,7 +23,7 @@ app.use('*', errorHandler);
 
 // Routes
 app.route('/auth', auth);
-app.route('/oauth', oauth);
+app.route('/oauth', createOAuthRouter(oauthController));
 
 // Root route
 app.get('/', (c) => c.json({ message: 'Bun Badges API' }));

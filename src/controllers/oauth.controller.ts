@@ -31,6 +31,25 @@ export class OAuthController {
     this.db = db;
   }
 
+  // Utility method to validate scopes
+  private validateScopes(requestedScopes: string[], clientScopes: string[]): string[] {
+    // If no scopes requested, return empty array
+    if (!requestedScopes || requestedScopes.length === 0) {
+      return [];
+    }
+
+    // Get all valid scopes from OAUTH_SCOPES
+    const validScopes = Object.values(OAUTH_SCOPES) as string[];
+    
+    // Filter requested scopes to only include valid ones that the client is allowed to request
+    const validRequestedScopes = requestedScopes.filter(scope => 
+      validScopes.includes(scope) && 
+      (clientScopes.length === 0 || clientScopes.includes(scope))
+    );
+    
+    return validRequestedScopes;
+  }
+
   // Implements RFC 7591 - OAuth 2.0 Dynamic Client Registration Protocol
   async registerClient(c: Context) {
     try {
@@ -124,16 +143,31 @@ export class OAuthController {
       throw new UnauthorizedError('Invalid redirect URI');
     }
 
+    // Validate and filter requested scopes
+    const requestedScopes = scope ? scope.split(' ') : [];
+    const clientScopes = client.scope ? client.scope.split(' ') : [];
+    const validScopes = this.validateScopes(requestedScopes, clientScopes);
+    
+    // If requested invalid scopes, redirect with error
+    if (requestedScopes.length > 0 && validScopes.length === 0) {
+      const redirectUrl = new URL(redirect_uri);
+      redirectUrl.searchParams.set('error', 'invalid_scope');
+      redirectUrl.searchParams.set('error_description', 'The requested scope is invalid or unknown');
+      if (state) {
+        redirectUrl.searchParams.set('state', state);
+      }
+      return c.redirect(redirectUrl.toString());
+    }
+
     // For now, we'll assume the user is already authenticated
     // In a real implementation, we would check for a session and redirect to login if needed
     
-    // Render consent page
-    const requestedScopes = scope ? scope.split(' ') : [];
+    // Render consent page with validated scopes
     const html = this.renderConsentPage({
       clientName: client.clientName,
       clientUri: client.clientUri,
       logoUri: client.logoUri,
-      scopes: requestedScopes,
+      scopes: validScopes,
       redirectUri: redirect_uri,
       state,
       clientId: client_id,
@@ -168,15 +202,25 @@ export class OAuthController {
       return c.redirect(redirectUrl.toString());
     }
     
+    // Verify client and validate scopes again
+    const client = await this.db.getOAuthClient(client_id as string);
+    if (!client) {
+      throw new UnauthorizedError('Invalid client');
+    }
+    
+    const requestedScopes = (scope as string)?.split(' ') || [];
+    const clientScopes = client.scope ? client.scope.split(' ') : [];
+    const validScopes = this.validateScopes(requestedScopes, clientScopes);
+    
     // User approved - generate authorization code
     const code = await generateCode();
     
-    // Store the authorization code
+    // Store the authorization code with validated scopes
     await this.db.createAuthorizationCode({
       code,
       clientId: client_id as string,
       redirectUri: redirect_uri as string,
-      scope: scope as string || '',
+      scope: validScopes.join(' '),
       expiresAt: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
     });
     
@@ -333,7 +377,8 @@ export class OAuthController {
         redirect_uri,
         refresh_token,
         client_id,
-        client_secret
+        client_secret,
+        scope
       } = body;
 
       // Validate required parameters
@@ -380,16 +425,21 @@ export class OAuthController {
           throw new UnauthorizedError('Authorization code has already been used');
         }
 
-        // Generate tokens
+        // Validate scopes from the authorization code
+        const codeScopes = authCode.scope.split(' ');
+        const clientScopes = client.scope ? client.scope.split(' ') : [];
+        const validScopes = this.validateScopes(codeScopes, clientScopes);
+
+        // Generate tokens with validated scopes
         const accessToken = await generateToken({
           sub: client.clientId,
-          scope: authCode.scope,
+          scope: validScopes.join(' '),
           type: 'access'
         });
 
         const refreshToken = await generateToken({
           sub: client.clientId,
-          scope: authCode.scope,
+          scope: validScopes.join(' '),
           type: 'refresh'
         });
 
@@ -402,9 +452,8 @@ export class OAuthController {
           token_type: 'Bearer',
           expires_in: 3600, // 1 hour
           refresh_token: refreshToken,
-          scope: authCode.scope
+          scope: validScopes.join(' ')
         };
-
       } else if (grant_type === 'refresh_token') {
         // Validate required parameters for refresh token grant
         if (!refresh_token) {
@@ -430,10 +479,26 @@ export class OAuthController {
             throw new UnauthorizedError('Token has been revoked');
           }
           
-          // Generate a new access token
+          // Get original scopes from the refresh token
+          const originalScopes = (payload.scope || '').split(' ').filter(Boolean);
+          
+          // If scope parameter is provided, validate the requested scopes
+          let validScopes = originalScopes;
+          if (scope) {
+            const requestedScopes = (scope as string).split(' ');
+            // Ensure requested scopes are a subset of the original scopes
+            validScopes = requestedScopes.filter(s => originalScopes.includes(s));
+            
+            // If requested scopes are invalid, return an error
+            if (requestedScopes.length > 0 && validScopes.length === 0) {
+              throw new BadRequestError('Invalid scope requested');
+            }
+          }
+          
+          // Generate a new access token with validated scopes
           const accessToken = await generateToken({
             sub: client.clientId,
-            scope: payload.scope || '',
+            scope: validScopes.join(' '),
             type: 'access'
           });
           
@@ -442,7 +507,7 @@ export class OAuthController {
             access_token: accessToken,
             token_type: 'Bearer',
             expires_in: 3600, // 1 hour
-            scope: payload.scope
+            scope: validScopes.join(' ')
           };
         } catch (error) {
           throw new UnauthorizedError('Invalid refresh token');
