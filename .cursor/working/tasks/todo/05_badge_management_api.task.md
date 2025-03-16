@@ -32,22 +32,23 @@
 - Create basic GET endpoint for badge assertions (10 mins)
 
 ### Major Steps
-1. Step One: Implement issuer endpoints (/issuers) (30 mins) 🎯
-2. Step Two: Implement badge class endpoints (/badges) (30 mins) 🎯
+1. Step One: Implement issuer endpoints (/issuers) (30 mins) ✅
+2. Step Two: Implement badge class endpoints (/badges) (30 mins) ✅
 3. Step Three: Implement badge assertion endpoints (/assertions) (30 mins) 🎯
 
 ## 5. Execution
 ### Progress Updates
 - Issuer endpoints drafted
+- Badge class endpoints completed with CRUD operations
 
 ### Context Resume Point
-- Last working on: Drafting the GET endpoint for /assertions/{id}
-- Next planned action: Expand CRUD operations for badges
+- Last working on: Badge class endpoints (GET, POST, PUT, DELETE)
+- Next planned action: Implement badge assertion endpoints
 - Current blockers: None
 
 ## 6. Next Actions & Blockers
 ### Immediate Next Actions
-- Complete CRUD for badge classes (30 mins)
+- Complete CRUD for badge assertions (30 mins)
 
 ### Current Blockers
 - None
@@ -64,3 +65,4 @@
 
 ### Celebration Notes
 🎉 Issuer endpoints completed 
+🎉 Badge class endpoints completed 
