@@ -106,10 +106,8 @@ export class AuthController {
     await this.db.markCodeAsUsed(verificationCode.id);
     
     try {
-      const [accessToken, refreshToken] = await Promise.all([
-        generateToken(body.username, 'access'),
-        generateToken(body.username, 'refresh')
-      ]);
+      const accessToken = await generateToken({ sub: body.username, type: 'access' });
+      const refreshToken = await generateToken({ sub: body.username, type: 'refresh' });
 
       return c.json({
         message: 'Code verified successfully',
@@ -152,10 +150,10 @@ export class AuthController {
       }
 
       // Verify the refresh token
-      const payload = await verifyToken(body.refreshToken, 'refresh');
+      const payload = await verifyToken(body.refreshToken);
       
       // Generate new access token
-      const accessToken = await generateToken(payload.sub, 'access');
+      const accessToken = await generateToken({ sub: payload.sub, type: 'access' });
       
       return c.json({
         message: 'Token refreshed successfully',
@@ -200,7 +198,7 @@ export class AuthController {
       }
 
       // Verify token type before revocation
-      const payload = await verifyToken(body.token, body.type);
+      const payload = await verifyToken(body.token);
 
       // Store revoked token in database
       await this.db.revokeToken({

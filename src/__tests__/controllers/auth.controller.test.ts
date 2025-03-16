@@ -237,7 +237,7 @@ describe('Auth Controller', () => {
       expect(body.refreshExpiresIn).toBe(getTokenExpirySeconds('refresh'));
 
       // Verify the access token
-      const accessPayload = await verifyToken(body.accessToken!, 'access');
+      const accessPayload = await verifyToken(body.accessToken!);
       expect(accessPayload.sub).toBe(username);
       expect(accessPayload.type).toBe('access');
       expect(accessPayload.iat).toBeDefined();
@@ -245,7 +245,7 @@ describe('Auth Controller', () => {
       expect(accessPayload.exp! - accessPayload.iat!).toBe(getTokenExpirySeconds('access'));
 
       // Verify the refresh token
-      const refreshPayload = await verifyToken(body.refreshToken!, 'refresh');
+      const refreshPayload = await verifyToken(body.refreshToken!);
       expect(refreshPayload.sub).toBe(username);
       expect(refreshPayload.type).toBe('refresh');
       expect(refreshPayload.iat).toBeDefined();
@@ -289,7 +289,7 @@ describe('Auth Controller', () => {
       const controller = new AuthController(undefined, mockDb);
       
       // Generate an access token but try to use it as refresh token
-      const invalidToken = await generateToken('test@example.com', 'access');
+      const invalidToken = await generateToken({ sub: 'test@example.com', type: 'access' });
       const ctx = createMockContext({ refreshToken: invalidToken });
 
       const response = await controller.refreshToken(ctx);
@@ -306,7 +306,7 @@ describe('Auth Controller', () => {
       const mockDb = createMockDatabase();
       const controller = new AuthController(rateLimiter, mockDb);
       const ip = 'test-ip';
-      const refreshToken = await generateToken('test@example.com', 'refresh');
+      const refreshToken = await generateToken({ sub: 'test@example.com', type: 'refresh' });
 
       // Make 5 refresh attempts
       for (let i = 0; i < 5; i++) {
@@ -328,7 +328,7 @@ describe('Auth Controller', () => {
       const mockDb = createMockDatabase();
       const controller = new AuthController(undefined, mockDb);
       const username = 'test@example.com';
-      const refreshToken = await generateToken(username, 'refresh');
+      const refreshToken = await generateToken({ sub: 'test@example.com', type: 'refresh' });
       const ctx = createMockContext({ refreshToken });
 
       const response = await controller.refreshToken(ctx);
@@ -339,7 +339,7 @@ describe('Auth Controller', () => {
       expect(body.expiresIn).toBe(getTokenExpirySeconds('access'));
 
       // Verify the new access token
-      const payload = await verifyToken(body.accessToken!, 'access');
+      const payload = await verifyToken(body.accessToken!);
       expect(payload.sub).toBe(username);
       expect(payload.type).toBe('access');
       expect(payload.iat).toBeDefined();
@@ -411,7 +411,7 @@ describe('Auth Controller', () => {
       const mockDb = createMockDatabase();
       const controller = new AuthController(rateLimiter, mockDb);
       const ip = 'test-ip';
-      const token = await generateToken('test@example.com', 'access');
+      const token = await generateToken({ sub: 'test@example.com', type: 'access' });
 
       // Make 5 revocation attempts
       for (let i = 0; i < 5; i++) {
@@ -432,7 +432,7 @@ describe('Auth Controller', () => {
     test('successfully revokes valid token', async () => {
       const mockDb = createMockDatabase();
       const controller = new AuthController(undefined, mockDb);
-      const token = await generateToken('test@example.com', 'access');
+      const token = await generateToken({ sub: 'test@example.com', type: 'access' });
       const ctx = createMockContext({ token, type: 'access' });
 
       const response = await controller.revokeToken(ctx);
@@ -483,7 +483,7 @@ describe('Auth Controller', () => {
     test('validates token type matches actual token', async () => {
       const mockDb = createMockDatabase();
       const controller = new AuthController(undefined, mockDb);
-      const token = await generateToken('test@example.com', 'access');
+      const token = await generateToken({ sub: 'test@example.com', type: 'access' });
       const ctx = createMockContext({ 
         token,
         type: 'refresh' // Wrong type
