@@ -3,7 +3,6 @@ import { db } from '../db/config';
 import { verificationCodes, revokedTokens } from '../db/schema/auth';
 import type { NewVerificationCode, NewRevokedToken } from '../db/schema/auth';
 import { oauthClients, authorizationCodes } from '../db/schema/oauth';
-import type { NewOAuthClient, NewAuthorizationCode } from '../db/schema/oauth';
 import { nanoid } from 'nanoid';
 
 export class DatabaseService {

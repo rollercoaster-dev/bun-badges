@@ -1,7 +1,5 @@
 import { describe, expect, it, beforeEach, mock } from 'bun:test';
 import { Hono } from 'hono';
-import { badgeAssertions, badgeClasses, issuerProfiles } from '../../db/schema';
-import { eq, and } from 'drizzle-orm';
 import crypto from 'crypto';
 
 // Mock database and response

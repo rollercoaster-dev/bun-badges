@@ -1,8 +1,5 @@
 import { describe, expect, it, mock, beforeEach } from 'bun:test';
-import { OAuthController } from '../../controllers/oauth.controller';
-import { generateToken } from '../../utils/auth/jwt';
-import { generateCode } from '../../utils/auth/code';
-import { OAUTH_SCOPES } from '../../routes/oauth.routes';
+import { OAuthController } from '@controllers/oauth.controller';
 
 // Define response types for better type checking
 interface MockResponse {
