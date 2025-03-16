@@ -5,6 +5,7 @@ import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
 import auth from '@routes/auth.routes';
 import badges from '@routes/badges.routes';
+import assertions from '@routes/assertions.routes';
 import { createOAuthRouter } from '@routes/oauth.routes';
 import { OAuthController } from '@controllers/oauth.controller';
 import { errorHandler } from '@middleware/error-handler';
@@ -26,6 +27,7 @@ app.use('*', errorHandler);
 app.route('/auth', auth);
 app.route('/oauth', createOAuthRouter(oauthController));
 app.route('/api', badges);
+app.route('/api', assertions);
 
 // Root route
 app.get('/', (c) => c.json({ message: 'Bun Badges API' }));
