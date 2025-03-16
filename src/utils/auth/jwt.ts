@@ -61,7 +61,7 @@ export async function generateToken(payload: {
 }
 
 // Verify a JWT token
-export async function verifyToken(token: string): Promise<{
+export async function verifyToken(token: string, tokenType: 'access' | 'refresh' = 'access'): Promise<{
   sub: string;
   type: string;
   scope?: string;
@@ -74,6 +74,11 @@ export async function verifyToken(token: string): Promise<{
       issuer: 'bun-badges',
       audience: 'bun-badges-clients',
     });
+    
+    // Verify token type if specified
+    if (tokenType && payload.type !== tokenType) {
+      throw new Error(`Invalid token type: expected ${tokenType}, got ${payload.type}`);
+    }
     
     return {
       sub: payload.sub as string,
