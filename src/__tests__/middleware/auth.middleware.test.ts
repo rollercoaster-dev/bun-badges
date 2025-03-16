@@ -86,7 +86,10 @@ describe('Auth Middleware', () => {
     const mockDb = createMockDatabase();
     const middleware = createAuthMiddleware(mockDb);
     const username = 'test@example.com';
-    const token = await generateToken(username, 'access');
+    const token = await generateToken({ 
+      sub: username,
+      type: 'access'
+    });
     const ctx = createMockContext({ Authorization: `Bearer ${token}` });
     const next = mock(() => Promise.resolve());
 
