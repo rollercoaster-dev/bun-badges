@@ -10,6 +10,7 @@ alwaysApply: true
 - Clear, descriptive messages
 - Consistent format
 - Link to tasks/issues when relevant
+- always run `git status` to check for forgotten files
 
 ## Commit Message Format
 <type>(<scope>): <subject>
