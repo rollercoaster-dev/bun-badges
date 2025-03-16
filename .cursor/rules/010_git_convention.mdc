@@ -1,0 +1,138 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Git Commit Convention
+
+## Core Principles
+- One logical change per commit
+- Clear, descriptive messages
+- Consistent format
+- Link to tasks/issues when relevant
+
+## Commit Message Format
+<type>(<scope>): <subject>
+[optional body]
+[optional footer]
+
+
+### Types
+- `feat`: New feature or enhancement
+- `fix`: Bug fix
+- `docs`: Documentation changes
+- `style`: Code style/formatting (no logic changes)
+- `refactor`: Code refactoring
+- `test`: Adding/updating tests
+- `chore`: Maintenance tasks, dependencies
+- `perf`: Performance improvements
+- `ci`: CI/CD changes
+- `revert`: Reverting changes
+
+### Scope
+- `auth`: Authentication/authorization
+- `api`: API endpoints
+- `db`: Database changes
+- `ui`: User interface
+- `badge`: Badge-related functionality
+- `issuer`: Issuer-related functionality
+- `verify`: Verification system
+- `test`: Test infrastructure
+- `deps`: Dependencies
+- `config`: Configuration changes
+
+### Subject Rules
+- Start with lowercase
+- No period at the end
+- Use imperative mood ("add" not "added")
+- Keep under 50 characters
+- Be specific and descriptive
+
+### Body (Optional)
+- Use when commit needs explanation
+- Wrap at 72 characters
+- Use bullet points for multiple items
+- Explain what and why, not how
+
+### Footer (Optional)
+- Reference issues/tasks: "Refs: #123"
+- Breaking changes: "BREAKING CHANGE: description"
+- Co-authors: "Co-authored-by: name <email>"
+
+## Examples
+
+Good commits:
+
+feat(badge): add JSON-LD context validation
+fix(auth): handle expired JWT tokens properly
+docs(api): update endpoint documentation
+style(ui): align form elements consistently
+refactor(db): optimize badge query performance
+test(verify): add assertion verification tests
+
+Bad commits:
+
+
+## Best Practices
+
+1. **Small Commits**
+   - One logical change per commit
+   - Easy to review and understand
+   - Simple to revert if needed
+
+2. **Atomic Changes**
+   - All tests should pass
+   - Documentation updated
+   - No incomplete features
+
+3. **Clear History**
+   - No merge commits on feature branches
+   - Rebase to keep history clean
+   - Squash temporary commits
+
+4. **Task References**
+   - Link to relevant tasks
+   - Use "Refs:" or "Closes:"
+   - Keep context for changes
+
+## Workflow Tips
+
+1. **Before Committing**
+   - Review changes with `git diff`
+   - Split large changes into logical chunks
+   - Verify tests pass
+
+2. **Writing Messages**
+   - Use `git commit` (not `-m`)
+   - Write subject line first
+   - Add body for complex changes
+
+3. **After Committing**
+   - Verify commit message
+   - Check commit contents
+   - Push to remote
+
+## Common Patterns
+
+### Feature Development
+
+feat(scope): add core feature
+test(scope): add tests for feature
+docs(scope): document new feature
+
+### Bug Fixes
+
+fix(scope): resolve specific issue
+test(scope): add regression test
+
+### Refactoring
+
+refactor(scope): improve code structure
+test(scope): update affected tests
+
+## Git Hooks (Optional)
+- Use commitlint for format
+- Run tests pre-commit
+- Check style pre-commit
+- Verify task references
+
