@@ -1,12 +1,12 @@
 ---
-description: Core project guidelines for the Open Badges server.
+description: 
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
  # Core Guidelines
 
 - **Strict TypeScript:** Enforce strict mode (no implicit any) for type safety.
 - **Modular Code:** Organize code into clear, single-responsibility modules.
 - **Conciseness:** Provide concise responses and code changes (only changed lines plus two surrounding lines).
-- **Clear Documentation:** Write self-explanatory comments and inline documentation.
+- **Clear Documentation:** Write self-explanatory comments and inline documentation NO JS_DOC!.
 - **No Unnecessary Imports:** Only include imports when explicitly required.
