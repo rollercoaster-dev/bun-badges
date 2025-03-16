@@ -1,5 +1,7 @@
 # Bun Badges
 
+[![CI/CD](https://github.com/rollercoaster.dev/bun-badges/actions/workflows/ci.yml/badge.svg)](https://github.com/rollercoaster.dev/bun-badges/actions/workflows/ci.yml)
+
 An Open Badges server implementation using Bun and Hono, supporting Open Badges 2.0 specification with a roadmap for 3.0.
 
 ## Features
@@ -12,6 +14,7 @@ An Open Badges server implementation using Bun and Hono, supporting Open Badges 
 - RESTful API design
 - Extensible architecture
 - Docker containerization for easy deployment
+- OpenAPI/Swagger documentation
 
 ## Prerequisites
 
@@ -155,3 +158,26 @@ REFRESH_TOKEN_EXPIRY=7d
 ## License
 
 MIT
+
+## API Documentation
+
+The API is documented using OpenAPI/Swagger. When running the server, you can access the API documentation at:
+
+```
+http://localhost:7777/docs
+```
+
+This provides an interactive interface to explore and test the API endpoints.
+
+## Project Structure
+
+```
+src/
+├── routes/       # API route definitions
+├── controllers/  # Request handlers
+├── services/     # Business logic
+├── models/       # Data models
+├── middleware/   # Custom middleware
+├── utils/        # Helper functions
+└── __tests__/    # Test files
+```
