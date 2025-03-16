@@ -1,18 +1,17 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
-import * as schema from './schema';
+import * as schema from './schema/auth';
+
+// In production, these should be loaded from environment variables
+const DATABASE_URL = process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/bun_badges';
 
 // Create a PostgreSQL connection pool
 const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: parseInt(process.env.DB_PORT || '5432', 10),
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
+  connectionString: DATABASE_URL,
 });
 
 // Create a Drizzle instance
 export const db = drizzle(pool, { schema });
 
-// Export the pool for direct access if needed
-export { pool }; 
+// Export the pool for use in migrations and cleanup
+export const dbPool = pool; 

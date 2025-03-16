@@ -8,6 +8,13 @@
       "when": 1742143827647,
       "tag": "0000_violet_garia",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1742148402728,
+      "tag": "0001_fancy_jackal",
+      "breakpoints": true
     }
   ]
 }

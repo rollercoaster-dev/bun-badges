@@ -1,7 +1,8 @@
 import { Context } from 'hono';
-import { generateCode, isCodeExpired, isValidCodeFormat } from '@utils/auth/codeGenerator';
+import { generateCode, isValidCodeFormat } from '@utils/auth/codeGenerator';
 import { RateLimiter } from '@utils/auth/rateLimiter';
-import { generateToken, getTokenExpirySeconds, verifyToken, revokeToken } from '@utils/auth/jwt';
+import { generateToken, getTokenExpirySeconds, verifyToken } from '@utils/auth/jwt';
+import { DatabaseService } from '@services/db.service';
 
 type CodeRequestBody = {
   username: string;
@@ -23,12 +24,14 @@ type RevokeTokenBody = {
 
 export class AuthController {
   private rateLimiter: RateLimiter;
+  private db: DatabaseService;
 
-  constructor(rateLimiter?: RateLimiter) {
+  constructor(rateLimiter?: RateLimiter, db?: DatabaseService) {
     this.rateLimiter = rateLimiter || new RateLimiter({
       maxAttempts: 5,
       windowMs: 3600000, // 1 hour
     });
+    this.db = db || new DatabaseService();
   }
 
   async requestCode(c: Context) {
@@ -51,8 +54,14 @@ export class AuthController {
 
     const { code, expiresAt, ttl } = generateCode();
 
-    // TODO: Store code in database
-    // For development, we'll return the code directly
+    // Store the code in the database
+    await this.db.createVerificationCode({
+      code,
+      username: body.username,
+      expiresAt,
+      attempts: [],
+    });
+
     // In production, this should be sent via the configured provider
     return c.json({
       message: 'Code generated successfully',
@@ -84,9 +93,17 @@ export class AuthController {
       }, 429);
     }
 
-    // TODO: Verify code from database
-    // For development, we'll just return success
-    // In production, this should verify against stored codes
+    // Verify code from database
+    const verificationCode = await this.db.getVerificationCode(body.username, body.code);
+    if (!verificationCode) {
+      return c.json({ error: 'Invalid code' }, 401);
+    }
+
+    // Record this attempt
+    await this.db.recordVerificationAttempt(verificationCode.id, clientIp);
+
+    // Mark code as used
+    await this.db.markCodeAsUsed(verificationCode.id);
     
     try {
       const [accessToken, refreshToken] = await Promise.all([
@@ -127,6 +144,13 @@ export class AuthController {
     }
 
     try {
+      // Check if token is revoked
+      if (await this.db.isTokenRevoked(body.refreshToken)) {
+        return c.json({
+          error: 'Token has been revoked',
+        }, 401);
+      }
+
       // Verify the refresh token
       const payload = await verifyToken(body.refreshToken, 'refresh');
       
@@ -168,9 +192,23 @@ export class AuthController {
     }
 
     try {
+      // Check if token is already revoked
+      if (await this.db.isTokenRevoked(body.token)) {
+        return c.json({
+          message: 'Token was already revoked',
+        }, 200);
+      }
+
       // Verify token type before revocation
-      await verifyToken(body.token, body.type);
-      await revokeToken(body.token);
+      const payload = await verifyToken(body.token, body.type);
+
+      // Store revoked token in database
+      await this.db.revokeToken({
+        token: body.token,
+        type: body.type,
+        username: payload.sub,
+        expiresAt: new Date(payload.exp! * 1000),
+      });
       
       return c.json({
         message: 'Token revoked successfully',

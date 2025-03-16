@@ -10,17 +10,18 @@
     "typecheck": "tsc --noEmit",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "lint": "eslint \"src/**/*.{ts,tsx}\" --fix",
-    "db:generate": "drizzle-kit generate",
+    "db:generate": "drizzle-kit generate:pg",
     "db:migrate": "bun run src/db/migrate.ts",
     "db:push": "drizzle-kit push:pg",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "test": "bun test"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.8",
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.40.0",
-    "hono": "^4.7.4",
-    "jose": "^6.0.10",
+    "hono": "^4.0.5",
+    "jose": "^5.2.2",
     "pg": "^8.11.3"
   },
   "devDependencies": {

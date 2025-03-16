@@ -1,9 +1,10 @@
-import { expect, test, describe } from 'bun:test';
+import { expect, test, describe, mock } from 'bun:test';
 import { Context } from 'hono';
 import { AuthController } from '@controllers/auth.controller';
 import { RateLimiter } from '@utils/auth/rateLimiter';
 import { AUTH_ROUTES } from '@routes/aliases';
-import { verifyToken, getTokenExpirySeconds, generateToken, isTokenRevoked } from '@utils/auth/jwt';
+import { verifyToken, getTokenExpirySeconds, generateToken } from '@utils/auth/jwt';
+import { DatabaseService } from '@services/db.service';
 
 type AuthResponse = {
   message?: string;
@@ -28,6 +29,36 @@ const createMockContext = (body: any, ip: string = 'test-ip') => {
   } as unknown as Context;
 };
 
+const createMockDatabase = () => {
+  const mockDb = {
+    createVerificationCode: mock(() => Promise.resolve('test-id')),
+    getVerificationCode: mock((username: string, code: string) => {
+      if (username === 'test@example.com' && code === '123456') {
+        return Promise.resolve({
+          id: 'test-id',
+          code: '123456',
+          username: 'test@example.com',
+          expiresAt: new Date(Date.now() + 300000),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          usedAt: null,
+          attempts: [],
+        });
+      }
+      return Promise.resolve(null);
+    }),
+    markCodeAsUsed: mock(() => Promise.resolve()),
+    recordVerificationAttempt: mock(() => Promise.resolve()),
+    revokeToken: mock(() => Promise.resolve()),
+    isTokenRevoked: mock((token: string) => {
+      return Promise.resolve(token === 'revoked-token');
+    }),
+    cleanupExpiredTokens: mock(() => Promise.resolve()),
+  };
+
+  return mockDb as unknown as DatabaseService;
+};
+
 describe('Auth Controller', () => {
   describe(AUTH_ROUTES.REQUEST_CODE, () => {
     test('requires username', async () => {
@@ -41,7 +72,8 @@ describe('Auth Controller', () => {
     });
 
     test('generates code for valid request', async () => {
-      const controller = new AuthController();
+      const mockDb = createMockDatabase();
+      const controller = new AuthController(undefined, mockDb);
       const ctx = createMockContext({ username: 'test@example.com' });
 
       const response = await controller.requestCode(ctx);
@@ -50,6 +82,12 @@ describe('Auth Controller', () => {
       expect(body.message).toBe('Code generated successfully');
       expect(body.code).toMatch(/^\d{6}$/);
       expect(body.expiresIn).toBe(300);
+
+      // Verify database was called
+      expect(mockDb.createVerificationCode).toHaveBeenCalledWith(expect.objectContaining({
+        username: 'test@example.com',
+        code: expect.stringMatching(/^\d{6}$/)
+      }));
     });
 
     test('enforces rate limiting', async () => {
@@ -57,7 +95,8 @@ describe('Auth Controller', () => {
         maxAttempts: 5,
         windowMs: 1000,
       });
-      const controller = new AuthController(rateLimiter);
+      const mockDb = createMockDatabase();
+      const controller = new AuthController(rateLimiter, mockDb);
       const ip = 'test-ip';
 
       // Make 5 successful requests
@@ -81,7 +120,8 @@ describe('Auth Controller', () => {
         maxAttempts: 5,
         windowMs: 1000,
       });
-      const controller = new AuthController(rateLimiter);
+      const mockDb = createMockDatabase();
+      const controller = new AuthController(rateLimiter, mockDb);
       const ip1 = 'ip1';
       const ip2 = 'ip2';
 
@@ -152,7 +192,8 @@ describe('Auth Controller', () => {
         maxAttempts: 5,
         windowMs: 1000,
       });
-      const controller = new AuthController(rateLimiter);
+      const mockDb = createMockDatabase();
+      const controller = new AuthController(rateLimiter, mockDb);
       const ip = 'test-ip';
 
       // Make 5 verification attempts
@@ -178,7 +219,8 @@ describe('Auth Controller', () => {
     });
 
     test('returns valid JWT tokens on successful verification', async () => {
-      const controller = new AuthController();
+      const mockDb = createMockDatabase();
+      const controller = new AuthController(undefined, mockDb);
       const username = 'test@example.com';
       const ctx = createMockContext({ 
         username,
@@ -209,19 +251,25 @@ describe('Auth Controller', () => {
       expect(refreshPayload.iat).toBeDefined();
       expect(refreshPayload.exp).toBeDefined();
       expect(refreshPayload.exp! - refreshPayload.iat!).toBe(getTokenExpirySeconds('refresh'));
+
+      // Verify database calls
+      expect(mockDb.getVerificationCode).toHaveBeenCalledTimes(1);
+      expect(mockDb.markCodeAsUsed).toHaveBeenCalledTimes(1);
+      expect(mockDb.recordVerificationAttempt).toHaveBeenCalledTimes(1);
     });
 
-    test('handles token generation failure', async () => {
-      const controller = new AuthController();
+    test('rejects invalid code', async () => {
+      const mockDb = createMockDatabase();
+      const controller = new AuthController(undefined, mockDb);
       const ctx = createMockContext({ 
-        username: '',  // Invalid username should cause token generation to fail
-        code: '123456'
+        username: 'test@example.com',
+        code: '999999'  // Invalid code
       });
 
       const response = await controller.verifyCode(ctx);
       const body = await response.json() as AuthResponse;
-      expect(response.status).toBe(400);
-      expect(body.error).toBe('Username and code are required');
+      expect(response.status).toBe(401);
+      expect(body.error).toBe('Invalid code');
     });
   });
 
@@ -237,7 +285,8 @@ describe('Auth Controller', () => {
     });
 
     test('validates refresh token type', async () => {
-      const controller = new AuthController();
+      const mockDb = createMockDatabase();
+      const controller = new AuthController(undefined, mockDb);
       
       // Generate an access token but try to use it as refresh token
       const invalidToken = await generateToken('test@example.com', 'access');
@@ -254,7 +303,8 @@ describe('Auth Controller', () => {
         maxAttempts: 5,
         windowMs: 1000,
       });
-      const controller = new AuthController(rateLimiter);
+      const mockDb = createMockDatabase();
+      const controller = new AuthController(rateLimiter, mockDb);
       const ip = 'test-ip';
       const refreshToken = await generateToken('test@example.com', 'refresh');
 
@@ -275,7 +325,8 @@ describe('Auth Controller', () => {
     });
 
     test('returns new access token for valid refresh token', async () => {
-      const controller = new AuthController();
+      const mockDb = createMockDatabase();
+      const controller = new AuthController(undefined, mockDb);
       const username = 'test@example.com';
       const refreshToken = await generateToken(username, 'refresh');
       const ctx = createMockContext({ refreshToken });
@@ -294,6 +345,22 @@ describe('Auth Controller', () => {
       expect(payload.iat).toBeDefined();
       expect(payload.exp).toBeDefined();
       expect(payload.exp! - payload.iat!).toBe(getTokenExpirySeconds('access'));
+
+      // Verify database was checked for revocation
+      expect(mockDb.isTokenRevoked).toHaveBeenCalledTimes(1);
+      expect(mockDb.isTokenRevoked).toHaveBeenCalledWith(refreshToken);
+    });
+
+    test('rejects revoked refresh token', async () => {
+      const mockDb = createMockDatabase();
+      const controller = new AuthController(undefined, mockDb);
+      const refreshToken = 'revoked-token';
+      const ctx = createMockContext({ refreshToken });
+
+      const response = await controller.refreshToken(ctx);
+      const body = await response.json() as AuthResponse;
+      expect(response.status).toBe(401);
+      expect(body.error).toBe('Token has been revoked');
     });
   });
 
@@ -341,7 +408,8 @@ describe('Auth Controller', () => {
         maxAttempts: 5,
         windowMs: 1000,
       });
-      const controller = new AuthController(rateLimiter);
+      const mockDb = createMockDatabase();
+      const controller = new AuthController(rateLimiter, mockDb);
       const ip = 'test-ip';
       const token = await generateToken('test@example.com', 'access');
 
@@ -362,7 +430,8 @@ describe('Auth Controller', () => {
     });
 
     test('successfully revokes valid token', async () => {
-      const controller = new AuthController();
+      const mockDb = createMockDatabase();
+      const controller = new AuthController(undefined, mockDb);
       const token = await generateToken('test@example.com', 'access');
       const ctx = createMockContext({ token, type: 'access' });
 
@@ -371,38 +440,35 @@ describe('Auth Controller', () => {
       expect(response.status).toBe(200);
       expect(body.message).toBe('Token revoked successfully');
 
-      // Verify token is actually revoked
-      expect(isTokenRevoked(token)).toBe(true);
-
-      // Attempt to use revoked token
-      try {
-        await verifyToken(token, 'access');
-        expect(true).toBe(false); // Should not reach here
-      } catch (error) {
-        expect(error instanceof Error).toBe(true);
-        expect((error as Error).message).toBe('Token has been revoked');
-      }
+      // Verify database calls
+      expect(mockDb.isTokenRevoked).toHaveBeenCalledWith(token);
+      expect(mockDb.revokeToken).toHaveBeenCalledWith(expect.objectContaining({
+        token,
+        type: 'access',
+        username: 'test@example.com',
+        expiresAt: expect.any(Date)
+      }));
     });
 
     test('handles already revoked token', async () => {
-      const controller = new AuthController();
-      const token = await generateToken('test@example.com', 'access');
+      const mockDb = createMockDatabase();
+      const controller = new AuthController(undefined, mockDb);
+      const token = 'revoked-token';
       
-      // Revoke token first time
-      let ctx = createMockContext({ token, type: 'access' });
-      let response = await controller.revokeToken(ctx);
-      expect(response.status).toBe(200);
-
-      // Try to revoke again
-      ctx = createMockContext({ token, type: 'access' });
-      response = await controller.revokeToken(ctx);
+      const ctx = createMockContext({ token, type: 'access' });
+      const response = await controller.revokeToken(ctx);
       const body = await response.json() as AuthResponse;
       expect(response.status).toBe(200);
       expect(body.message).toBe('Token was already revoked');
+
+      // Verify database was checked but not updated
+      expect(mockDb.isTokenRevoked).toHaveBeenCalledTimes(1);
+      expect(mockDb.revokeToken).toHaveBeenCalledTimes(0);
     });
 
     test('handles invalid token', async () => {
-      const controller = new AuthController();
+      const mockDb = createMockDatabase();
+      const controller = new AuthController(undefined, mockDb);
       const ctx = createMockContext({ 
         token: 'invalid-token',
         type: 'access'
@@ -415,7 +481,8 @@ describe('Auth Controller', () => {
     });
 
     test('validates token type matches actual token', async () => {
-      const controller = new AuthController();
+      const mockDb = createMockDatabase();
+      const controller = new AuthController(undefined, mockDb);
       const token = await generateToken('test@example.com', 'access');
       const ctx = createMockContext({ 
         token,
