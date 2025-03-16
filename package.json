@@ -31,10 +31,12 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@hono/swagger-ui": "^0.5.1",
     "@types/node": "^20.0.0",
     "@types/pg": "^8.11.0",
     "bun-types": "latest",
     "drizzle-kit": "^0.30.5",
+    "swagger-typescript-api": "^13.0.23",
     "typescript": "^5.0.0"
   },
   "engines": {
