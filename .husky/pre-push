@@ -1,0 +1,3 @@
+# Run TypeScript check and tests before pushing
+echo "Running TypeScript checks and tests before pushing..."
+bun run typecheck && bun test

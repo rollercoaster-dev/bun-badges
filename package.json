@@ -14,7 +14,14 @@
     "db:migrate": "bun run src/db/migrate.ts",
     "db:push": "drizzle-kit push:pg",
     "db:studio": "drizzle-kit studio",
-    "test": "bun test"
+    "test": "bun test",
+    "prepare": "husky install"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "bun run lint",
+      "bun run format"
+    ]
   },
   "dependencies": {
     "@hono/node-server": "^1.13.8",
@@ -34,8 +41,15 @@
     "@hono/swagger-ui": "^0.5.1",
     "@types/node": "^20.0.0",
     "@types/pg": "^8.11.0",
+    "@typescript-eslint/eslint-plugin": "^8.26.1",
+    "@typescript-eslint/parser": "^8.26.1",
     "bun-types": "latest",
     "drizzle-kit": "^0.30.5",
+    "eslint": "^9.22.0",
+    "eslint-config-prettier": "^10.1.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.0",
+    "prettier": "^3.5.3",
     "swagger-typescript-api": "^13.0.23",
     "typescript": "^5.0.0"
   },

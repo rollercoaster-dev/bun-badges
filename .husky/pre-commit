@@ -1,0 +1,2 @@
+# Run lint-staged only (skip typecheck to avoid duplication with pre-push)
+npx lint-staged
