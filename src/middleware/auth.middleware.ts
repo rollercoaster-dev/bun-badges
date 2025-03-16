@@ -10,7 +10,7 @@ export interface AuthContext extends Context {
 }
 
 export const createAuthMiddleware = (db: DatabaseService) => {
-  return async (c: Context, next: Next) => {
+  return async (c: Context, next: Next): Promise<Response | void> => {
     const authHeader = c.req.header('Authorization');
     
     if (!authHeader?.startsWith('Bearer ')) {
