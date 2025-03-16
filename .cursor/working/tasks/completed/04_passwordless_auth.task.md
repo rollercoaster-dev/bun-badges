@@ -122,4 +122,54 @@
 🎉 JWT refresh token system implemented
 🎉 Token revocation system implemented
 🎉 Database storage implemented and tested
-🎉 JWT verification middleware complete 
+🎉 JWT verification middleware complete
+
+## 8. Research Notes
+
+### WebAuthn Integration
+- ✓ WebAuthn W3C Specification [researched]
+  - Core Concepts:
+    - Uses public key cryptography for passwordless authentication
+    - Requires secure hardware authenticators (biometric, security keys)
+    - Supports both registration and authentication ceremonies
+    - Provides strong protection against phishing
+  - Integration Points:
+    - Can complement our code-based auth as a second factor
+    - Requires HTTPS and secure context
+    - Browser support: Chrome 67+, Firefox 60+, Safari 13+
+  - Implementation Considerations:
+    - Need to store public key credentials in database
+    - Must handle attestation for security verification
+    - Consider fallback for unsupported browsers
+    - Plan for credential management (registration, deletion)
+
+### OAuth 2.0 System Integration
+- ✓ OAuth 2.0 Framework [researched]
+  - Core Components:
+    - Resource Owner: Our users
+    - Client: Third-party applications
+    - Authorization Server: Our auth service
+    - Resource Server: Our API endpoints
+  - Integration Points:
+    - Can extend current JWT implementation
+    - Need to implement OAuth-specific endpoints
+    - Must support different grant types
+    - Required for Open Badges API compliance
+  - Implementation Considerations:
+    - Client registration and management
+    - Scope definition and validation
+    - Token lifecycle management
+    - Security best practices (PKCE, state validation)
+    - Open Badges specific scopes and endpoints
+  - Benefits:
+    - Standardized protocol for API access
+    - No credential sharing
+    - Fine-grained access control
+    - Token revocation support
+    - Enables Open Badges API integration
+  - Open Badges Requirements:
+    - Must implement OAuth 2.0 Authorization Code Grant
+    - Dynamic client registration (RFC 7591)
+    - Support for refresh tokens
+    - Granular resource-based permission scopes
+    - HTTPS/TLS 1.2+ for all endpoints 
