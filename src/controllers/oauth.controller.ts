@@ -185,7 +185,6 @@ export class OAuthController {
       redirect_uri,
       scope,
       state,
-      response_type,
       user_decision
     } = body;
     
@@ -530,7 +529,7 @@ export class OAuthController {
   async introspect(c: Context) {
     try {
       const body = await c.req.parseBody();
-      const { token, token_type_hint } = body;
+      const { token } = body;
       const clientId = c.req.header('Authorization')?.split(' ')[1];
 
       // Validate required parameters
@@ -592,7 +591,7 @@ export class OAuthController {
   async revoke(c: Context) {
     try {
       const body = await c.req.parseBody();
-      const { token, token_type_hint } = body;
+      const { token } = body;
       const clientId = c.req.header('Authorization')?.split(' ')[1];
 
       // Validate required parameters
@@ -627,13 +626,10 @@ export class OAuthController {
           return c.json({}, 200);
         }
         
-        // Determine token type if not provided
-        const tokenType = token_type_hint || payload.type;
-        
         // Revoke the token
         await this.db.revokeToken({
           token: token as string,
-          type: tokenType as string,
+          type: payload.type as string,
           username: payload.sub,
           expiresAt: new Date(payload.exp! * 1000)
         });

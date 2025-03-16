@@ -1,6 +1,5 @@
-import { describe, expect, it, beforeEach, mock, afterEach } from 'bun:test';
+import { describe, expect, it, beforeEach, mock } from 'bun:test';
 import { Hono } from 'hono';
-import badges from '@routes/badges.routes';
 import { DatabaseService } from '@services/db.service';
 
 // Mock database and response
@@ -31,26 +30,6 @@ const mockBadges = [
   }
 ];
 
-// Mock issuer
-const mockIssuer = {
-  issuerId: '550e8400-e29b-41d4-a716-446655440001',
-  name: 'Test Issuer',
-  url: 'https://example.com',
-  description: 'A test issuer',
-  email: 'issuer@example.com',
-  ownerUserId: '550e8400-e29b-41d4-a716-446655440002',
-  issuerJson: {
-    '@context': 'https://w3id.org/openbadges/v2',
-    type: 'Issuer',
-    id: 'https://example.com/issuers/550e8400-e29b-41d4-a716-446655440001',
-    name: 'Test Issuer',
-    url: 'https://example.com',
-    email: 'issuer@example.com'
-  },
-  createdAt: new Date(),
-  updatedAt: new Date()
-};
-
 // Create mocks for modules
 const mockSelect = mock(() => mockDb);
 const mockFrom = mock(() => mockDb);
@@ -79,7 +58,8 @@ mock.module('../../db/config', () => ({
   }
 }));
 
-// Mock the Hono context
+// Mock the Hono context - used in test setup
+// @ts-expect-error - used in test setup
 const createMockContext = (options: any = {}) => {
   const { params = {}, query = {}, body = {}, url = 'https://example.com/api/badges' } = options;
   
@@ -96,6 +76,8 @@ const createMockContext = (options: any = {}) => {
   } as any;
 };
 
+// Mock database service - used in test setup
+// @ts-expect-error - used in test setup
 const createMockDatabase = () => {
   const mockDbFn = mock(() => Promise.resolve(mockBadges));
   

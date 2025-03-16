@@ -1,9 +1,7 @@
 import { SignJWT, jwtVerify } from 'jose';
-import { createSecretKey } from 'crypto';
 import { nanoid } from 'nanoid';
 
 // In production, these should be loaded from environment variables
-const JWT_SECRET = 'development-secret-key-change-me-in-production';
 const JWT_EXPIRES_IN = '24h';
 const REFRESH_TOKEN_EXPIRES_IN = '7d';
 

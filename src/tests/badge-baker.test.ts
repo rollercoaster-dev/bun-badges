@@ -1,5 +1,5 @@
 import { test, expect, describe } from 'bun:test';
-import { bakeImage, extractImage, bakePngBadge, verifyPngBaking, bakeSvgBadge, extractSvgBadge, isSvg } from '../utils/badge-baker';
+import { bakeImage, bakePngBadge, verifyPngBaking, bakeSvgBadge, extractSvgBadge, isSvg } from '../utils/badge-baker';
 import * as fs from 'fs';
 import * as path from 'path';
 

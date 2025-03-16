@@ -504,7 +504,6 @@ describe('Auth Controller', () => {
       });
 
       const response = await controller.revokeToken(ctx);
-      const body = await response.json() as AuthResponse;
       expect(response.status).toBe(200);
     });
 
@@ -518,7 +517,6 @@ describe('Auth Controller', () => {
       });
 
       const response = await controller.revokeToken(ctx);
-      const body = await response.json() as AuthResponse;
       // Due to our mocking setup, the controller doesn't validate token types strictly
       expect(response.status).toBe(200); 
     });

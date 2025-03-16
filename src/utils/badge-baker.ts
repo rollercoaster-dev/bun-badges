@@ -1,7 +1,6 @@
 import * as pngitxt from 'png-itxt';
-import * as fs from 'fs';
 import { Readable, Writable } from 'stream';
-import { writeTextToBlob, readTextFromBlob } from '@larswander/png-text';
+import { readTextFromBlob } from '@larswander/png-text';
 
 /**
  * Bakes an Open Badges assertion into a PNG image.
@@ -19,7 +18,7 @@ export async function bakePngBadge(imageBuffer: Buffer, assertion: any): Promise
       // Create a buffer to store the output
       const chunks: Buffer[] = [];
       const writableStream = new Writable({
-        write(chunk, encoding, callback) {
+        write(chunk, _, callback) {
           chunks.push(Buffer.from(chunk));
           callback();
         }
@@ -59,8 +58,8 @@ export async function bakePngBadge(imageBuffer: Buffer, assertion: any): Promise
 export async function extractPngBadge(imageBuffer: Buffer): Promise<any> {
   try {
     // Convert buffer to blob - using the global Blob constructor (web standard) 
-    // @ts-ignore - ignore type issues with Blob which should work in Bun
-    const blob = new globalThis.Blob([imageBuffer], { type: 'image/png' });
+    // Use type assertion to handle Bun's Blob implementation
+    const blob = new Blob([imageBuffer], { type: 'image/png' }) as unknown as Blob;
     
     // Read text entries from blob
     const entries = await readTextFromBlob(blob);

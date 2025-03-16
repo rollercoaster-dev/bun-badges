@@ -1,8 +1,6 @@
-import { describe, expect, it, beforeEach, mock, afterEach } from 'bun:test';
+import { describe, expect, it, beforeEach, mock } from 'bun:test';
 import { Hono } from 'hono';
 import crypto from 'crypto';
-import assertions from '@routes/assertions.routes';
-import { DatabaseService } from '@services/db.service';
 
 // Add to the top of the file, after other imports and before any tests
 interface RevokedAssertion {
@@ -20,48 +18,6 @@ interface RevocationResponse {
 // Mock database and response
 let mockDb: any;
 let mockApp: Hono;
-
-// Mocked badge data
-const mockBadge = {
-  badgeId: '550e8400-e29b-41d4-a716-446655440000',
-  issuerId: '550e8400-e29b-41d4-a716-446655440001',
-  name: 'Test Badge',
-  description: 'A test badge',
-  criteria: 'Test criteria',
-  imageUrl: 'https://example.com/badge.png',
-  badgeJson: {
-    '@context': 'https://w3id.org/openbadges/v2',
-    type: 'BadgeClass',
-    id: 'https://example.com/badges/550e8400-e29b-41d4-a716-446655440000',
-    name: 'Test Badge',
-    description: 'A test badge',
-    image: 'https://example.com/badge.png',
-    criteria: { narrative: 'Test criteria' },
-    issuer: 'https://example.com/issuers/550e8400-e29b-41d4-a716-446655440001'
-  },
-  createdAt: new Date(),
-  updatedAt: new Date()
-};
-
-// Mock issuer
-const mockIssuer = {
-  issuerId: '550e8400-e29b-41d4-a716-446655440001',
-  name: 'Test Issuer',
-  url: 'https://example.com',
-  description: 'A test issuer',
-  email: 'issuer@example.com',
-  ownerUserId: '550e8400-e29b-41d4-a716-446655440002',
-  issuerJson: {
-    '@context': 'https://w3id.org/openbadges/v2',
-    type: 'Issuer',
-    id: 'https://example.com/issuers/550e8400-e29b-41d4-a716-446655440001',
-    name: 'Test Issuer',
-    url: 'https://example.com',
-    email: 'issuer@example.com'
-  },
-  createdAt: new Date(),
-  updatedAt: new Date()
-};
 
 // Mock assertions
 const mockAssertions = [
@@ -124,7 +80,8 @@ const randomBytesMock = mock(() => ({
 crypto.createHash = createHashMock as any;
 crypto.randomBytes = randomBytesMock as any;
 
-// Mock the Hono context
+// Mock the Hono context - used in test setup
+// @ts-expect-error - used in test setup
 const createMockContext = (options: any = {}) => {
   const { params = {}, query = {}, body = {}, url = 'https://example.com/api/assertions' } = options;
   

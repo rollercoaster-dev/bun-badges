@@ -31,10 +31,11 @@ export const createAuthMiddleware = (db: DatabaseService) => {
       // Add user info to context
       (c as AuthContext).user = {
         username: payload.sub,
-        tokenType: payload.type || 'access',
+        tokenType: payload.type as 'access' | 'refresh',
       };
 
       await next();
+      return;
     } catch (error) {
       // Normalize error messages for invalid tokens
       if (error instanceof Error && error.message === 'Invalid Compact JWS') {

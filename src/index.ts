@@ -40,6 +40,7 @@ api.use('/badges', async (c, next) => {
     return authMiddleware(c, next);
   }
   await next();
+  return;
 });
 
 api.use('/assertions', async (c, next) => {
@@ -47,6 +48,7 @@ api.use('/assertions', async (c, next) => {
     return authMiddleware(c, next);
   }
   await next();
+  return;
 });
 
 // Mount the API routes

@@ -5,6 +5,7 @@ import { APIError } from '../utils/errors';
 export async function errorHandler(c: Context, next: Next) {
   try {
     await next();
+    return;
   } catch (error) {
     console.error('Error:', error);
     
