@@ -1,7 +1,7 @@
 import { Context } from 'hono';
 import { generateCode, isCodeExpired, isValidCodeFormat } from '@utils/auth/codeGenerator';
 import { RateLimiter } from '@utils/auth/rateLimiter';
-import { generateToken, getTokenExpirySeconds, verifyToken } from '@utils/auth/jwt';
+import { generateToken, getTokenExpirySeconds, verifyToken, revokeToken } from '@utils/auth/jwt';
 
 type CodeRequestBody = {
   username: string;
@@ -14,6 +14,11 @@ type CodeVerifyBody = {
 
 type RefreshTokenBody = {
   refreshToken: string;
+};
+
+type RevokeTokenBody = {
+  token: string;
+  type: 'access' | 'refresh';
 };
 
 export class AuthController {
@@ -136,6 +141,49 @@ export class AuthController {
     } catch (error) {
       return c.json({
         error: 'Invalid refresh token',
+      }, 401);
+    }
+  }
+
+  async revokeToken(c: Context) {
+    const body = await c.req.json<RevokeTokenBody>();
+    
+    if (!body.token || !body.type) {
+      return c.json({ error: 'Token and type are required' }, 400);
+    }
+
+    if (body.type !== 'access' && body.type !== 'refresh') {
+      return c.json({ error: 'Invalid token type' }, 400);
+    }
+
+    const clientIp = c.req.header('x-forwarded-for') || 'unknown';
+    const rateLimitKey = `token-revoke:${clientIp}`;
+
+    if (!this.rateLimiter.attempt(rateLimitKey)) {
+      const timeToReset = this.rateLimiter.getTimeToReset(rateLimitKey);
+      return c.json({
+        error: 'Too many revocation attempts',
+        retryAfter: Math.ceil(timeToReset / 1000),
+      }, 429);
+    }
+
+    try {
+      // Verify token type before revocation
+      await verifyToken(body.token, body.type);
+      await revokeToken(body.token);
+      
+      return c.json({
+        message: 'Token revoked successfully',
+      }, 200);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Token has been revoked') {
+        return c.json({
+          message: 'Token was already revoked',
+        }, 200);
+      }
+
+      return c.json({
+        error: 'Invalid token',
       }, 401);
     }
   }

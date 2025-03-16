@@ -3,7 +3,7 @@ import { Context } from 'hono';
 import { AuthController } from '@controllers/auth.controller';
 import { RateLimiter } from '@utils/auth/rateLimiter';
 import { AUTH_ROUTES } from '@routes/aliases';
-import { verifyToken, getTokenExpirySeconds, generateToken } from '@utils/auth/jwt';
+import { verifyToken, getTokenExpirySeconds, generateToken, isTokenRevoked } from '@utils/auth/jwt';
 
 type AuthResponse = {
   message?: string;
@@ -294,6 +294,138 @@ describe('Auth Controller', () => {
       expect(payload.iat).toBeDefined();
       expect(payload.exp).toBeDefined();
       expect(payload.exp! - payload.iat!).toBe(getTokenExpirySeconds('access'));
+    });
+  });
+
+  describe(AUTH_ROUTES.REVOKE_TOKEN, () => {
+    test('requires token and type', async () => {
+      const controller = new AuthController();
+      
+      // Missing both
+      let ctx = createMockContext({});
+      let response = await controller.revokeToken(ctx);
+      let body = await response.json() as AuthResponse;
+      expect(response.status).toBe(400);
+      expect(body.error).toBe('Token and type are required');
+
+      // Missing type
+      ctx = createMockContext({ token: 'some-token' });
+      response = await controller.revokeToken(ctx);
+      body = await response.json() as AuthResponse;
+      expect(response.status).toBe(400);
+      expect(body.error).toBe('Token and type are required');
+
+      // Missing token
+      ctx = createMockContext({ type: 'access' });
+      response = await controller.revokeToken(ctx);
+      body = await response.json() as AuthResponse;
+      expect(response.status).toBe(400);
+      expect(body.error).toBe('Token and type are required');
+    });
+
+    test('validates token type', async () => {
+      const controller = new AuthController();
+      const ctx = createMockContext({ 
+        token: 'some-token',
+        type: 'invalid-type'
+      });
+
+      const response = await controller.revokeToken(ctx);
+      const body = await response.json() as AuthResponse;
+      expect(response.status).toBe(400);
+      expect(body.error).toBe('Invalid token type');
+    });
+
+    test('enforces rate limiting', async () => {
+      const rateLimiter = new RateLimiter({
+        maxAttempts: 5,
+        windowMs: 1000,
+      });
+      const controller = new AuthController(rateLimiter);
+      const ip = 'test-ip';
+      const token = await generateToken('test@example.com', 'access');
+
+      // Make 5 revocation attempts
+      for (let i = 0; i < 5; i++) {
+        const ctx = createMockContext({ token, type: 'access' }, ip);
+        const response = await controller.revokeToken(ctx);
+        expect(response.status).toBe(200);
+      }
+
+      // 6th attempt should be rate limited
+      const ctx = createMockContext({ token, type: 'access' }, ip);
+      const response = await controller.revokeToken(ctx);
+      const body = await response.json() as AuthResponse;
+      expect(response.status).toBe(429);
+      expect(body.error).toBe('Too many revocation attempts');
+      expect(body.retryAfter).toBeGreaterThan(0);
+    });
+
+    test('successfully revokes valid token', async () => {
+      const controller = new AuthController();
+      const token = await generateToken('test@example.com', 'access');
+      const ctx = createMockContext({ token, type: 'access' });
+
+      const response = await controller.revokeToken(ctx);
+      const body = await response.json() as AuthResponse;
+      expect(response.status).toBe(200);
+      expect(body.message).toBe('Token revoked successfully');
+
+      // Verify token is actually revoked
+      expect(isTokenRevoked(token)).toBe(true);
+
+      // Attempt to use revoked token
+      try {
+        await verifyToken(token, 'access');
+        expect(true).toBe(false); // Should not reach here
+      } catch (error) {
+        expect(error instanceof Error).toBe(true);
+        expect((error as Error).message).toBe('Token has been revoked');
+      }
+    });
+
+    test('handles already revoked token', async () => {
+      const controller = new AuthController();
+      const token = await generateToken('test@example.com', 'access');
+      
+      // Revoke token first time
+      let ctx = createMockContext({ token, type: 'access' });
+      let response = await controller.revokeToken(ctx);
+      expect(response.status).toBe(200);
+
+      // Try to revoke again
+      ctx = createMockContext({ token, type: 'access' });
+      response = await controller.revokeToken(ctx);
+      const body = await response.json() as AuthResponse;
+      expect(response.status).toBe(200);
+      expect(body.message).toBe('Token was already revoked');
+    });
+
+    test('handles invalid token', async () => {
+      const controller = new AuthController();
+      const ctx = createMockContext({ 
+        token: 'invalid-token',
+        type: 'access'
+      });
+
+      const response = await controller.revokeToken(ctx);
+      const body = await response.json() as AuthResponse;
+      expect(response.status).toBe(401);
+      expect(body.error).toBe('Invalid token');
+    });
+
+    test('validates token type matches actual token', async () => {
+      const controller = new AuthController();
+      const token = await generateToken('test@example.com', 'access');
+      const ctx = createMockContext({ 
+        token,
+        type: 'refresh' // Wrong type
+      });
+
+      const response = await controller.revokeToken(ctx);
+      const body = await response.json() as AuthResponse;
+      expect(response.status).toBe(401);
+      expect(body.error).toBe('Invalid token');
     });
   });
 }); 
