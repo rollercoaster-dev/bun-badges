@@ -1,6 +1,6 @@
 # Bun Badges
 
-[![CI/CD](https://github.com/rollercoaster.dev/bun-badges/actions/workflows/ci.yml/badge.svg)](https://github.com/rollercoaster.dev/bun-badges/actions/workflows/ci.yml)
+[![CI/CD](https://github.com/rollercoaster-dev/bun-badges/actions/workflows/ci.yml/badge.svg)](https://github.com/rollercoaster-dev/bun-badges/actions/workflows/ci.yml)
 
 An Open Badges server implementation using Bun and Hono, supporting Open Badges 2.0 specification with a roadmap for 3.0.
 
