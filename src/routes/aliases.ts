@@ -12,6 +12,8 @@ export const BADGE_ROUTES = {
   UPDATE: '/badges/:id',
   DELETE: '/badges/:id',
   VERIFY: '/badges/:id/verify',
+  BAKE_BADGE: '/badges/bake/:badgeId/:assertionId',
+  EXTRACT_BADGE: '/badges/extract',
 } as const;
 
 export const ISSUER_ROUTES = {

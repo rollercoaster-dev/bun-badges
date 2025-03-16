@@ -1,9 +1,10 @@
 import { Hono } from 'hono';
 import { db } from '../db/config';
-import { badgeClasses, issuerProfiles } from '../db/schema';
+import { badgeClasses, issuerProfiles, badgeAssertions } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { BADGE_ROUTES } from './aliases';
 import { BadgeController } from '../controllers/badge.controller';
+import { bakeImage, extractImage } from '../utils/badge-baker';
 
 const badges = new Hono();
 const controller = new BadgeController();
@@ -333,6 +334,177 @@ badges.delete(BADGE_ROUTES.DELETE, async (c) => {
         error: {
           code: 'SERVER_ERROR',
           message: 'Failed to delete badge'
+        }
+      },
+      500
+    );
+  }
+});
+
+// Add badge baking endpoints
+badges.get(BADGE_ROUTES.BAKE_BADGE, async (c) => {
+  try {
+    const { badgeId, assertionId } = c.req.param();
+    
+    if (!badgeId || !assertionId) {
+      return c.json(
+        {
+          status: 'error',
+          error: {
+            code: 'VALIDATION',
+            message: 'Missing badge ID or assertion ID'
+          }
+        },
+        400
+      );
+    }
+    
+    // Get the badge assertion
+    const assertion = await db.select()
+      .from(badgeAssertions)
+      .where(eq(badgeAssertions.assertionId, assertionId))
+      .limit(1);
+    
+    if (!assertion || assertion.length === 0) {
+      return c.json(
+        {
+          status: 'error',
+          error: {
+            code: 'NOT_FOUND',
+            message: 'Assertion not found'
+          }
+        },
+        404
+      );
+    }
+    
+    // Get the badge class
+    const badge = await db.select()
+      .from(badgeClasses)
+      .where(eq(badgeClasses.badgeId, badgeId))
+      .limit(1);
+    
+    if (!badge || badge.length === 0) {
+      return c.json(
+        {
+          status: 'error',
+          error: {
+            code: 'NOT_FOUND',
+            message: 'Badge not found'
+          }
+        },
+        404
+      );
+    }
+    
+    // Get the image data from URL - this would typically fetch from your storage
+    // For demonstration, we'll fetch from the badge's imageUrl
+    const imageUrl = badge[0].imageUrl;
+    const imageResponse = await fetch(imageUrl);
+    
+    if (!imageResponse.ok) {
+      return c.json(
+        {
+          status: 'error',
+          error: {
+            code: 'FETCH_ERROR',
+            message: 'Failed to fetch badge image'
+          }
+        },
+        500
+      );
+    }
+    
+    // Get image data as buffer
+    const imageArrayBuffer = await imageResponse.arrayBuffer();
+    const imageBuffer = Buffer.from(imageArrayBuffer);
+    
+    // Bake the assertion into the image
+    const assertionJson = assertion[0].assertionJson;
+    const bakedImage = await bakeImage(imageBuffer, assertionJson);
+    
+    // Set content type based on image type
+    const contentType = imageUrl.toLowerCase().endsWith('.svg') 
+      ? 'image/svg+xml' 
+      : 'image/png';
+    
+    // Send the image back to the client
+    c.header('Content-Type', contentType);
+    c.header('Content-Disposition', `attachment; filename="badge-${badgeId}.${contentType.includes('svg') ? 'svg' : 'png'}"`);
+    
+    return new Response(bakedImage);
+  } catch (error) {
+    console.error('Error baking badge:', error);
+    
+    return c.json(
+      {
+        status: 'error',
+        error: {
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to bake badge'
+        }
+      },
+      500
+    );
+  }
+});
+
+// Add endpoint to extract badge data
+badges.post(BADGE_ROUTES.EXTRACT_BADGE, async (c) => {
+  try {
+    // Get the uploaded badge image
+    const formData = await c.req.formData();
+    const file = formData.get('badge');
+    
+    if (!file || !(file instanceof File)) {
+      return c.json(
+        {
+          status: 'error',
+          error: {
+            code: 'VALIDATION',
+            message: 'No badge file uploaded or invalid file'
+          }
+        },
+        400
+      );
+    }
+    
+    // Get file data as buffer
+    const fileArrayBuffer = await file.arrayBuffer();
+    const fileBuffer = Buffer.from(fileArrayBuffer);
+    
+    // Extract assertion from image
+    const assertion = await extractImage(fileBuffer);
+    
+    if (!assertion) {
+      return c.json(
+        {
+          status: 'error',
+          error: {
+            code: 'EXTRACTION_ERROR',
+            message: 'No badge data found in the image'
+          }
+        },
+        400
+      );
+    }
+    
+    return c.json({
+      status: 'success',
+      data: {
+        assertion,
+        format: assertion._note ? 'PNG (limited extraction)' : 'SVG'
+      }
+    });
+  } catch (error) {
+    console.error('Error extracting badge data:', error);
+    
+    return c.json(
+      {
+        status: 'error',
+        error: {
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to extract badge data'
         }
       },
       500
