@@ -1,0 +1,39 @@
+---
+description: Documentation Organization Guidelines
+globs: 
+alwaysApply: false
+---
+ # Documentation Organization Guidelines
+
+## Documentation Structure
+- Store all documentation in `.cursor/working/docs/`
+- Break large documents into focused sections
+- Use consistent naming: `<section>-<topic>.md`
+
+## Reference Documents
+- Development-plan.md serves as the primary reference
+- Link to specific sections in tasks using `@Development-plan.md#section`
+- Use checkmarks ✓ to track reviewed sections
+
+## Documentation Types
+1. **Reference Docs** (like Development-plan.md)
+   - Comprehensive technical details
+   - Source of truth for implementation
+   - Used by Cursor for context
+
+2. **Task Docs** (.task.md files)
+   - Implementation steps
+   - Link to relevant sections in reference docs
+   - Track progress and decisions
+
+3. **Rules** (.mdc files)
+   - Concise guidelines
+   - Derived from reference docs
+   - Used by Cursor for active guidance
+
+## Usage in Tasks
+When referencing the development plan in tasks:
+1. Link to specific sections
+2. Add research notes under each link
+3. Mark with ✓ when section is fully reviewed
+4. Add [researched] tag after reviewed links

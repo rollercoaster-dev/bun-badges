@@ -1,0 +1,12 @@
+---
+description: Self-hosting and deployment configuration guidelines.
+globs: 
+alwaysApply: false
+---
+ # Deployment & Hosting Guidelines
+
+- **Headless Architecture:** Build a headless server accessible via a REST API.
+- **Containerization:** Provide Docker and docker-compose files for easy self-hosting.
+- **Config Management:** Read settings from environment variables.
+- **Scalability:** Ensure the design supports scaling (stateless API servers).
+- **Structured Logging:** Log errors and key events in a structured, minimal format.

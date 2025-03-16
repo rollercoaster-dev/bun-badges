@@ -1,0 +1,13 @@
+---
+description: Authentication and security guidelines for the server.
+globs: 
+alwaysApply: false
+---
+ # Authentication & Security Guidelines
+
+- **Primary Auth:** Implement OAuth 2.0 as the main authentication method.
+- **Fallback Methods:** Provide secure alternatives using WebAuthn and email-based OTP.
+- **HTTPS Enforcement:** Ensure all communication is over HTTPS.
+- **Token Validation:** Rigorously validate all JWTs or session tokens.
+- **Sensitive Data:** Avoid logging sensitive information.
+- **Minimal Flows:** Keep authentication flows concise and secure.

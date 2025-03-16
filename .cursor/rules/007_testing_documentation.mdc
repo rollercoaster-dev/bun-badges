@@ -1,0 +1,12 @@
+---
+description: Testing, code quality, and documentation standards.
+globs: 
+alwaysApply: false
+---
+ # Testing & Documentation Guidelines
+
+- **Unit & Integration Tests:** Write tests for core functionality and API endpoints.
+- **Inline Documentation:** Use well named functions and typescript type to document the code. Each function should be so clear it doesn't need a coment.
+- **API Documentation:** Maintain clear documentation for each endpoint (e.g., via OpenAPI).
+- **Concise Commits:** Ensure code changes are minimal and well-explained.
+- **Refactoring:** Regularly refactor for clarity, maintainability, and performance.

@@ -1,0 +1,12 @@
+---
+description: Guidelines for Bun runtime and Hono framework usage.
+globs: 
+alwaysApply: false
+---
+ # Bun & Hono Guidelines
+
+- **Bun as Runtime:** Leverage Bun’s performance features and built-in TypeScript support.
+- **Hono for Routing:** Use Hono for creating fast, modular RESTful endpoints.
+- **Middleware Best Practices:** Implement middleware for error handling, logging, and authentication.
+- **API Consistency:** Ensure that all routes return well-structured, minimal JSON responses.
+

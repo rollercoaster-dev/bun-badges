@@ -1,0 +1,38 @@
+---
+description: 
+globs: *task.md
+alwaysApply: false
+---
+ # Task Research Guidelines
+
+## Link Processing
+- All links in task descriptions must be followed and researched
+- Document key findings under a "Research Notes" section in the task
+- Mark processed links with:
+  - ✓ prefix before the link
+  - [researched] suffix after the link
+
+## Documentation Format
+- Add a "Research Notes" section if not present
+- Under each link, document:
+  - Key concepts and definitions
+  - Relevant code examples
+  - Implementation considerations
+  - Potential challenges
+  - Integration points with our system
+
+## Example:
+Original link:
+- WebAuthn W3C Recommendation
+
+After research:
+- ✓ WebAuthn W3C Recommendation [researched]
+  - Supports passwordless and 2FA authentication
+  - Uses public key cryptography
+  - Requires secure context (HTTPS)
+  - Browser compatibility: Chrome 67+, Firefox 60+, Safari 13+
+
+## Tracking
+- Maintain a research progress indicator in the task header
+- Update task status to reflect research completion
+- Link findings to related tasks when applicable

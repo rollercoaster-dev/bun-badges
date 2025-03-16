@@ -1,0 +1,12 @@
+---
+description: PostgreSQL database interaction and schema management guidelines.
+globs: 
+alwaysApply: false
+---
+# PostgreSQL Guidelines
+
+- **Primary Storage:** Use PostgreSQL as the database for storing badge data.
+- **ORM/Query Builder:** Use a compatible ORM (e.g., Drizzle ORM or Prisma) with Bun.
+- **Versioned Migrations:** Maintain a clear, version-controlled migration strategy.
+- **Flexible Schemas:** Utilize JSONB columns for dynamic Open Badges JSON structures.
+- **Indexing:** Optimize queries with indexes on key fields (e.g., issuer and assertion IDs).

@@ -1,0 +1,13 @@
+---
+description: RESTful API design and endpoint structure principles.
+globs: 
+alwaysApply: false
+---
+ # REST API Guidelines
+
+- **REST Conventions:** Follow standard HTTP methods and resource naming (e.g., /api/v1/).
+- **Clear Endpoints:** Define endpoints for issuers, badge classes, assertions, and authentication.
+- **Error Handling:** Return appropriate HTTP status codes and error messages.
+- **Documentation:** Maintain concise API documentation (consider using OpenAPI/Swagger).
+- **Versioning:** Use API versioning to future-proof changes.
+
