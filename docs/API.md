@@ -31,6 +31,8 @@ To authenticate:
 | POST | `/api/badges` | Create a new badge class | **Yes** |
 | PUT | `/api/badges/{id}` | Update a badge class | **Yes** |
 | DELETE | `/api/badges/{id}` | Delete a badge class | **Yes** |
+| GET | `/api/badges/bake/:badgeId/:assertionId` | Bake assertion data into badge image | No |
+| POST | `/api/badges/extract` | Extract assertion data from a baked badge | No |
 
 ### Badge Assertion Endpoints
 
@@ -152,4 +154,56 @@ Common error codes:
 - `UNAUTHORIZED` - Authentication required or invalid credentials
 - `FORBIDDEN` - Valid authentication but insufficient permissions
 - `CONFLICT` - Cannot perform operation due to resource state
-- `SERVER_ERROR` - Unexpected server error 
+- `SERVER_ERROR` - Unexpected server error
+
+## Badge Baking
+
+Badge baking refers to the practice of embedding Open Badges metadata directly into image files, allowing the badge to be verified even when disconnected from the server.
+
+### Baking a Badge
+
+**Request:**
+```http
+GET /api/badges/bake/550e8400-e29b-41d4-a716-446655440000/550e8400-e29b-41d4-a716-446655440010
+```
+
+**Response:**
+The response will be the badge image file (PNG or SVG) with embedded assertion data.
+Content-Type will be either `image/png` or `image/svg+xml` depending on the original badge format.
+
+### Extracting Badge Data
+
+**Request:**
+```http
+POST /api/badges/extract
+Content-Type: multipart/form-data
+
+Form data:
+- badge: [file upload]
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "data": {
+    "assertion": {
+      "@context": "https://w3id.org/openbadges/v2",
+      "type": "Assertion",
+      "id": "https://example.com/assertions/550e8400-e29b-41d4-a716-446655440010",
+      "recipient": {
+        "type": "email",
+        "identity": "sha256$a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e",
+        "hashed": true,
+        "salt": "abcd1234"
+      },
+      "badge": "https://example.com/badges/550e8400-e29b-41d4-a716-446655440000",
+      "issuedOn": "2023-03-16T12:30:00Z",
+      "verification": {
+        "type": "hosted"
+      }
+    },
+    "format": "SVG"
+  }
+}
+``` 

@@ -10,12 +10,33 @@ The server will fully comply with the Open Badges 2.0 specification, which defin
   - Assertion
 - Required metadata and JSON-LD context
 - Badge verification endpoints
-- Optional badge "baking" functionality
+- Badge "baking" functionality for both PNG and SVG formats
+
+### Badge Baking Implementation
+Our badge baking feature supports embedding assertions into both PNG and SVG badge images:
+
+#### PNG Badge Baking
+- Uses the `png-itxt` library to embed data in PNG tEXt chunks
+- Implements stream-based processing for efficient handling
+- Supports basic extraction (with some browser limitations)
+- Conforms to Open Badges 2.0 specification for PNG baking
+
+#### SVG Badge Baking
+- Implements direct XML manipulation in SVG files
+- Adds the Open Badges namespace to the SVG tag
+- Inserts the assertion as a CDATA block inside an `openbadges:assertion` element
+- Provides complete baking and extraction capabilities
+- Better cross-platform and browser compatibility
+
+#### API Support
+- GET endpoint to bake badges: `/api/badges/bake/:badgeId/:assertionId`
+- POST endpoint to extract data: `/api/badges/extract`
+- Format detection and appropriate processing for both PNG and SVG
 
 ### Implementation Details
 - JSON-LD uses proper context (https://w3id.org/openbadges/v2)
 - All required properties for OB 2.0 compliance
-- Support for both baked PNG files and hosted verification
+- Support for both baked image files and hosted verification
 - IMS Open Badges 2.0 certification standards compliance
 
 ## Open Badges 3.0 Support (Roadmap)
