@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <!-- Badge Circle -->
+  <circle cx="100" cy="100" r="95" fill="#4285f4" stroke="#2962ff" stroke-width="5" />
+  
+  <!-- Inner Circle -->
+  <circle cx="100" cy="100" r="80" fill="#5c9eff" />
+  
+  <!-- Badge Star -->
+  <path d="M100 30 L113 70 H155 L121 95 L134 135 L100 110 L66 135 L79 95 L45 70 H87 Z" fill="#f9f9f9" />
+  
+  <!-- Badge Text -->
+  <text x="100" y="160" font-family="Arial, sans-serif" font-size="16" font-weight="bold" text-anchor="middle" fill="#ffffff">TEST BADGE</text>
+</svg> 
