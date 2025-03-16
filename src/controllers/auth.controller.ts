@@ -1,6 +1,6 @@
 import { Context } from 'hono';
-import { generateCode } from '../utils/auth/codeGenerator';
-import { RateLimiter } from '../utils/auth/rateLimiter';
+import { generateCode } from '@utils/auth/codeGenerator';
+import { RateLimiter } from '@utils/auth/rateLimiter';
 
 type CodeRequestBody = {
   username: string;
