@@ -10,6 +10,7 @@ import { OAuthController } from '@controllers/oauth.controller';
 import { errorHandler } from '@middleware/error-handler';
 import { createAuthMiddleware } from '@middleware/auth.middleware';
 import { DatabaseService } from '@services/db.service';
+import { createSwaggerUI } from './swagger';
 
 const app = new Hono();
 
@@ -52,6 +53,9 @@ api.use('/assertions', async (c, next) => {
 api.route('/badges', badges);
 api.route('/assertions', assertions);
 app.route('/api', api);
+
+// Mount Swagger UI
+app.route('/docs', createSwaggerUI());
 
 // Root route
 app.get('/', (c) => c.json({ message: 'Bun Badges API' }));
