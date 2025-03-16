@@ -5,6 +5,7 @@ import { generateCode } from '../utils/auth/code';
 import { BadRequestError, UnauthorizedError } from '../utils/errors';
 import { OAUTH_SCOPES } from '../routes/oauth.routes';
 import { z } from 'zod';
+import { verifyToken } from '../utils/auth/jwt';
 
 // Client registration request schema
 const clientRegistrationSchema = z.object({
@@ -92,6 +93,12 @@ export class OAuthController {
 
   // Handle authorization code grant flow
   async authorize(c: Context) {
+    // Check if this is a form submission (POST) or initial request (GET)
+    if (c.req.method === 'POST') {
+      return this.handleAuthorizationDecision(c);
+    }
+    
+    // Initial authorization request (GET)
     const query = c.req.query();
     const { 
       response_type,
@@ -117,117 +124,466 @@ export class OAuthController {
       throw new UnauthorizedError('Invalid redirect URI');
     }
 
-    // Generate authorization code
+    // For now, we'll assume the user is already authenticated
+    // In a real implementation, we would check for a session and redirect to login if needed
+    
+    // Render consent page
+    const requestedScopes = scope ? scope.split(' ') : [];
+    const html = this.renderConsentPage({
+      clientName: client.clientName,
+      clientUri: client.clientUri,
+      logoUri: client.logoUri,
+      scopes: requestedScopes,
+      redirectUri: redirect_uri,
+      state,
+      clientId: client_id,
+      responseType: response_type
+    });
+    
+    return c.html(html);
+  }
+
+  // Handle the user's authorization decision
+  private async handleAuthorizationDecision(c: Context) {
+    const body = await c.req.parseBody();
+    const {
+      client_id,
+      redirect_uri,
+      scope,
+      state,
+      response_type,
+      user_decision
+    } = body;
+    
+    // Build the redirect URL
+    const redirectUrl = new URL(redirect_uri as string);
+    
+    // Check if the user denied access
+    if (user_decision !== 'approve') {
+      redirectUrl.searchParams.set('error', 'access_denied');
+      redirectUrl.searchParams.set('error_description', 'The user denied the authorization request');
+      if (state) {
+        redirectUrl.searchParams.set('state', state as string);
+      }
+      return c.redirect(redirectUrl.toString());
+    }
+    
+    // User approved - generate authorization code
     const code = await generateCode();
+    
+    // Store the authorization code
     await this.db.createAuthorizationCode({
       code,
-      clientId: client_id,
-      redirectUri: redirect_uri,
-      scope: scope || '',
+      clientId: client_id as string,
+      redirectUri: redirect_uri as string,
+      scope: scope as string || '',
       expiresAt: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
     });
-
-    // Build redirect URL
-    const redirectUrl = new URL(redirect_uri);
+    
+    // Add code to redirect URL
     redirectUrl.searchParams.set('code', code);
     if (state) {
-      redirectUrl.searchParams.set('state', state);
+      redirectUrl.searchParams.set('state', state as string);
     }
-
+    
     return c.redirect(redirectUrl.toString());
+  }
+
+  // Render a simple HTML consent page
+  private renderConsentPage(params: {
+    clientName: string;
+    clientUri: string;
+    logoUri: string | null;
+    scopes: string[];
+    redirectUri: string;
+    state?: string;
+    clientId: string;
+    responseType: string;
+  }) {
+    const scopeDescriptions: Record<string, string> = {
+      'badge:create': 'Create badges on your behalf',
+      'badge:read': 'Read your badges',
+      'badge:update': 'Update your badges',
+      'badge:delete': 'Delete your badges',
+      'assertion:create': 'Issue badge assertions on your behalf',
+      'assertion:read': 'Read your badge assertions',
+      'assertion:update': 'Update your badge assertions',
+      'assertion:delete': 'Delete your badge assertions',
+      'profile:read': 'Read your profile information',
+      'profile:update': 'Update your profile information',
+      'offline_access': 'Access your data when you are not present'
+    };
+    
+    const scopeHtml = params.scopes.map(scope => {
+      const description = scopeDescriptions[scope] || scope;
+      return `<li><strong>${scope}</strong>: ${description}</li>`;
+    }).join('');
+    
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Authorization Request</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+          }
+          .container {
+            background: #f9f9f9;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+          }
+          .client-info {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+          }
+          .client-logo {
+            width: 60px;
+            height: 60px;
+            margin-right: 15px;
+            border-radius: 8px;
+            object-fit: contain;
+            background: #fff;
+          }
+          .client-name {
+            font-size: 1.2em;
+            font-weight: bold;
+          }
+          .client-uri {
+            font-size: 0.9em;
+            color: #666;
+          }
+          .scope-list {
+            margin: 20px 0;
+            padding-left: 20px;
+          }
+          .buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+          }
+          .btn {
+            padding: 10px 20px;
+            border-radius: 4px;
+            border: none;
+            font-size: 1em;
+            cursor: pointer;
+          }
+          .btn-approve {
+            background: #4CAF50;
+            color: white;
+          }
+          .btn-deny {
+            background: #f44336;
+            color: white;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>Authorization Request</h1>
+          
+          <div class="client-info">
+            ${params.logoUri ? `<img src="${params.logoUri}" alt="${params.clientName} logo" class="client-logo">` : ''}
+            <div>
+              <div class="client-name">${params.clientName}</div>
+              <div class="client-uri">${params.clientUri}</div>
+            </div>
+          </div>
+          
+          <p>The application is requesting permission to:</p>
+          
+          <ul class="scope-list">
+            ${scopeHtml}
+          </ul>
+          
+          <form method="post">
+            <input type="hidden" name="client_id" value="${params.clientId}">
+            <input type="hidden" name="redirect_uri" value="${params.redirectUri}">
+            <input type="hidden" name="scope" value="${params.scopes.join(' ')}">
+            <input type="hidden" name="state" value="${params.state || ''}">
+            <input type="hidden" name="response_type" value="${params.responseType}">
+            
+            <div class="buttons">
+              <button type="submit" name="user_decision" value="approve" class="btn btn-approve">Approve</button>
+              <button type="submit" name="user_decision" value="deny" class="btn btn-deny">Deny</button>
+            </div>
+          </form>
+        </div>
+      </body>
+      </html>
+    `;
   }
 
   // Handle token requests for authorization code and refresh token grants
   async token(c: Context) {
-    const body = await c.req.parseBody();
-    const {
-      grant_type,
-      code,
-      redirect_uri,
-      refresh_token,
-      client_id,
-      client_secret
-    } = body;
+    try {
+      const body = await c.req.parseBody();
+      const {
+        grant_type,
+        code,
+        redirect_uri,
+        refresh_token,
+        client_id,
+        client_secret
+      } = body;
 
-    // Validate client credentials
-    const client = await this.db.getOAuthClient(client_id as string);
-    if (!client || client.clientSecret !== client_secret) {
-      throw new UnauthorizedError('Invalid client credentials');
-    }
-
-    let tokenResponse;
-
-    if (grant_type === 'authorization_code') {
-      // Verify authorization code
-      const authCode = await this.db.getAuthorizationCode(code as string);
-      if (!authCode || authCode.clientId !== client_id || authCode.redirectUri !== redirect_uri) {
-        throw new UnauthorizedError('Invalid authorization code');
+      // Validate required parameters
+      if (!grant_type) {
+        throw new BadRequestError('Missing grant_type parameter');
       }
 
-      // Generate tokens
-      const accessToken = await generateToken({
-        sub: client_id as string,
-        scope: authCode.scope,
-        type: 'access'
-      });
-
-      const refreshToken = await generateToken({
-        sub: client_id as string,
-        scope: authCode.scope,
-        type: 'refresh'
-      });
-
-      tokenResponse = {
-        access_token: accessToken,
-        token_type: 'Bearer',
-        expires_in: 3600,
-        refresh_token: refreshToken,
-        scope: authCode.scope
-      };
-
-      // Invalidate used code
-      await this.db.deleteAuthorizationCode(code as string);
-
-    } else if (grant_type === 'refresh_token') {
-      // Verify refresh token
-      if (!refresh_token) {
-        throw new BadRequestError('Missing refresh token');
+      // Validate client credentials
+      if (!client_id || !client_secret) {
+        throw new UnauthorizedError('Missing client credentials');
       }
 
-      // TODO: Implement refresh token validation and rotation
-      throw new BadRequestError('Refresh token grant not implemented');
-    } else {
-      throw new BadRequestError('Unsupported grant type');
-    }
+      const client = await this.db.getOAuthClient(client_id as string);
+      if (!client || client.clientSecret !== client_secret) {
+        throw new UnauthorizedError('Invalid client credentials');
+      }
 
-    return c.json(tokenResponse);
+      let tokenResponse;
+
+      if (grant_type === 'authorization_code') {
+        // Validate required parameters for authorization code grant
+        if (!code || !redirect_uri) {
+          throw new BadRequestError('Missing required parameters for authorization code grant');
+        }
+
+        // Verify authorization code
+        const authCode = await this.db.getAuthorizationCode(code as string);
+        if (!authCode) {
+          throw new UnauthorizedError('Invalid authorization code');
+        }
+
+        // Verify the code belongs to this client and redirect URI
+        if (authCode.clientId !== client.id || authCode.redirectUri !== redirect_uri) {
+          throw new UnauthorizedError('Invalid authorization code for this client or redirect URI');
+        }
+
+        // Check if the code has expired
+        if (new Date() > authCode.expiresAt) {
+          throw new UnauthorizedError('Authorization code has expired');
+        }
+
+        // Check if the code has already been used
+        if (authCode.isUsed) {
+          throw new UnauthorizedError('Authorization code has already been used');
+        }
+
+        // Generate tokens
+        const accessToken = await generateToken({
+          sub: client.clientId,
+          scope: authCode.scope,
+          type: 'access'
+        });
+
+        const refreshToken = await generateToken({
+          sub: client.clientId,
+          scope: authCode.scope,
+          type: 'refresh'
+        });
+
+        // Mark the code as used
+        await this.db.deleteAuthorizationCode(code as string);
+
+        // Return the token response
+        tokenResponse = {
+          access_token: accessToken,
+          token_type: 'Bearer',
+          expires_in: 3600, // 1 hour
+          refresh_token: refreshToken,
+          scope: authCode.scope
+        };
+
+      } else if (grant_type === 'refresh_token') {
+        // Validate required parameters for refresh token grant
+        if (!refresh_token) {
+          throw new BadRequestError('Missing refresh_token parameter');
+        }
+
+        try {
+          // Verify the refresh token
+          const payload = await verifyToken(refresh_token as string);
+          
+          // Check if the token is a refresh token
+          if (payload.type !== 'refresh') {
+            throw new UnauthorizedError('Invalid token type');
+          }
+          
+          // Check if the token belongs to this client
+          if (payload.sub !== client.clientId) {
+            throw new UnauthorizedError('Token does not belong to this client');
+          }
+          
+          // Check if the token has been revoked
+          if (await this.db.isTokenRevoked(refresh_token as string)) {
+            throw new UnauthorizedError('Token has been revoked');
+          }
+          
+          // Generate a new access token
+          const accessToken = await generateToken({
+            sub: client.clientId,
+            scope: payload.scope || '',
+            type: 'access'
+          });
+          
+          // Return the token response
+          tokenResponse = {
+            access_token: accessToken,
+            token_type: 'Bearer',
+            expires_in: 3600, // 1 hour
+            scope: payload.scope
+          };
+        } catch (error) {
+          throw new UnauthorizedError('Invalid refresh token');
+        }
+      } else {
+        throw new BadRequestError(`Unsupported grant type: ${grant_type}`);
+      }
+
+      return c.json(tokenResponse);
+    } catch (error) {
+      if (error instanceof BadRequestError || error instanceof UnauthorizedError) {
+        throw error;
+      }
+      console.error('Token endpoint error:', error);
+      throw new BadRequestError('Failed to process token request');
+    }
   }
 
   // Implements RFC 7662 - OAuth 2.0 Token Introspection
   async introspect(c: Context) {
-    const body = await c.req.parseBody();
-    const { token } = body;
+    try {
+      const body = await c.req.parseBody();
+      const { token, token_type_hint } = body;
+      const clientId = c.req.header('Authorization')?.split(' ')[1];
 
-    if (!token) {
-      throw new BadRequestError('Missing token parameter');
+      // Validate required parameters
+      if (!token) {
+        throw new BadRequestError('Missing token parameter');
+      }
+
+      // Validate client authentication
+      if (!clientId) {
+        throw new UnauthorizedError('Client authentication required');
+      }
+
+      // Verify client
+      const client = await this.db.getOAuthClient(clientId);
+      if (!client) {
+        throw new UnauthorizedError('Invalid client');
+      }
+
+      try {
+        // Check if the token has been revoked
+        if (await this.db.isTokenRevoked(token as string)) {
+          return c.json({ active: false });
+        }
+
+        // Verify the token
+        const payload = await verifyToken(token as string);
+        
+        // Check if the token has expired
+        const now = Math.floor(Date.now() / 1000);
+        if (payload.exp && payload.exp < now) {
+          return c.json({ active: false });
+        }
+        
+        // Return the introspection response
+        return c.json({
+          active: true,
+          client_id: payload.sub,
+          scope: payload.scope,
+          token_type: payload.type === 'access' ? 'Bearer' : payload.type,
+          exp: payload.exp,
+          iat: payload.iat,
+          sub: payload.sub,
+          jti: payload.jti
+        });
+      } catch (error) {
+        // If token verification fails, return inactive
+        return c.json({ active: false });
+      }
+    } catch (error) {
+      if (error instanceof BadRequestError || error instanceof UnauthorizedError) {
+        throw error;
+      }
+      console.error('Token introspection error:', error);
+      throw new BadRequestError('Failed to process introspection request');
     }
-
-    // TODO: Implement token introspection
-    return c.json({
-      active: false
-    });
   }
 
   // Implements RFC 7009 - OAuth 2.0 Token Revocation
   async revoke(c: Context) {
-    const body = await c.req.parseBody();
-    const { token } = body;
+    try {
+      const body = await c.req.parseBody();
+      const { token, token_type_hint } = body;
+      const clientId = c.req.header('Authorization')?.split(' ')[1];
 
-    if (!token) {
-      throw new BadRequestError('Missing token parameter');
+      // Validate required parameters
+      if (!token) {
+        throw new BadRequestError('Missing token parameter');
+      }
+
+      // Validate client authentication
+      if (!clientId) {
+        throw new UnauthorizedError('Client authentication required');
+      }
+
+      // Verify client
+      const client = await this.db.getOAuthClient(clientId);
+      if (!client) {
+        throw new UnauthorizedError('Invalid client');
+      }
+
+      try {
+        // Check if the token is already revoked
+        if (await this.db.isTokenRevoked(token as string)) {
+          // RFC 7009 requires 200 OK even if token is already revoked
+          return c.json({}, 200);
+        }
+
+        // Verify the token
+        const payload = await verifyToken(token as string);
+        
+        // Check if the token belongs to this client
+        if (payload.sub !== client.clientId) {
+          // RFC 7009 requires 200 OK even if token doesn't belong to client
+          return c.json({}, 200);
+        }
+        
+        // Determine token type if not provided
+        const tokenType = token_type_hint || payload.type;
+        
+        // Revoke the token
+        await this.db.revokeToken({
+          token: token as string,
+          type: tokenType as string,
+          username: payload.sub,
+          expiresAt: new Date(payload.exp! * 1000)
+        });
+        
+        return c.json({}, 200);
+      } catch (error) {
+        // RFC 7009 requires 200 OK even if token is invalid
+        return c.json({}, 200);
+      }
+    } catch (error) {
+      if (error instanceof BadRequestError || error instanceof UnauthorizedError) {
+        throw error;
+      }
+      console.error('Token revocation error:', error);
+      throw new BadRequestError('Failed to process revocation request');
     }
-
-    // TODO: Implement token revocation
-    return c.json({}, 200);
   }
 } 
