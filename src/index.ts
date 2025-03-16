@@ -1,5 +1,4 @@
 import { Hono } from 'hono';
-import { serve } from '@hono/node-server';
 import { logger } from 'hono/logger';
 import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
@@ -66,13 +65,10 @@ app.get('/health', (c) => {
   });
 });
 
-// Start server
-const port = parseInt(process.env.PORT || '6669', 10);
-console.log(`Server starting on port ${port}...`);
+// Log server startup
+const port = parseInt(process.env.PORT || '7777', 10);
+console.log(`Server will start on port ${port}...`);
 
-serve({
-  fetch: app.fetch,
-  port
-});
-
+// Export the app without manually calling serve()
+// Bun will automatically serve this when using 'bun run'
 export default app; 
