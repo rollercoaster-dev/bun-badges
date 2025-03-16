@@ -1,7 +1,7 @@
 import { Context } from 'hono';
 import { generateCode, isCodeExpired, isValidCodeFormat } from '@utils/auth/codeGenerator';
 import { RateLimiter } from '@utils/auth/rateLimiter';
-import { generateToken, getTokenExpirySeconds } from '@utils/auth/jwt';
+import { generateToken, getTokenExpirySeconds, verifyToken } from '@utils/auth/jwt';
 
 type CodeRequestBody = {
   username: string;
@@ -10,6 +10,10 @@ type CodeRequestBody = {
 type CodeVerifyBody = {
   username: string;
   code: string;
+};
+
+type RefreshTokenBody = {
+  refreshToken: string;
 };
 
 export class AuthController {
@@ -80,18 +84,59 @@ export class AuthController {
     // In production, this should verify against stored codes
     
     try {
-      const token = await generateToken(body.username);
-      const expiresIn = getTokenExpirySeconds();
-      
+      const [accessToken, refreshToken] = await Promise.all([
+        generateToken(body.username, 'access'),
+        generateToken(body.username, 'refresh')
+      ]);
+
       return c.json({
         message: 'Code verified successfully',
-        token,
-        expiresIn,
+        accessToken,
+        refreshToken,
+        expiresIn: getTokenExpirySeconds('access'),
+        refreshExpiresIn: getTokenExpirySeconds('refresh'),
       }, 200);
     } catch (error) {
       return c.json({
-        error: 'Failed to generate token',
+        error: 'Failed to generate tokens',
       }, 500);
+    }
+  }
+
+  async refreshToken(c: Context) {
+    const body = await c.req.json<RefreshTokenBody>();
+    
+    if (!body.refreshToken) {
+      return c.json({ error: 'Refresh token is required' }, 400);
+    }
+
+    const clientIp = c.req.header('x-forwarded-for') || 'unknown';
+    const rateLimitKey = `token-refresh:${clientIp}`;
+
+    if (!this.rateLimiter.attempt(rateLimitKey)) {
+      const timeToReset = this.rateLimiter.getTimeToReset(rateLimitKey);
+      return c.json({
+        error: 'Too many refresh attempts',
+        retryAfter: Math.ceil(timeToReset / 1000),
+      }, 429);
+    }
+
+    try {
+      // Verify the refresh token
+      const payload = await verifyToken(body.refreshToken, 'refresh');
+      
+      // Generate new access token
+      const accessToken = await generateToken(payload.sub, 'access');
+      
+      return c.json({
+        message: 'Token refreshed successfully',
+        accessToken,
+        expiresIn: getTokenExpirySeconds('access'),
+      }, 200);
+    } catch (error) {
+      return c.json({
+        error: 'Invalid refresh token',
+      }, 401);
     }
   }
 } 

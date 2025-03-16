@@ -3,14 +3,16 @@ import { Context } from 'hono';
 import { AuthController } from '@controllers/auth.controller';
 import { RateLimiter } from '@utils/auth/rateLimiter';
 import { AUTH_ROUTES } from '@routes/aliases';
-import { verifyToken, getTokenExpirySeconds } from '@utils/auth/jwt';
+import { verifyToken, getTokenExpirySeconds, generateToken } from '@utils/auth/jwt';
 
 type AuthResponse = {
   message?: string;
   error?: string;
   code?: string;
-  token?: string;
+  accessToken?: string;
+  refreshToken?: string;
   expiresIn?: number;
+  refreshExpiresIn?: number;
   retryAfter?: number;
 };
 
@@ -175,7 +177,7 @@ describe('Auth Controller', () => {
       expect(body.retryAfter).toBeGreaterThan(0);
     });
 
-    test('returns valid JWT token on successful verification', async () => {
+    test('returns valid JWT tokens on successful verification', async () => {
       const controller = new AuthController();
       const username = 'test@example.com';
       const ctx = createMockContext({ 
@@ -187,15 +189,26 @@ describe('Auth Controller', () => {
       const body = await response.json() as AuthResponse;
       expect(response.status).toBe(200);
       expect(body.message).toBe('Code verified successfully');
-      expect(body.token).toBeDefined();
-      expect(body.expiresIn).toBe(getTokenExpirySeconds());
+      expect(body.accessToken).toBeDefined();
+      expect(body.refreshToken).toBeDefined();
+      expect(body.expiresIn).toBe(getTokenExpirySeconds('access'));
+      expect(body.refreshExpiresIn).toBe(getTokenExpirySeconds('refresh'));
 
-      // Verify the token is a valid JWT with correct payload
-      const payload = await verifyToken(body.token!);
-      expect(payload.sub).toBe(username);
-      expect(payload.iat).toBeDefined();
-      expect(payload.exp).toBeDefined();
-      expect(payload.exp! - payload.iat!).toBe(getTokenExpirySeconds());
+      // Verify the access token
+      const accessPayload = await verifyToken(body.accessToken!, 'access');
+      expect(accessPayload.sub).toBe(username);
+      expect(accessPayload.type).toBe('access');
+      expect(accessPayload.iat).toBeDefined();
+      expect(accessPayload.exp).toBeDefined();
+      expect(accessPayload.exp! - accessPayload.iat!).toBe(getTokenExpirySeconds('access'));
+
+      // Verify the refresh token
+      const refreshPayload = await verifyToken(body.refreshToken!, 'refresh');
+      expect(refreshPayload.sub).toBe(username);
+      expect(refreshPayload.type).toBe('refresh');
+      expect(refreshPayload.iat).toBeDefined();
+      expect(refreshPayload.exp).toBeDefined();
+      expect(refreshPayload.exp! - refreshPayload.iat!).toBe(getTokenExpirySeconds('refresh'));
     });
 
     test('handles token generation failure', async () => {
@@ -209,6 +222,78 @@ describe('Auth Controller', () => {
       const body = await response.json() as AuthResponse;
       expect(response.status).toBe(400);
       expect(body.error).toBe('Username and code are required');
+    });
+  });
+
+  describe(AUTH_ROUTES.REFRESH_TOKEN, () => {
+    test('requires refresh token', async () => {
+      const controller = new AuthController();
+      const ctx = createMockContext({});
+
+      const response = await controller.refreshToken(ctx);
+      const body = await response.json() as AuthResponse;
+      expect(response.status).toBe(400);
+      expect(body.error).toBe('Refresh token is required');
+    });
+
+    test('validates refresh token type', async () => {
+      const controller = new AuthController();
+      
+      // Generate an access token but try to use it as refresh token
+      const invalidToken = await generateToken('test@example.com', 'access');
+      const ctx = createMockContext({ refreshToken: invalidToken });
+
+      const response = await controller.refreshToken(ctx);
+      const body = await response.json() as AuthResponse;
+      expect(response.status).toBe(401);
+      expect(body.error).toBe('Invalid refresh token');
+    });
+
+    test('enforces rate limiting', async () => {
+      const rateLimiter = new RateLimiter({
+        maxAttempts: 5,
+        windowMs: 1000,
+      });
+      const controller = new AuthController(rateLimiter);
+      const ip = 'test-ip';
+      const refreshToken = await generateToken('test@example.com', 'refresh');
+
+      // Make 5 refresh attempts
+      for (let i = 0; i < 5; i++) {
+        const ctx = createMockContext({ refreshToken }, ip);
+        const response = await controller.refreshToken(ctx);
+        expect(response.status).toBe(200);
+      }
+
+      // 6th attempt should be rate limited
+      const ctx = createMockContext({ refreshToken }, ip);
+      const response = await controller.refreshToken(ctx);
+      const body = await response.json() as AuthResponse;
+      expect(response.status).toBe(429);
+      expect(body.error).toBe('Too many refresh attempts');
+      expect(body.retryAfter).toBeGreaterThan(0);
+    });
+
+    test('returns new access token for valid refresh token', async () => {
+      const controller = new AuthController();
+      const username = 'test@example.com';
+      const refreshToken = await generateToken(username, 'refresh');
+      const ctx = createMockContext({ refreshToken });
+
+      const response = await controller.refreshToken(ctx);
+      const body = await response.json() as AuthResponse;
+      expect(response.status).toBe(200);
+      expect(body.message).toBe('Token refreshed successfully');
+      expect(body.accessToken).toBeDefined();
+      expect(body.expiresIn).toBe(getTokenExpirySeconds('access'));
+
+      // Verify the new access token
+      const payload = await verifyToken(body.accessToken!, 'access');
+      expect(payload.sub).toBe(username);
+      expect(payload.type).toBe('access');
+      expect(payload.iat).toBeDefined();
+      expect(payload.exp).toBeDefined();
+      expect(payload.exp! - payload.iat!).toBe(getTokenExpirySeconds('access'));
     });
   });
 }); 
