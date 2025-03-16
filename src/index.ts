@@ -19,7 +19,7 @@ app.get('/health', (c) => {
 });
 
 // Start server
-const port = parseInt(process.env.PORT || '3000', 10);
+const port = parseInt(process.env.PORT || '6669', 10);
 console.log(`Server starting on port ${port}...`);
 
 serve({
