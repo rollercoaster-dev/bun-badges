@@ -1,9 +1,14 @@
 import { Context } from 'hono';
-import { generateCode } from '@utils/auth/codeGenerator';
+import { generateCode, isCodeExpired, isValidCodeFormat } from '@utils/auth/codeGenerator';
 import { RateLimiter } from '@utils/auth/rateLimiter';
 
 type CodeRequestBody = {
   username: string;
+};
+
+type CodeVerifyBody = {
+  username: string;
+  code: string;
 };
 
 export class AuthController {
@@ -44,6 +49,38 @@ export class AuthController {
       expiresIn: ttl,
       // DEVELOPMENT ONLY - remove in production
       code,
+    }, 200);
+  }
+
+  async verifyCode(c: Context) {
+    const body = await c.req.json<CodeVerifyBody>();
+    
+    if (!body.username || !body.code) {
+      return c.json({ error: 'Username and code are required' }, 400);
+    }
+
+    if (!isValidCodeFormat(body.code)) {
+      return c.json({ error: 'Invalid code format' }, 400);
+    }
+
+    const clientIp = c.req.header('x-forwarded-for') || 'unknown';
+    const rateLimitKey = `code-verify:${clientIp}:${body.username}`;
+
+    if (!this.rateLimiter.attempt(rateLimitKey)) {
+      const timeToReset = this.rateLimiter.getTimeToReset(rateLimitKey);
+      return c.json({
+        error: 'Too many verification attempts',
+        retryAfter: Math.ceil(timeToReset / 1000),
+      }, 429);
+    }
+
+    // TODO: Verify code from database
+    // For development, we'll just return success
+    // In production, this should verify against stored codes
+    return c.json({
+      message: 'Code verified successfully',
+      // TODO: Return JWT token here
+      token: 'dummy-token',
     }, 200);
   }
 } 
