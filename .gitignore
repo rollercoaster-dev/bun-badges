@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+bun.lockb
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Build output
+dist/
+build/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Test coverage
+coverage/
+
+# Temporary files
+tmp/
+temp/
+
+# Debug files
+.debug/
+
+# Local development
+*.local
+
+# TypeScript
+*.tsbuildinfo 
