@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto';
+import { randomBytes } from "crypto";
 
 // Generates a secure random base64url-encoded string for OAuth authorization codes
 export async function generateCode(): Promise<string> {
@@ -9,11 +9,12 @@ export async function generateCode(): Promise<string> {
         return;
       }
       // Convert to base64url encoding (RFC 4648)
-      const code = buffer.toString('base64')
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=/g, '');
+      const code = buffer
+        .toString("base64")
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=/g, "");
       resolve(code);
     });
   });
-} 
+}

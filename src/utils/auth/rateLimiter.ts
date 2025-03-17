@@ -47,7 +47,9 @@ export class RateLimiter {
     }
 
     if (entry.count >= this.options.maxAttempts) {
-      const blockedUntil = new Date(entry.lastAttempt.getTime() + this.options.blockDurationMs);
+      const blockedUntil = new Date(
+        entry.lastAttempt.getTime() + this.options.blockDurationMs,
+      );
       if (now < blockedUntil) {
         return false;
       }
@@ -92,4 +94,4 @@ export class RateLimiter {
       }
     }
   }
-} 
+}
