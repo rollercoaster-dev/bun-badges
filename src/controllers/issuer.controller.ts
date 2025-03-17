@@ -5,14 +5,26 @@ import {
   CreateIssuerDto,
   UpdateIssuerDto,
   constructIssuerJsonLd,
+  constructIssuerJsonLdV3,
 } from "../models/issuer.model";
 import crypto from "crypto";
+
+export type IssuerVersion = "2.0" | "3.0";
+
+// Helper function to convert null to undefined
+function nullToUndefined<T>(value: T | null): T | undefined {
+  return value === null ? undefined : value;
+}
 
 export class IssuerController {
   /**
    * List all issuer profiles with optional pagination
    */
-  async listIssuers(page: number = 1, limit: number = 20) {
+  async listIssuers(
+    page: number = 1,
+    limit: number = 20,
+    version: IssuerVersion = "2.0",
+  ) {
     const offset = (page - 1) * limit;
 
     try {
@@ -26,8 +38,38 @@ export class IssuerController {
         .select({ count: count() })
         .from(issuerProfiles);
 
+      // Transform results based on requested version
+      const transformedIssuers = results.map((issuer) => ({
+        ...issuer,
+        description: nullToUndefined(issuer.description),
+        email: nullToUndefined(issuer.email),
+        issuerJson:
+          version === "3.0"
+            ? constructIssuerJsonLdV3(
+                new URL(issuer.url).origin,
+                issuer.issuerId,
+                {
+                  name: issuer.name,
+                  url: issuer.url,
+                  description: nullToUndefined(issuer.description),
+                  email: nullToUndefined(issuer.email),
+                  publicKey: issuer.publicKey as any,
+                },
+              )
+            : constructIssuerJsonLd(
+                new URL(issuer.url).origin,
+                issuer.issuerId,
+                {
+                  name: issuer.name,
+                  url: issuer.url,
+                  description: nullToUndefined(issuer.description),
+                  email: nullToUndefined(issuer.email),
+                },
+              ),
+      }));
+
       return {
-        issuers: results,
+        issuers: transformedIssuers,
         pagination: {
           total: totalCount[0].count,
           page,
@@ -45,7 +87,7 @@ export class IssuerController {
   /**
    * Get a specific issuer profile by ID
    */
-  async getIssuer(issuerId: string) {
+  async getIssuer(issuerId: string, version: IssuerVersion = "2.0") {
     try {
       const issuer = await db
         .select()
@@ -57,7 +99,29 @@ export class IssuerController {
         throw new Error("Issuer not found");
       }
 
-      return issuer[0];
+      // Transform to requested version
+      const transformedIssuer = {
+        ...issuer[0],
+        description: nullToUndefined(issuer[0].description),
+        email: nullToUndefined(issuer[0].email),
+        issuerJson:
+          version === "3.0"
+            ? constructIssuerJsonLdV3(new URL(issuer[0].url).origin, issuerId, {
+                name: issuer[0].name,
+                url: issuer[0].url,
+                description: nullToUndefined(issuer[0].description),
+                email: nullToUndefined(issuer[0].email),
+                publicKey: issuer[0].publicKey as any,
+              })
+            : constructIssuerJsonLd(new URL(issuer[0].url).origin, issuerId, {
+                name: issuer[0].name,
+                url: issuer[0].url,
+                description: nullToUndefined(issuer[0].description),
+                email: nullToUndefined(issuer[0].email),
+              }),
+      };
+
+      return transformedIssuer;
     } catch (error) {
       throw new Error(
         `Failed to get issuer: ${error instanceof Error ? error.message : String(error)}`,
@@ -72,22 +136,27 @@ export class IssuerController {
     ownerUserId: string,
     data: CreateIssuerDto,
     hostUrl: string,
+    version: IssuerVersion = "2.0",
   ) {
     try {
       // Create a placeholder ID that will be updated after insertion
       const placeholderId = crypto.randomUUID();
 
-      // Generate the Open Badges 2.0 compliant JSON-LD
-      const issuerJson = constructIssuerJsonLd(hostUrl, placeholderId, data);
+      // Generate the JSON-LD based on requested version
+      const issuerJson =
+        version === "3.0"
+          ? constructIssuerJsonLdV3(hostUrl, placeholderId, data)
+          : constructIssuerJsonLd(hostUrl, placeholderId, data);
 
       // Prepare issuer data for insertion
       const newIssuer = {
         name: data.name,
         url: data.url,
-        description: data.description,
-        email: data.email,
+        description: data.description ?? null,
+        email: data.email ?? null,
         ownerUserId,
         issuerJson,
+        publicKey: data.publicKey ?? null,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -105,11 +174,21 @@ export class IssuerController {
       const insertedIssuer = result[0];
 
       // Update the issuer JSON with the correct ID
-      const updatedIssuerJson = constructIssuerJsonLd(
-        hostUrl,
-        insertedIssuer.issuerId,
-        data,
-      );
+      const updatedIssuerJson =
+        version === "3.0"
+          ? constructIssuerJsonLdV3(hostUrl, insertedIssuer.issuerId, {
+              name: data.name,
+              url: data.url,
+              description: data.description,
+              email: data.email,
+              publicKey: data.publicKey,
+            })
+          : constructIssuerJsonLd(hostUrl, insertedIssuer.issuerId, {
+              name: data.name,
+              url: data.url,
+              description: data.description,
+              email: data.email,
+            });
 
       // Update the issuer with the correct JSON-LD
       await db
@@ -120,6 +199,8 @@ export class IssuerController {
       // Return the updated issuer
       return {
         ...insertedIssuer,
+        description: nullToUndefined(insertedIssuer.description),
+        email: nullToUndefined(insertedIssuer.email),
         issuerJson: updatedIssuerJson,
       };
     } catch (error) {
@@ -132,28 +213,42 @@ export class IssuerController {
   /**
    * Update an existing issuer profile
    */
-  async updateIssuer(issuerId: string, data: UpdateIssuerDto, hostUrl: string) {
+  async updateIssuer(
+    issuerId: string,
+    data: UpdateIssuerDto,
+    hostUrl: string,
+    version: IssuerVersion = "2.0",
+  ) {
     try {
       // Verify the issuer exists and get current data
       const existingIssuer = await this.getIssuer(issuerId);
 
-      // Merge existing data with updates, converting null to undefined
+      // Merge existing data with updates
       const updatedData = {
         name: data.name ?? existingIssuer.name,
         url: data.url ?? existingIssuer.url,
-        description:
-          data.description ?? existingIssuer.description ?? undefined,
-        email: data.email ?? existingIssuer.email ?? undefined,
+        description: data.description ?? existingIssuer.description ?? null,
+        email: data.email ?? existingIssuer.email ?? null,
+        publicKey: data.publicKey ?? existingIssuer.publicKey ?? null,
         updatedAt: new Date(),
       };
 
       // Generate updated JSON-LD
-      const updatedIssuerJson = constructIssuerJsonLd(hostUrl, issuerId, {
-        name: updatedData.name,
-        url: updatedData.url,
-        description: updatedData.description,
-        email: updatedData.email,
-      });
+      const updatedIssuerJson =
+        version === "3.0"
+          ? constructIssuerJsonLdV3(hostUrl, issuerId, {
+              name: updatedData.name,
+              url: updatedData.url,
+              description: nullToUndefined(updatedData.description),
+              email: nullToUndefined(updatedData.email),
+              publicKey: updatedData.publicKey as any,
+            })
+          : constructIssuerJsonLd(hostUrl, issuerId, {
+              name: updatedData.name,
+              url: updatedData.url,
+              description: nullToUndefined(updatedData.description),
+              email: nullToUndefined(updatedData.email),
+            });
 
       // Update the issuer
       const result = await db
@@ -169,7 +264,11 @@ export class IssuerController {
         throw new Error("Failed to update issuer");
       }
 
-      return result[0];
+      return {
+        ...result[0],
+        description: nullToUndefined(result[0].description),
+        email: nullToUndefined(result[0].email),
+      };
     } catch (error) {
       throw new Error(
         `Failed to update issuer: ${error instanceof Error ? error.message : String(error)}`,
@@ -246,16 +345,15 @@ export class IssuerController {
   /**
    * Verify an issuer profile against Open Badges standards
    */
-  verifyIssuer(issuerJson: any): { valid: boolean; errors: string[] } {
+  verifyIssuer(
+    issuerJson: any,
+    version: IssuerVersion = "2.0",
+  ): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
 
-    // Basic verification checks
+    // Common validations
     if (!issuerJson["@context"]) {
       errors.push("Missing @context property");
-    }
-
-    if (issuerJson.type !== "Issuer") {
-      errors.push("Invalid type - must be 'Issuer'");
     }
 
     if (!issuerJson.id) {
@@ -268,6 +366,46 @@ export class IssuerController {
 
     if (!issuerJson.url) {
       errors.push("Missing url property");
+    }
+
+    // Version-specific validations
+    if (version === "2.0") {
+      if (issuerJson.type !== "Profile" && issuerJson.type !== "Issuer") {
+        errors.push("Invalid type - must be 'Profile' or 'Issuer'");
+      }
+    } else {
+      if (
+        issuerJson.type !==
+        "https://purl.imsglobal.org/spec/vc/ob/vocab.html#Profile"
+      ) {
+        errors.push("Invalid type - must be OB 3.0 Profile type");
+      }
+
+      // Check DID format if present
+      if (issuerJson.id && issuerJson.id.startsWith("did:")) {
+        if (!issuerJson.id.startsWith("did:web:")) {
+          errors.push("Only did:web method is supported");
+        }
+      }
+
+      // Check public key if present
+      if (issuerJson.publicKey) {
+        if (!Array.isArray(issuerJson.publicKey)) {
+          errors.push("publicKey must be an array");
+        } else {
+          issuerJson.publicKey.forEach((key: any, index: number) => {
+            if (!key.id) errors.push(`Public key ${index} missing id`);
+            if (!key.type) errors.push(`Public key ${index} missing type`);
+            if (!key.controller)
+              errors.push(`Public key ${index} missing controller`);
+            if (!key.publicKeyJwk && !key.publicKeyPem) {
+              errors.push(
+                `Public key ${index} must have either publicKeyJwk or publicKeyPem`,
+              );
+            }
+          });
+        }
+      }
     }
 
     return {
