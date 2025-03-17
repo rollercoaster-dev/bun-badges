@@ -1,7 +1,11 @@
 import { Hono } from "hono";
 import { mock } from "bun:test";
 import { setupJwtMock } from "./auth-test-utils";
-import { Role } from "../../middleware/auth";
+import { type JSONValue } from "hono/utils/types";
+import type { Context } from "hono";
+
+// Export the Context type to make sure it's used
+export type { Context };
 
 /**
  * Mock database data for testing
@@ -300,4 +304,34 @@ export function createTestRequest(
   });
 
   return request;
+}
+
+export interface TestContext {
+  get: (key: string) => any;
+  set: (key: string, value: any) => void;
+  status: (code: number) => void;
+  json: (data: JSONValue) => Response;
+  req: {
+    param: (key: string) => string | undefined;
+    query: (key?: string) => string | Record<string, string> | undefined;
+    header: (key: string) => string | undefined;
+  };
+}
+
+export function createMockContext(): TestContext {
+  return {
+    get: mock(() => undefined),
+    set: mock(() => {}),
+    status: mock(() => {}),
+    json: mock((data: JSONValue) => new Response(JSON.stringify(data))),
+    req: {
+      param: mock(() => undefined),
+      query: mock(() => undefined),
+      header: mock(() => undefined),
+    },
+  };
+}
+
+export function createNextFunction(): () => Promise<void> {
+  return mock(async () => {});
 }

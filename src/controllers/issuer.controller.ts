@@ -8,6 +8,7 @@ import {
   constructIssuerJsonLdV3,
 } from "../models/issuer.model";
 import crypto from "crypto";
+import { type Context } from "hono";
 
 export type IssuerVersion = "2.0" | "3.0";
 
@@ -20,18 +21,17 @@ export class IssuerController {
   /**
    * List all issuer profiles with optional pagination
    */
-  async listIssuers(
-    page: number = 1,
-    limit: number = 20,
-    version: IssuerVersion = "2.0",
-  ) {
-    const offset = (page - 1) * limit;
+  async listIssuers(c: Context) {
+    const { page = "1", limit = "20", version = "2.0" } = c.req.query();
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const offset = (pageNum - 1) * limitNum;
 
     try {
       const results = await db
         .select()
         .from(issuerProfiles)
-        .limit(limit)
+        .limit(limitNum)
         .offset(offset);
 
       const totalCount = await db
@@ -68,15 +68,14 @@ export class IssuerController {
               ),
       }));
 
-      return {
-        issuers: transformedIssuers,
+      return c.json({
+        data: transformedIssuers,
         pagination: {
           total: totalCount[0].count,
-          page,
-          limit,
-          pages: Math.ceil(totalCount[0].count / limit),
+          page: pageNum,
+          pageSize: limitNum,
         },
-      };
+      });
     } catch (error) {
       throw new Error(
         `Failed to list issuers: ${error instanceof Error ? error.message : String(error)}`,
@@ -87,7 +86,10 @@ export class IssuerController {
   /**
    * Get a specific issuer profile by ID
    */
-  async getIssuer(issuerId: string, version: IssuerVersion = "2.0") {
+  async getIssuer(c: Context) {
+    const issuerId = c.req.param("id");
+    const version = c.req.query("version") || "2.0";
+
     try {
       const issuer = await db
         .select()
@@ -99,29 +101,37 @@ export class IssuerController {
         throw new Error("Issuer not found");
       }
 
-      // Transform to requested version
+      // Transform issuer based on requested version
       const transformedIssuer = {
         ...issuer[0],
         description: nullToUndefined(issuer[0].description),
         email: nullToUndefined(issuer[0].email),
         issuerJson:
           version === "3.0"
-            ? constructIssuerJsonLdV3(new URL(issuer[0].url).origin, issuerId, {
-                name: issuer[0].name,
-                url: issuer[0].url,
-                description: nullToUndefined(issuer[0].description),
-                email: nullToUndefined(issuer[0].email),
-                publicKey: issuer[0].publicKey as any,
-              })
-            : constructIssuerJsonLd(new URL(issuer[0].url).origin, issuerId, {
-                name: issuer[0].name,
-                url: issuer[0].url,
-                description: nullToUndefined(issuer[0].description),
-                email: nullToUndefined(issuer[0].email),
-              }),
+            ? constructIssuerJsonLdV3(
+                new URL(issuer[0].url).origin,
+                issuer[0].issuerId,
+                {
+                  name: issuer[0].name,
+                  url: issuer[0].url,
+                  description: nullToUndefined(issuer[0].description),
+                  email: nullToUndefined(issuer[0].email),
+                  publicKey: issuer[0].publicKey as any,
+                },
+              )
+            : constructIssuerJsonLd(
+                new URL(issuer[0].url).origin,
+                issuer[0].issuerId,
+                {
+                  name: issuer[0].name,
+                  url: issuer[0].url,
+                  description: nullToUndefined(issuer[0].description),
+                  email: nullToUndefined(issuer[0].email),
+                },
+              ),
       };
 
-      return transformedIssuer;
+      return c.json(transformedIssuer);
     } catch (error) {
       throw new Error(
         `Failed to get issuer: ${error instanceof Error ? error.message : String(error)}`,
@@ -214,22 +224,31 @@ export class IssuerController {
    * Update an existing issuer profile
    */
   async updateIssuer(
-    issuerId: string,
+    c: Context,
     data: UpdateIssuerDto,
     hostUrl: string,
     version: IssuerVersion = "2.0",
   ) {
     try {
-      // Verify the issuer exists and get current data
-      const existingIssuer = await this.getIssuer(issuerId);
+      const issuerId = c.req.param("id");
+      // Get the current issuer data
+      const issuer = await db
+        .select()
+        .from(issuerProfiles)
+        .where(eq(issuerProfiles.issuerId, issuerId))
+        .limit(1);
+
+      if (!issuer || issuer.length === 0) {
+        throw new Error("Issuer not found");
+      }
 
       // Merge existing data with updates
       const updatedData = {
-        name: data.name ?? existingIssuer.name,
-        url: data.url ?? existingIssuer.url,
-        description: data.description ?? existingIssuer.description ?? null,
-        email: data.email ?? existingIssuer.email ?? null,
-        publicKey: data.publicKey ?? existingIssuer.publicKey ?? null,
+        name: data.name ?? issuer[0].name,
+        url: data.url ?? issuer[0].url,
+        description: data.description ?? issuer[0].description ?? null,
+        email: data.email ?? issuer[0].email ?? null,
+        publicKey: data.publicKey ?? issuer[0].publicKey ?? null,
         updatedAt: new Date(),
       };
 
@@ -253,10 +272,7 @@ export class IssuerController {
       // Update the issuer
       const result = await db
         .update(issuerProfiles)
-        .set({
-          ...updatedData,
-          issuerJson: updatedIssuerJson,
-        })
+        .set({ ...updatedData, issuerJson: updatedIssuerJson })
         .where(eq(issuerProfiles.issuerId, issuerId))
         .returning();
 
@@ -264,11 +280,13 @@ export class IssuerController {
         throw new Error("Failed to update issuer");
       }
 
-      return {
+      // Return the updated issuer
+      return c.json({
         ...result[0],
         description: nullToUndefined(result[0].description),
         email: nullToUndefined(result[0].email),
-      };
+        issuerJson: updatedIssuerJson,
+      });
     } catch (error) {
       throw new Error(
         `Failed to update issuer: ${error instanceof Error ? error.message : String(error)}`,

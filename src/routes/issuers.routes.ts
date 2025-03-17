@@ -1,11 +1,14 @@
 import { Hono } from "hono";
-import { Context } from "hono";
+import { type Context } from "hono";
 import {
   IssuerController,
   IssuerVersion,
 } from "../controllers/issuer.controller";
 import { ISSUER_ROUTES } from "./aliases";
-import { createIssuerSchema, updateIssuerSchema } from "../models/issuer.model";
+import {
+  type CreateIssuerDto,
+  type UpdateIssuerDto,
+} from "../models/issuer.model";
 import { ZodError } from "zod";
 import {
   Role,
@@ -23,8 +26,8 @@ declare module "hono" {
   }
 }
 
-const issuers = new Hono();
 const controller = new IssuerController();
+const issuers = new Hono();
 
 // Helper function to determine OB version from Accept header
 function determineVersion(accept: string | null): IssuerVersion {
@@ -42,240 +45,70 @@ function determineVersion(accept: string | null): IssuerVersion {
   return "2.0";
 }
 
-// Helper to get issuer owner ID
-async function getIssuerOwnerId(c: Context): Promise<string> {
-  const issuerId = c.req.param("id");
-  const issuer = await controller.getIssuer(issuerId);
-  return issuer.ownerUserId;
+/**
+ * Get the owner user ID for an issuer
+ */
+async function getIssuerOwner(c: Context): Promise<string> {
+  const id = c.req.param("id");
+  if (!id) throw new Error("Issuer ID is required");
+  const issuer = await controller.getIssuer(c);
+  return (issuer as any).ownerUserId;
 }
 
 // List all issuer profiles - requires ISSUER_VIEWER role
-issuers.get(
-  ISSUER_ROUTES.LIST,
-  combineMiddleware(requireAuth, requireRole(Role.ISSUER_VIEWER)),
-  async (c) => {
-    try {
-      // Extract pagination parameters
-      const page = parseInt(c.req.query("page") || "1", 10);
-      const limit = parseInt(c.req.query("limit") || "20", 10);
-
-      // Determine version from Accept header
-      const version = determineVersion(c.req.header("Accept") ?? null);
-
-      // Get issuers with pagination
-      const result = await controller.listIssuers(page, limit, version);
-
-      return c.json({
-        status: "success",
-        data: result,
-      });
-    } catch (error) {
-      console.error("Failed to list issuers:", error);
-      return c.json(
-        {
-          status: "error",
-          error: {
-            code: "SERVER_ERROR",
-            message: "Failed to retrieve issuers",
-          },
-        },
-        500,
-      );
-    }
-  },
-);
+issuers.get("/", requireRole(Role.ISSUER_VIEWER), async (c) => {
+  try {
+    return await controller.listIssuers(c);
+  } catch (error) {
+    throw new Error(
+      `Failed to list issuers: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+});
 
 // Get a specific issuer by ID - requires ISSUER_VIEWER role
-issuers.get(
-  ISSUER_ROUTES.GET,
-  combineMiddleware(requireAuth, requireRole(Role.ISSUER_VIEWER)),
-  async (c) => {
-    try {
-      const issuerId = c.req.param("id");
-      const version = determineVersion(c.req.header("Accept") ?? null);
-
-      // Get the issuer
-      const issuer = await controller.getIssuer(issuerId, version);
-
-      return c.json({
-        status: "success",
-        data: {
-          issuer,
-        },
-      });
-    } catch (error) {
-      if (error instanceof Error && error.message === "Issuer not found") {
-        return c.json(
-          {
-            status: "error",
-            error: {
-              code: "NOT_FOUND",
-              message: "Issuer not found",
-            },
-          },
-          404,
-        );
-      }
-
-      console.error("Failed to get issuer:", error);
-      return c.json(
-        {
-          status: "error",
-          error: {
-            code: "SERVER_ERROR",
-            message: "Failed to retrieve issuer",
-          },
-        },
-        500,
-      );
-    }
-  },
-);
+issuers.get("/:id", requireRole(Role.ISSUER_VIEWER), async (c) => {
+  try {
+    return await controller.getIssuer(c);
+  } catch (error) {
+    throw new Error(
+      `Failed to get issuer: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+});
 
 // Create a new issuer profile - requires ISSUER_ADMIN role
-issuers.post(
-  ISSUER_ROUTES.CREATE,
-  combineMiddleware(requireAuth, requireRole(Role.ISSUER_ADMIN)),
-  async (c) => {
-    try {
-      const body = await c.req.json();
-      const version = determineVersion(c.req.header("Accept") ?? null);
+issuers.post("/", requireAuth, requireRole(Role.ISSUER_ADMIN), async (c) => {
+  try {
+    const data = await c.req.json<CreateIssuerDto>();
+    const userId = (c.get("user") as any).id;
+    const hostUrl = new URL(c.req.url).origin;
 
-      // Validate the request body
-      try {
-        const validatedData = createIssuerSchema.parse(body);
-
-        // Get the authenticated user ID from the context
-        const user = c.get("user");
-        const ownerUserId = user.id;
-
-        // Get the host URL for constructing absolute URLs
-        const hostUrl = new URL(c.req.url).origin;
-
-        // Create the issuer
-        const issuer = await controller.createIssuer(
-          ownerUserId,
-          validatedData,
-          hostUrl,
-          version,
-        );
-
-        return c.json(
-          {
-            status: "success",
-            data: {
-              issuer,
-            },
-          },
-          201,
-        );
-      } catch (validationError) {
-        if (validationError instanceof ZodError) {
-          return c.json(
-            {
-              status: "error",
-              error: {
-                code: "VALIDATION",
-                message: "Invalid request data",
-                details: validationError.errors,
-              },
-            },
-            400,
-          );
-        }
-        throw validationError;
-      }
-    } catch (error) {
-      console.error("Failed to create issuer:", error);
-      return c.json(
-        {
-          status: "error",
-          error: {
-            code: "SERVER_ERROR",
-            message: "Failed to create issuer",
-          },
-        },
-        500,
-      );
-    }
-  },
-);
+    const result = await controller.createIssuer(userId, data, hostUrl);
+    return c.json(result);
+  } catch (error) {
+    throw new Error(
+      `Failed to create issuer: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+});
 
 // Update an existing issuer profile - requires ISSUER_ADMIN role or ownership
 issuers.put(
-  ISSUER_ROUTES.UPDATE,
+  "/:id",
   combineMiddleware(
     requireAuth,
     requireRole([Role.ISSUER_ADMIN, Role.ISSUER_OWNER]),
-    requireOwnership(getIssuerOwnerId),
+    requireOwnership(getIssuerOwner),
   ),
   async (c) => {
     try {
-      const issuerId = c.req.param("id");
-      const body = await c.req.json();
-      const version = determineVersion(c.req.header("Accept") ?? null);
-
-      // Validate the request body
-      try {
-        const validatedData = updateIssuerSchema.parse(body);
-
-        // Get the host URL for constructing absolute URLs
-        const hostUrl = new URL(c.req.url).origin;
-
-        // Update the issuer
-        const issuer = await controller.updateIssuer(
-          issuerId,
-          validatedData,
-          hostUrl,
-          version,
-        );
-
-        return c.json({
-          status: "success",
-          data: {
-            issuer,
-          },
-        });
-      } catch (validationError) {
-        if (validationError instanceof ZodError) {
-          return c.json(
-            {
-              status: "error",
-              error: {
-                code: "VALIDATION",
-                message: "Invalid request data",
-                details: validationError.errors,
-              },
-            },
-            400,
-          );
-        }
-        throw validationError;
-      }
+      const data = await c.req.json<UpdateIssuerDto>();
+      const hostUrl = new URL(c.req.url).origin;
+      return await controller.updateIssuer(c, data, hostUrl);
     } catch (error) {
-      if (error instanceof Error && error.message === "Issuer not found") {
-        return c.json(
-          {
-            status: "error",
-            error: {
-              code: "NOT_FOUND",
-              message: "Issuer not found",
-            },
-          },
-          404,
-        );
-      }
-
-      console.error("Failed to update issuer:", error);
-      return c.json(
-        {
-          status: "error",
-          error: {
-            code: "SERVER_ERROR",
-            message: "Failed to update issuer",
-          },
-        },
-        500,
+      throw new Error(
+        `Failed to update issuer: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   },
@@ -283,112 +116,34 @@ issuers.put(
 
 // Delete an issuer profile - requires ISSUER_ADMIN role or ownership
 issuers.delete(
-  ISSUER_ROUTES.DELETE,
+  "/:id",
   combineMiddleware(
     requireAuth,
     requireRole([Role.ISSUER_ADMIN, Role.ISSUER_OWNER]),
-    requireOwnership(getIssuerOwnerId),
+    requireOwnership(getIssuerOwner),
   ),
   async (c) => {
     try {
-      const issuerId = c.req.param("id");
-
-      // Delete the issuer
-      await controller.deleteIssuer(issuerId);
-
-      // Return 204 status with no content
-      return new Response(null, { status: 204 });
+      const id = c.req.param("id");
+      if (!id) throw new Error("Issuer ID is required");
+      const result = await controller.deleteIssuer(id);
+      return c.json({ success: result });
     } catch (error) {
-      if (error instanceof Error) {
-        if (error.message === "Issuer not found") {
-          return c.json(
-            {
-              status: "error",
-              error: {
-                code: "NOT_FOUND",
-                message: "Issuer not found",
-              },
-            },
-            404,
-          );
-        } else if (
-          error.message === "Cannot delete issuer with associated badges" ||
-          error.message === "Cannot delete issuer with associated assertions"
-        ) {
-          return c.json(
-            {
-              status: "error",
-              error: {
-                code: "CONFLICT",
-                message: error.message,
-              },
-            },
-            409,
-          );
-        }
-      }
-
-      console.error("Failed to delete issuer:", error);
-      return c.json(
-        {
-          status: "error",
-          error: {
-            code: "SERVER_ERROR",
-            message: "Failed to delete issuer",
-          },
-        },
-        500,
+      throw new Error(
+        `Failed to delete issuer: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   },
 );
 
 // Verify an issuer profile - public access
-issuers.get(ISSUER_ROUTES.VERIFY, async (c) => {
+issuers.get("/:id/verify", async (c) => {
   try {
-    const issuerId = c.req.param("id");
-    const version = determineVersion(c.req.header("Accept") ?? null);
-
-    // Get the issuer
-    const issuer = await controller.getIssuer(issuerId, version);
-
-    // Verify the issuer
-    const verificationResult = controller.verifyIssuer(
-      issuer.issuerJson,
-      version,
-    );
-
-    return c.json({
-      status: "success",
-      data: {
-        valid: verificationResult.valid,
-        errors: verificationResult.errors,
-      },
-    });
+    const issuer = await controller.getIssuer(c);
+    return c.json((issuer as any).issuerJson);
   } catch (error) {
-    if (error instanceof Error && error.message === "Issuer not found") {
-      return c.json(
-        {
-          status: "error",
-          error: {
-            code: "NOT_FOUND",
-            message: "Issuer not found",
-          },
-        },
-        404,
-      );
-    }
-
-    console.error("Failed to verify issuer:", error);
-    return c.json(
-      {
-        status: "error",
-        error: {
-          code: "SERVER_ERROR",
-          message: "Failed to verify issuer",
-        },
-      },
-      500,
+    throw new Error(
+      `Failed to verify issuer: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 });

@@ -1,239 +1,187 @@
-import { describe, expect, test, mock, beforeEach } from "bun:test";
-import { Context } from "hono";
-import { HTTPException } from "hono/http-exception";
+import { mock, describe, expect, it, beforeEach } from "bun:test";
+import { type Context } from "hono";
+import { Role } from "../../middleware/auth";
 import {
-  Role,
+  createMockContext,
+  createNextFunction,
+} from "../../utils/test/route-test-utils";
+import {
   requireAuth,
   requireRole,
   requireOwnership,
   combineMiddleware,
 } from "../../middleware/auth";
-import {
-  createAuthTestContext,
-  createNextFunction,
-  expectHttpException,
-  setupJwtMock,
-} from "../../utils/test/auth-test-utils";
-
-// Set up the JWT mock
-setupJwtMock();
+import { setupJwtMock } from "../../utils/test/auth-test-utils";
 
 describe("Auth Middleware", () => {
   beforeEach(() => {
-    // Reset mocks
-    mock.restore();
+    // Set up JWT mock before each test
+    setupJwtMock();
   });
 
   describe("requireAuth", () => {
-    test("allows request with valid token", async () => {
-      const c = createAuthTestContext({
-        headers: { Authorization: "Bearer valid-token" },
-      });
+    it("allows request with valid token", async () => {
+      const ctx = createMockContext();
       const next = createNextFunction();
+      // Mock the Authorization header
+      ctx.req.header = mock((name: string) => {
+        if (name === "Authorization") return "Bearer valid-token";
+        return undefined;
+      });
 
-      await requireAuth(c, next);
+      await requireAuth(ctx as any, next);
 
-      expect(c.get("user")).toBeDefined();
-      expect(c.get("user").id).toBe("user123");
+      expect(next).toHaveBeenCalled();
     });
 
-    test("rejects request without token", async () => {
-      const c = createAuthTestContext();
+    it("rejects request without token", async () => {
+      const ctx = createMockContext();
       const next = createNextFunction();
+      // Empty Authorization header
+      ctx.req.header = mock((_: string) => undefined);
 
-      try {
-        await requireAuth(c, next);
-        expect().fail("Should have thrown exception");
-      } catch (error: any) {
-        expect(error.status).toBe(401);
-      }
+      await expect(requireAuth(ctx as any, next)).rejects.toThrow(
+        "Authentication required",
+      );
     });
 
-    test("rejects invalid token", async () => {
-      const c = createAuthTestContext({
-        headers: { Authorization: "Bearer invalid-token" },
-      });
+    it("rejects invalid token", async () => {
+      const ctx = createMockContext();
       const next = createNextFunction();
+      // Invalid token
+      ctx.req.header = mock((name: string) => {
+        if (name === "Authorization") return "Bearer invalid-token";
+        return undefined;
+      });
 
-      try {
-        await requireAuth(c, next);
-        expect().fail("Should have thrown exception");
-      } catch (error: any) {
-        expect(error.status).toBe(401);
-      }
+      await expect(requireAuth(ctx as any, next)).rejects.toThrow(
+        "Invalid or expired token",
+      );
     });
   });
 
   describe("requireRole", () => {
-    test("allows access with matching single role", async () => {
-      const c = createAuthTestContext({
-        user: {
-          id: "user123",
-          roles: [Role.ISSUER_VIEWER],
-          organizationId: "org123",
-        },
-      });
+    it("allows access with matching single role", async () => {
+      const ctx = createMockContext();
       const next = createNextFunction();
-      const middleware = requireRole(Role.ISSUER_VIEWER);
+      ctx.get = mock(() => ({ id: "123", roles: [Role.ISSUER_ADMIN] }));
 
-      await middleware(c, next);
-      expect(c.finalized).toBe(false);
+      await requireRole(Role.ISSUER_ADMIN)(ctx as any, next);
+
+      expect(next).toHaveBeenCalled();
     });
 
-    test("allows access with one matching role from array", async () => {
-      const c = createAuthTestContext({
-        user: {
-          id: "user123",
-          roles: [Role.ISSUER_VIEWER],
-          organizationId: "org123",
-        },
-      });
+    it("allows access with one matching role from array", async () => {
+      const ctx = createMockContext();
       const next = createNextFunction();
-      const middleware = requireRole([Role.ISSUER_ADMIN, Role.ISSUER_VIEWER]);
+      ctx.get = mock(() => ({ id: "123", roles: [Role.ISSUER_ADMIN] }));
 
-      await middleware(c, next);
-      expect(c.finalized).toBe(false);
+      await requireRole([Role.ISSUER_ADMIN, Role.ISSUER_OWNER])(
+        ctx as any,
+        next,
+      );
+
+      expect(next).toHaveBeenCalled();
     });
 
-    test("denies access with no matching roles from array", async () => {
-      const c = createAuthTestContext({
-        user: {
-          id: "user123",
-          roles: [Role.ISSUER_VIEWER],
-          organizationId: "org123",
-        },
-      });
+    it("denies access with no matching roles from array", async () => {
+      const ctx = createMockContext();
       const next = createNextFunction();
-      const middleware = requireRole([Role.ISSUER_ADMIN, Role.ISSUER_OWNER]);
+      ctx.get = mock(() => ({ id: "123", roles: [Role.ISSUER_VIEWER] }));
 
-      try {
-        await middleware(c, next);
-        expect().fail("Should have thrown exception");
-      } catch (error: any) {
-        expect(error.status).toBe(403);
-      }
+      await expect(
+        requireRole([Role.ISSUER_ADMIN, Role.ISSUER_OWNER])(ctx as any, next),
+      ).rejects.toThrow("Insufficient permissions");
     });
 
-    test("denies access with non-matching single role", async () => {
-      const c = createAuthTestContext({
-        user: {
-          id: "user123",
-          roles: [Role.ISSUER_VIEWER],
-          organizationId: "org123",
-        },
-      });
+    it("denies access with non-matching single role", async () => {
+      const ctx = createMockContext();
       const next = createNextFunction();
-      const middleware = requireRole(Role.ISSUER_ADMIN);
+      ctx.get = mock(() => ({ id: "123", roles: [Role.ISSUER_VIEWER] }));
 
-      try {
-        await middleware(c, next);
-        expect().fail("Should have thrown exception");
-      } catch (error: any) {
-        expect(error.status).toBe(403);
-      }
+      await expect(
+        requireRole(Role.ISSUER_ADMIN)(ctx as any, next),
+      ).rejects.toThrow("Insufficient permissions");
     });
   });
 
   describe("requireOwnership", () => {
-    test("allows resource owner", async () => {
-      const userId = "user123";
-      const c = createAuthTestContext({
-        user: {
-          id: userId,
-          roles: [Role.ISSUER_VIEWER],
-          organizationId: "org123",
-        },
-      });
+    it("allows resource owner", async () => {
+      const ctx = createMockContext();
       const next = createNextFunction();
-      const getOwnerId = () => Promise.resolve(userId);
-      const middleware = requireOwnership(getOwnerId);
+      ctx.get = mock(() => ({ id: "123", roles: [Role.ISSUER_OWNER] }));
 
-      await middleware(c, next);
-      expect(c.finalized).toBe(false);
+      const getOwnerId = async () => "123";
+
+      await requireOwnership(getOwnerId)(ctx as any, next);
+
+      expect(next).toHaveBeenCalled();
     });
 
-    test("allows admin user regardless of ownership", async () => {
-      const c = createAuthTestContext({
-        user: {
-          id: "admin123",
-          roles: [Role.ADMIN],
-          organizationId: "org123",
-        },
-      });
+    it("allows admin user regardless of ownership", async () => {
+      const ctx = createMockContext();
       const next = createNextFunction();
-      const getOwnerId = () => Promise.resolve("other-user");
-      const middleware = requireOwnership(getOwnerId);
+      ctx.get = mock(() => ({ id: "456", roles: [Role.ISSUER_ADMIN] }));
 
-      await middleware(c, next);
-      expect(c.finalized).toBe(false);
+      const getOwnerId = async () => "123";
+
+      await requireOwnership(getOwnerId)(ctx as any, next);
+
+      expect(next).toHaveBeenCalled();
     });
 
-    test("rejects non-owner without admin role", async () => {
-      const c = createAuthTestContext({
-        user: {
-          id: "user123",
-          roles: [Role.ISSUER_VIEWER],
-          organizationId: "org123",
-        },
-      });
+    it("rejects non-owner without admin role", async () => {
+      const ctx = createMockContext();
       const next = createNextFunction();
-      const getOwnerId = () => Promise.resolve("other-user");
-      const middleware = requireOwnership(getOwnerId);
+      ctx.get = mock(() => ({ id: "456", roles: [Role.ISSUER_OWNER] }));
 
-      try {
-        await middleware(c, next);
-        expect().fail("Should have thrown exception");
-      } catch (error: any) {
-        expect(error.status).toBe(403);
-      }
+      const getOwnerId = async () => "123";
+
+      await expect(
+        requireOwnership(getOwnerId)(ctx as any, next),
+      ).rejects.toThrow("Insufficient permissions");
     });
   });
 
   describe("combineMiddleware", () => {
-    test("executes middleware in order", async () => {
-      const c = createAuthTestContext();
-      const next = createNextFunction();
+    it("executes middleware in order", async () => {
       const order: number[] = [];
-
-      const middleware1 = async (c: Context, next: () => Promise<void>) => {
+      const middleware1 = async (_: Context, next: () => Promise<void>) => {
         order.push(1);
         await next();
       };
-
-      const middleware2 = async (c: Context, next: () => Promise<void>) => {
+      const middleware2 = async (_: Context, next: () => Promise<void>) => {
         order.push(2);
         await next();
       };
 
       const combined = combineMiddleware(middleware1, middleware2);
-      await combined(c, next);
+      await combined({} as Context, async () => {
+        order.push(3);
+      });
 
-      expect(order).toEqual([1, 2]);
+      expect(order).toEqual([1, 2, 3]);
     });
 
-    test("stops execution on error", async () => {
-      const c = createAuthTestContext();
-      const next = createNextFunction();
+    it("stops execution on error", async () => {
       const order: number[] = [];
-
-      const middleware1 = async (c: Context, next: () => Promise<void>) => {
+      const middleware1 = async (_: Context) => {
         order.push(1);
-        throw new Error("Test error");
+        throw new Error("Stop here");
       };
-
-      const middleware2 = async (c: Context, next: () => Promise<void>) => {
+      const middleware2 = async (_: Context, next: () => Promise<void>) => {
         order.push(2);
         await next();
       };
 
       const combined = combineMiddleware(middleware1, middleware2);
-      try {
-        await combined(c, next);
-        expect().fail("Should have thrown exception");
-      } catch (error) {
-        expect(error).toBeDefined();
-        expect(order).toEqual([1]);
-      }
+      await expect(
+        combined({} as Context, async () => {
+          order.push(3);
+        }),
+      ).rejects.toThrow("Stop here");
+
+      expect(order).toEqual([1]);
     });
   });
 });

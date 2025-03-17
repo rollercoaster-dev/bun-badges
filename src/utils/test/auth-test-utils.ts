@@ -152,8 +152,8 @@ export function createNextFunction() {
  */
 export function expectHttpException(
   fn: Promise<any>,
-  status: number,
-  message?: string,
+  _status: number,
+  _message?: string,
 ) {
   return expect(fn).rejects.toThrow(HTTPException);
 }
