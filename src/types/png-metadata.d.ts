@@ -1,4 +1,4 @@
-declare module 'png-metadata' {
+declare module "png-metadata" {
   interface PngMetadata {
     tEXt?: Record<string, string>;
     iTXt?: Record<string, string>;
@@ -24,4 +24,4 @@ declare module 'png-metadata' {
    * @returns New buffer with metadata
    */
   export function writeMetadata(buffer: Buffer, metadata: PngMetadata): Buffer;
-} 
+}
