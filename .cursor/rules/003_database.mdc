@@ -1,6 +1,6 @@
 ---
-description: PostgreSQL database interaction and schema management guidelines.
-globs: 
+description: "PostgreSQL database interaction and schema management guidelines."
+globs: ["**/*.ts", "**/*.tsx"]
 alwaysApply: false
 ---
 # PostgreSQL Guidelines
@@ -10,3 +10,6 @@ alwaysApply: false
 - **Versioned Migrations:** Maintain a clear, version-controlled migration strategy.
 - **Flexible Schemas:** Utilize JSONB columns for dynamic Open Badges JSON structures.
 - **Indexing:** Optimize queries with indexes on key fields (e.g., issuer and assertion IDs).
+
+Rule Type: Manual
+This rule needs to be mentioned to be included 

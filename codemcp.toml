@@ -1,0 +1,88 @@
+[project]
+name = "bun-badges"
+version = "0.0.1"
+description = "Open Badges server implementation using Bun and Hono"
+
+[quality]
+min_test_coverage = 80
+max_complexity = 10
+max_lines_per_function = 50
+max_parameters = 4
+enforce_types = true
+
+[style]
+indent_size = 2
+max_line_length = 100
+quotes = "single"
+semicolons = true
+
+[patterns]
+src_dir = "src"
+test_dir = "src/__tests__"
+build_dir = "dist"
+docs_dir = "docs"
+
+[naming]
+components = "PascalCase"
+functions = "camelCase"
+variables = "camelCase"
+constants = "UPPER_SNAKE_CASE"
+types = "PascalCase"
+interfaces = "PascalCase"
+
+[git]
+main_branch = "main"
+commit_convention = "conventional"
+require_issue_reference = true
+protected_branches = ["main", "develop"]
+
+[security]
+require_auth = true
+env_file_required = true
+sensitive_patterns = [
+  "password",
+  "secret",
+  "key",
+  "token"
+]
+
+[dependencies]
+package_manager = "bun"
+lockfile_required = true
+allow_only_exact_versions = false
+security_audit_level = "high"
+
+[testing]
+framework = "bun:test"
+require_tests = true
+coverage_tool = "bun:coverage"
+
+[documentation]
+api_docs = true
+readme_required = true
+changelog_required = true
+jsdoc_style = "minimal"
+
+[ci]
+required_checks = [
+  "typecheck",
+  "lint",
+  "test",
+  "build"
+]
+
+[database]
+migrations_required = true
+schema_docs_required = true
+type = "postgresql"
+
+[api]
+framework = "hono"
+openapi_spec_required = true
+versioning_required = true
+
+[development]
+node_version = ">=20.0.0"
+bun_version = ">=1.0.0"
+use_strict_mode = true
+use_typescript = true 

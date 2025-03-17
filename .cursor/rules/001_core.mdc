@@ -3,10 +3,13 @@ description:
 globs: 
 alwaysApply: true
 ---
- # Core Guidelines
+# Core Guidelines
+
+Rule Type: Manual
+This rule needs to be mentioned to be included
 
 - **Strict TypeScript:** Enforce strict mode (no implicit any) for type safety.
 - **Modular Code:** Organize code into clear, single-responsibility modules.
 - **Conciseness:** Provide concise responses and code changes (only changed lines plus two surrounding lines).
-- **Clear Documentation:** Write self-explanatory comments and inline documentation NO JS_DOC!.
-- **No Unnecessary Imports:** Only include imports when explicitly required.
+- **Clear Documentation:** Write self-explanatory comments and inline documentation.
+- **No Unnecessary Imports:** Only include imports when explicitly required. 

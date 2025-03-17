@@ -1,40 +1,40 @@
-import { Hono } from 'hono';
-import { Context } from 'hono';
+import { Hono } from "hono";
+import { Context } from "hono";
 
 // OAuth scopes for Open Badges
 export const OAUTH_SCOPES = {
   // Badge issuer scopes
-  BADGE_CREATE: 'badge:create',
-  BADGE_UPDATE: 'badge:update',
-  BADGE_DELETE: 'badge:delete',
-  BADGE_READ: 'badge:read',
-  
+  BADGE_CREATE: "badge:create",
+  BADGE_UPDATE: "badge:update",
+  BADGE_DELETE: "badge:delete",
+  BADGE_READ: "badge:read",
+
   // Badge assertion scopes
-  ASSERTION_CREATE: 'assertion:create',
-  ASSERTION_UPDATE: 'assertion:update',
-  ASSERTION_DELETE: 'assertion:delete',
-  ASSERTION_READ: 'assertion:read',
-  
+  ASSERTION_CREATE: "assertion:create",
+  ASSERTION_UPDATE: "assertion:update",
+  ASSERTION_DELETE: "assertion:delete",
+  ASSERTION_READ: "assertion:read",
+
   // Profile scopes
-  PROFILE_READ: 'profile:read',
-  PROFILE_UPDATE: 'profile:update',
-  
+  PROFILE_READ: "profile:read",
+  PROFILE_UPDATE: "profile:update",
+
   // Special scopes
-  OFFLINE_ACCESS: 'offline_access', // For refresh tokens
+  OFFLINE_ACCESS: "offline_access", // For refresh tokens
 } as const;
 
 // OAuth endpoint paths
 export const OAUTH_ROUTES = {
   // Dynamic client registration
-  REGISTER: '/register',
-  
+  REGISTER: "/register",
+
   // Authorization endpoints
-  AUTHORIZE: '/authorize',
-  TOKEN: '/token',
-  
+  AUTHORIZE: "/authorize",
+  TOKEN: "/token",
+
   // Token management
-  INTROSPECT: '/introspect',
-  REVOKE: '/revoke',
+  INTROSPECT: "/introspect",
+  REVOKE: "/revoke",
 } as const;
 
 // Create OAuth router with dependency injection for the controller
@@ -60,4 +60,4 @@ export const createOAuthRouter = (controller: {
   oauth.post(OAUTH_ROUTES.REVOKE, (c) => controller.revoke(c));
 
   return oauth;
-}; 
+};

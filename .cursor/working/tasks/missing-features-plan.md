@@ -14,6 +14,7 @@
 - Review the issuer schema in the database to ensure all required fields are present
 - Add any missing indexes for query optimization
 - Ensure schema supports both OB 2.0 required fields and recommended fields
+- **Badge-engine Alignment**: Follow the issuerProfileSchema structure from badge-engine
 
 ### Phase 3: Controller Implementation (2-3 days)
 - Create an `IssuerController` class with the following methods:
@@ -23,6 +24,7 @@
   - `updateIssuer`: Update an existing issuer's information
   - `deleteIssuer`: Remove an issuer (with safety checks for associated badges)
 - Implement proper error handling and validation
+- **Badge-engine Alignment**: Reference badge-engine's issuer.router.ts implementation patterns
 
 ### Phase 4: Routes Implementation (1-2 days)
 - Implement the routes defined in the `ISSUER_ROUTES` constants:
@@ -32,6 +34,7 @@
   - `PUT /api/issuers/:id`: Update an issuer
   - `DELETE /api/issuers/:id`: Delete an issuer
 - Add authorization middleware to protect creation, update, and deletion
+- **Badge-engine Alignment**: Use similar route structure and error handling
 
 ### Phase 5: Testing and Validator Integration (1-2 days)
 - **Research Prompt**: "What validation tools are available for testing Open Badges issuer compliance? How can we integrate automated validation into our test suite?"
@@ -50,16 +53,19 @@
 - Document cryptographic requirements and security considerations
 
 ### Phase 2: Library Selection and Architecture Design (1-2 days)
-- Evaluate libraries for Ed25519 digital signatures
-- Select libraries for JSON-LD processing and canonicalization
-- Design the key management approach (compare with badge-engine)
+- **Badge-engine Alignment**: Use the same libraries as badge-engine:
+  - jsonld for JSON-LD processing
+  - n3 for RDF operations
+  - @noble/curves/ed25519 for Ed25519 digital signatures
+  - multiformats/bases/base58 for encoding
+- Design the key management approach similar to badge-engine
 - Create architecture document for the signing implementation
 
 ### Phase 3: Core Signing Utilities (2-3 days)
 - Create utility functions for:
-  - Generating and storing signing keys
-  - JSON-LD document processing and canonicalization
-  - Creating and verifying Ed25519 signatures
+  - Generating and storing signing keys (reference badge-engine's create-signing-key.ts)
+  - JSON-LD document processing and canonicalization using RDFC10
+  - Creating and verifying Ed25519 signatures with eddsa-rdfc-2022 cryptosuite
   - Proper key management and security
 - Ensure compatibility with Open Badges verification requirements
 
@@ -72,12 +78,14 @@
   - `POST /api/sign/:assertionId`: Sign a credential
   - `POST /api/verify`: Verify a signed credential
 - Add authentication and authorization for signing operations
+- **Badge-engine Alignment**: Reference the signing.router.ts implementation for proof creation
 
 ### Phase 5: Integration with Assertions (1-2 days)
 - **Research Prompt**: "How should signed Open Badges be represented to ensure maximum compatibility with badge consumers and backpacks? What 'proof' format is most widely supported?"
 - Modify the assertion creation process to support optional signing
 - Update the badge assertion JSON structure to accommodate proofs
 - Ensure compatibility with Verifiable Credentials specification
+- **Badge-engine Alignment**: Use proof.schema.ts as reference for proof structure
 
 ### Phase 6: Testing and Validation (1-2 days)
 - Write unit tests for signing utilities
@@ -95,17 +103,17 @@
 
 ### Phase 2: Image Storage Strategy (1-2 days)
 - Design image storage approach (local vs. cloud storage)
-- Select and integrate appropriate libraries for image processing
+- **Badge-engine Alignment**: Use sharp library for image processing as in badge-engine
 - Create configuration for storage options
 - Consider implications for badge baking processes
 
 ### Phase 3: Image Processing Utilities (2-3 days)
 - Implement utilities for:
-  - Image resizing and optimization
+  - Image resizing and optimization (reference badge-engine's resizeAndEncode function)
   - Format conversion if needed
   - Metadata extraction and validation
   - Security scanning
-- Ensure all processed images meet Open Badges specifications
+- **Badge-engine Alignment**: Consider base64 encoding for smaller images similar to badge-engine approach
 
 ### Phase 4: API Implementation (2-3 days)
 - Create an `ImageController` with methods for:
@@ -118,6 +126,7 @@
   - `GET /api/images/:id`: Retrieve an image
   - `PUT /api/images/:id`: Update image metadata
   - `DELETE /api/images/:id`: Delete an image
+- **Badge-engine Alignment**: Reference image.router.ts implementation
 
 ### Phase 5: Integration with Badges and Issuers (1-2 days)
 - Update badge and issuer creation/update to handle direct image uploads
@@ -174,10 +183,10 @@
 ## Dependencies and Prerequisites
 
 1. **Library Requirements**:
-   - Ed25519 implementation (like `@noble/curves` used in badge-engine)
-   - JSON-LD processor (like `jsonld` used in badge-engine)
-   - RDF canonicalization library (for signing)
-   - Image processing library (like `sharp`)
+   - Ed25519 implementation (@noble/curves as used in badge-engine)
+   - JSON-LD processor (jsonld as used in badge-engine)
+   - RDF canonicalization library (n3 and RDFC10 as used in badge-engine)
+   - Image processing library (sharp as used in badge-engine)
    - Stream processing utilities
 
 2. **Configuration Updates**:
