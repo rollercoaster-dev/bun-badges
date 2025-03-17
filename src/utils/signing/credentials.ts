@@ -14,6 +14,54 @@ export interface SigningOptions {
 }
 
 /**
+ * Represents a JSON-LD context URL or object
+ */
+type JsonLdContext = string | Record<string, unknown>;
+
+/**
+ * Base interface for JSON-LD documents
+ */
+interface JsonLdDocument {
+  "@context": JsonLdContext | JsonLdContext[];
+  [key: string]: unknown;
+}
+
+/**
+ * Interface for a JSON-LD proof
+ */
+interface JsonLdProof {
+  type: string;
+  created: string;
+  proofPurpose: string;
+  verificationMethod: string;
+  jws?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Interface for a credential issuer
+ */
+interface CredentialIssuer {
+  id: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Interface for a verifiable credential
+ */
+interface VerifiableCredential extends JsonLdDocument {
+  issuer: CredentialIssuer;
+  [key: string]: unknown;
+}
+
+/**
+ * Interface for a signed credential
+ */
+type SignedCredential = VerifiableCredential & {
+  proof: JsonLdProof;
+};
+
+/**
  * Creates a document loader for JSON-LD contexts
  */
 function createDocumentLoader() {
@@ -121,10 +169,10 @@ function createDocumentLoader() {
  * @param options - Signing options
  * @returns The signed credential
  */
-export async function signCredential<T extends Record<string, any>>(
-  credential: T,
+export async function signCredential(
+  credential: VerifiableCredential,
   options: SigningOptions,
-): Promise<T & { proof: any }> {
+): Promise<SignedCredential> {
   const key = await createJsonWebKey(options.keyPair);
 
   const suite = new JsonWebSignature({
@@ -132,18 +180,9 @@ export async function signCredential<T extends Record<string, any>>(
     date: options.date || new Date().toISOString(),
   });
 
-  // Ensure the credential has the required context for JSON-LD signatures
-  const credentialWithContext = {
-    "@context": [
-      "https://www.w3.org/2018/credentials/v1",
-      "https://w3id.org/security/suites/jws-2020/v1",
-    ],
-    ...credential,
-  };
-
   // Create the proof
   const proof = await suite.createProof({
-    document: credentialWithContext,
+    document: credential,
     purpose: {
       proofPurpose: "assertionMethod",
       verificationMethod: `${options.keyPair.controller}#${options.keyPair.publicKey}`,
@@ -154,7 +193,7 @@ export async function signCredential<T extends Record<string, any>>(
 
   // Add the proof to the credential
   return {
-    ...credentialWithContext,
+    ...credential,
     proof,
   };
 }
@@ -166,7 +205,7 @@ export async function signCredential<T extends Record<string, any>>(
  * @returns True if the signature is valid, false otherwise
  */
 export async function verifyCredential(
-  signedCredential: Record<string, any>,
+  signedCredential: SignedCredential,
   publicKey: string,
 ): Promise<boolean> {
   try {
@@ -190,6 +229,7 @@ export async function verifyCredential(
 
     return result.verified;
   } catch (error) {
+    // Log the error for debugging but don't expose it to the caller
     console.error("Verification failed:", error);
     return false;
   }
