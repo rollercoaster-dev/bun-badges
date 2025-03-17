@@ -144,10 +144,11 @@ function isValidJWTPayload(payload: unknown): payload is JWTPayload {
 }
 
 // Role-based authorization middleware
-export function requireRole(role: Role) {
+export function requireRole(role: Role | Role[]) {
   return async function roleMiddleware(c: Context, next: Next): Promise<void> {
     const user = c.get("user") as AuthUser;
-    if (!hasRole(user, role)) {
+    const requiredRoles = Array.isArray(role) ? role : [role];
+    if (!requiredRoles.some((r) => hasRole(user, r))) {
       throw new HTTPException(403, {
         message: AUTH_ERRORS.INSUFFICIENT_PERMISSIONS,
       });

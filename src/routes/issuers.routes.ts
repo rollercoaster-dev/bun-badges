@@ -206,7 +206,7 @@ issuers.put(
   ISSUER_ROUTES.UPDATE,
   combineMiddleware(
     requireAuth,
-    requireRole(Role.ISSUER_OWNER),
+    requireRole([Role.ISSUER_ADMIN, Role.ISSUER_OWNER]),
     requireOwnership(getIssuerOwnerId),
   ),
   async (c) => {
@@ -286,7 +286,7 @@ issuers.delete(
   ISSUER_ROUTES.DELETE,
   combineMiddleware(
     requireAuth,
-    requireRole(Role.ISSUER_OWNER),
+    requireRole([Role.ISSUER_ADMIN, Role.ISSUER_OWNER]),
     requireOwnership(getIssuerOwnerId),
   ),
   async (c) => {
