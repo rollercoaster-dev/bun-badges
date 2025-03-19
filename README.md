@@ -2,19 +2,32 @@
 
 [![CI/CD](https://github.com/rollercoaster-dev/bun-badges/actions/workflows/ci.yml/badge.svg)](https://github.com/rollercoaster-dev/bun-badges/actions/workflows/ci.yml)
 
-An Open Badges server implementation using Bun and Hono, supporting Open Badges 2.0 specification with a roadmap for 3.0.
+A high-performance Open Badges server implementation using Bun and Hono, supporting both Open Badges 2.0 and 3.0 specifications.
 
 ## Features
 
-- Open Badges 2.0 compliant
-- Badge baking for both PNG and SVG formats
-- Assertion extraction from baked badges
-- Built with Bun and Hono for high performance
-- TypeScript with strict mode
-- RESTful API design
-- Extensible architecture
-- Docker containerization for easy deployment
-- OpenAPI/Swagger documentation
+- **Open Badges Standards Support**:
+  - Open Badges 2.0 compliant
+  - Open Badges 3.0 with W3C Verifiable Credentials implementation
+  - Backward compatibility between versions
+- **Badge Handling**:
+  - Badge creation and issuance
+  - Badge verification with cryptographic proofs
+  - Badge baking for both PNG and SVG formats
+  - Assertion extraction from baked badges
+- **Authentication**:
+  - Passwordless email authentication
+  - WebAuthn support
+  - OAuth integration (coming soon)
+- **Modern Stack**:
+  - Built with Bun and Hono for high performance
+  - TypeScript with strict mode
+  - PostgreSQL with Drizzle ORM
+  - RESTful API design
+- **Deployment**:
+  - Docker containerization
+  - Easy self-hosting
+  - OpenAPI/Swagger documentation
 
 ## Prerequisites
 
@@ -108,6 +121,18 @@ src/
 ### Health Check
 - `GET /health` - Server health status
 
+### Authentication
+- `POST /auth/email/start` - Start email authentication flow
+- `POST /auth/email/verify` - Verify email authentication code
+- `POST /auth/webauthn/register` - Register WebAuthn credential
+- `POST /auth/webauthn/authenticate` - Authenticate with WebAuthn
+
+### Issuers
+- `GET /issuers` - List all issuers
+- `GET /issuers/:id` - Get a specific issuer
+- `POST /issuers` - Create a new issuer
+- `PUT /issuers/:id` - Update an issuer
+
 ### Badges
 - `GET /badges` - List all badges
 - `GET /badges/:id` - Get a specific badge
@@ -117,7 +142,17 @@ src/
 - `GET /badges/bake/:badgeId/:assertionId` - Bake an assertion into a badge image
 - `POST /badges/extract` - Extract assertion from a baked badge
 
-More endpoints coming soon...
+### Assertions
+- `GET /assertions` - List all assertions (with optional filtering)
+- `GET /assertions/:id` - Get a specific assertion (add `?format=ob3` for Open Badges 3.0 format)
+- `POST /assertions` - Issue a badge (add `"version": "ob3"` in request body for OB3.0)
+- `POST /assertions/:id/revoke` - Revoke a badge assertion
+
+### Verification
+- `GET /verify/:id` - Verify a badge assertion
+- `POST /verify` - Verify a badge assertion from provided JSON
+
+See the [API Documentation](#api-documentation) section for more details on using these endpoints.
 
 ## Environment Variables
 
@@ -168,6 +203,10 @@ http://localhost:7777/docs
 ```
 
 This provides an interactive interface to explore and test the API endpoints.
+
+## Open Badges 3.0 Support
+
+For detailed information about the Open Badges 3.0 implementation, including the Verifiable Credentials data model, cryptographic verification, and example usage, see [Open Badges 3.0 Documentation](docs/OPEN_BADGES_3.md).
 
 ## Project Structure
 

@@ -1,8 +1,10 @@
 import { Hono } from "hono";
-import { db } from "../db/config";
-import { badgeAssertions, badgeClasses, issuerProfiles } from "../db/schema";
+import { db } from "@/db/config";
+import { badgeAssertions, badgeClasses, issuerProfiles } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import crypto from "crypto";
+import { CredentialService } from "@/services/credential.service";
+import { VerificationService } from "@/services/verification.service";
 
 const ASSERTION_ROUTES = {
   CREATE: "/assertions",
@@ -12,6 +14,10 @@ const ASSERTION_ROUTES = {
 };
 
 const assertions = new Hono();
+
+// Initialize services
+const credentialService = new CredentialService();
+const verificationService = new VerificationService();
 
 // List all assertions (with optional filters)
 assertions.get(ASSERTION_ROUTES.LIST, async (c) => {
@@ -89,6 +95,7 @@ assertions.get(ASSERTION_ROUTES.LIST, async (c) => {
 assertions.get(ASSERTION_ROUTES.GET, async (c) => {
   try {
     const assertionId = c.req.param("id");
+    const format = c.req.query("format") || "default";
 
     if (!assertionId) {
       return c.json(
@@ -103,6 +110,7 @@ assertions.get(ASSERTION_ROUTES.GET, async (c) => {
       );
     }
 
+    // Get the assertion from the database
     const assertion = await db
       .select()
       .from(badgeAssertions)
@@ -121,6 +129,56 @@ assertions.get(ASSERTION_ROUTES.GET, async (c) => {
         404,
       );
     }
+
+    // If format=ob3 is specified, return as Open Badges 3.0
+    if (format === "ob3") {
+      try {
+        const hostUrl = new URL(c.req.url).origin;
+        const credential = await credentialService.createCredential(
+          hostUrl,
+          assertionId,
+        );
+
+        // Include verification result
+        const verificationResult =
+          await verificationService.verifyAssertion(assertionId);
+
+        // If the assertion is revoked, include that information
+        if (assertion[0].revoked) {
+          return c.json({
+            status: "success",
+            data: {
+              credential,
+              verification: verificationResult,
+              revoked: true,
+              revocationReason: assertion[0].revocationReason,
+            },
+          });
+        }
+
+        return c.json({
+          status: "success",
+          data: {
+            credential,
+            verification: verificationResult,
+          },
+        });
+      } catch (error) {
+        console.error("Failed to create OB3 credential:", error);
+        return c.json(
+          {
+            status: "error",
+            error: {
+              code: "SERVER_ERROR",
+              message: "Failed to generate Open Badges 3.0 credential",
+            },
+          },
+          500,
+        );
+      }
+    }
+
+    // Default format - return original OB2.0 assertion
 
     // If the assertion is revoked, include that information
     if (assertion[0].revoked) {
@@ -161,7 +219,9 @@ assertions.post(ASSERTION_ROUTES.CREATE, async (c) => {
     const body = await c.req.json();
 
     // Validate required fields
-    const { badgeId, recipient, evidence } = body;
+    const { badgeId, recipient, evidence, version } = body;
+    // Default to OB2 if not specified
+    const badgeVersion = version || "ob2";
 
     if (!badgeId || !recipient || !recipient.identity || !recipient.type) {
       return c.json(
@@ -237,12 +297,12 @@ assertions.post(ASSERTION_ROUTES.CREATE, async (c) => {
       recipientHashed = true;
     }
 
-    // Generate the Open Badges 2.0 compliant JSON-LD
+    // Generate the Open Badges JSON
     const hostUrl = new URL(c.req.url).origin;
     const issuedOn = new Date();
 
-    // Create a new assertion with placeholder ID (will be replaced after insert)
-    const newAssertion = {
+    // Create assertion base
+    const assertionBase = {
       badgeId,
       issuerId,
       recipientType: recipient.type,
@@ -252,7 +312,21 @@ assertions.post(ASSERTION_ROUTES.CREATE, async (c) => {
       evidenceUrl: evidence || null,
       revoked: false,
       revocationReason: null,
-      assertionJson: {
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    let assertionJson;
+    let ob3Credential;
+
+    // Create JSON based on requested version
+    if (badgeVersion === "ob3") {
+      // Ensure issuer has signing key for OB3.0
+      await credentialService.ensureIssuerKeyExists(issuerId);
+
+      // For OB3, we first create in the database with a placeholder,
+      // then generate the verifiable credential after getting the ID
+      assertionJson = {
         "@context": "https://w3id.org/openbadges/v2",
         type: "Assertion",
         id: `${hostUrl}/assertions/placeholder-id`,
@@ -268,30 +342,100 @@ assertions.post(ASSERTION_ROUTES.CREATE, async (c) => {
           type: "HostedBadge",
         },
         ...(evidence && { evidence: evidence }),
-      },
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+      };
+    } else {
+      // Standard OB2.0 format
+      assertionJson = {
+        "@context": "https://w3id.org/openbadges/v2",
+        type: "Assertion",
+        id: `${hostUrl}/assertions/placeholder-id`,
+        recipient: {
+          type: recipient.type,
+          identity: recipientIdentity,
+          hashed: recipientHashed,
+          ...(recipientHashed && { salt }),
+        },
+        badge: `${hostUrl}/badges/${badgeId}`,
+        issuedOn: issuedOn.toISOString(),
+        verification: {
+          type: "HostedBadge",
+        },
+        ...(evidence && { evidence: evidence }),
+      };
+    }
 
     // Insert the assertion
     const result = await db
       .insert(badgeAssertions)
-      .values(newAssertion)
+      .values({
+        ...assertionBase,
+        assertionJson,
+      })
       .returning();
 
     if (!result || result.length === 0) {
       throw new Error("Failed to insert assertion");
     }
 
-    // Update the assertion JSON with the correct ID
+    // Get the inserted assertion
     const insertedAssertion = result[0];
-    const assertionJson = insertedAssertion.assertionJson as any;
-    assertionJson.id = `${hostUrl}/assertions/${insertedAssertion.assertionId}`;
+
+    // If OB3.0 was requested, generate the signed credential
+    if (badgeVersion === "ob3") {
+      try {
+        // Create OB3.0 credential with proper cryptographic proof
+        ob3Credential = await credentialService.createCredential(
+          hostUrl,
+          insertedAssertion.assertionId,
+        );
+
+        // Save the credential to the assertionJson field
+        await db
+          .update(badgeAssertions)
+          .set({
+            assertionJson: ob3Credential,
+            updatedAt: new Date(),
+          })
+          .where(
+            eq(badgeAssertions.assertionId, insertedAssertion.assertionId),
+          );
+
+        // Also verify the credential
+        const verificationResult = await verificationService.verifyOB3Assertion(
+          insertedAssertion.assertionId,
+        );
+
+        // Return the credential and verification result
+        return c.json(
+          {
+            status: "success",
+            data: {
+              assertionId: insertedAssertion.assertionId,
+              credential: ob3Credential,
+              verification: verificationResult,
+            },
+          },
+          201,
+        );
+      } catch (error) {
+        console.error("Failed to create OB3 credential:", error);
+        // Continue with OB2.0 format as fallback
+      }
+    }
+
+    // For OB2.0 or as fallback
+
+    // Update the assertion JSON with the correct ID
+    const updatedAssertionJson = insertedAssertion.assertionJson as any;
+    updatedAssertionJson.id = `${hostUrl}/assertions/${insertedAssertion.assertionId}`;
 
     // Update the assertion with the correct ID
     await db
       .update(badgeAssertions)
-      .set({ assertionJson })
+      .set({
+        assertionJson: updatedAssertionJson,
+        updatedAt: new Date(),
+      })
       .where(eq(badgeAssertions.assertionId, insertedAssertion.assertionId));
 
     // Return the created assertion
@@ -302,7 +446,7 @@ assertions.post(ASSERTION_ROUTES.CREATE, async (c) => {
           assertionId: insertedAssertion.assertionId,
           assertion: {
             ...insertedAssertion,
-            assertionJson,
+            assertionJson: updatedAssertionJson,
           },
         },
       },
@@ -390,28 +534,82 @@ assertions.post(ASSERTION_ROUTES.REVOKE, async (c) => {
       });
     }
 
-    // Update the assertion to mark it as revoked
     const assertionJson = assertion[0].assertionJson as any;
-    assertionJson.revoked = true;
-    assertionJson.revocationReason = reason;
+    const isOB3 = !!assertionJson.proof;
+    const hostUrl = new URL(c.req.url).origin;
 
-    await db
-      .update(badgeAssertions)
-      .set({
-        revoked: true,
-        revocationReason: reason,
-        assertionJson,
-        updatedAt: new Date(),
-      })
-      .where(eq(badgeAssertions.assertionId, assertionId));
+    if (isOB3) {
+      try {
+        // For OB3, we need to update the credential with revocation status
+        // and possibly re-sign it or use a status list
+        assertionJson.revoked = true;
+        assertionJson.revocationReason = reason;
 
-    return c.json({
-      status: "success",
-      data: {
-        message: "Assertion revoked successfully",
-        reason,
-      },
-    });
+        // Update status verification field
+        if (!assertionJson.credentialStatus) {
+          assertionJson.credentialStatus = {
+            id: `${hostUrl}/status/${assertionId}`,
+            type: "RevocationList2020Status",
+            revocationListIndex: assertionId,
+            revocationListCredential: `${hostUrl}/status/list`,
+          };
+        }
+
+        // Store the updated credential
+        await db
+          .update(badgeAssertions)
+          .set({
+            revoked: true,
+            revocationReason: reason,
+            assertionJson,
+            updatedAt: new Date(),
+          })
+          .where(eq(badgeAssertions.assertionId, assertionId));
+
+        return c.json({
+          status: "success",
+          data: {
+            message: "Assertion revoked successfully",
+            reason,
+            credentialStatus: assertionJson.credentialStatus,
+          },
+        });
+      } catch (error) {
+        console.error("Failed to revoke OB3 credential:", error);
+        return c.json(
+          {
+            status: "error",
+            error: {
+              code: "SERVER_ERROR",
+              message: "Failed to revoke OB3 credential",
+            },
+          },
+          500,
+        );
+      }
+    } else {
+      // Standard OB2.0 revocation
+      assertionJson.revoked = true;
+      assertionJson.revocationReason = reason;
+
+      await db
+        .update(badgeAssertions)
+        .set({
+          revoked: true,
+          revocationReason: reason,
+          assertionJson,
+          updatedAt: new Date(),
+        })
+        .where(eq(badgeAssertions.assertionId, assertionId));
+
+      return c.json({
+        status: "success",
+        data: {
+          message: "Assertion revoked successfully",
+          reason,
+        },
+      });
+    }
   } catch (error) {
     console.error("Failed to revoke assertion:", error);
     return c.json(
@@ -426,5 +624,4 @@ assertions.post(ASSERTION_ROUTES.REVOKE, async (c) => {
     );
   }
 });
-
 export default assertions;
