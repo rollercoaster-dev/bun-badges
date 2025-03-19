@@ -1,10 +1,13 @@
 import { describe, it, expect, beforeEach, mock } from "bun:test";
 import { VerificationService } from "@/services/verification.service";
-import { base64url } from "@scure/base";
+import { TEST_PUBLIC_KEY } from "@/utils/test/crypto-setup";
+
+// Import crypto setup to ensure mocks are applied
+import "@/utils/test/crypto-setup";
 
 // Create mock data
 const mockKeyPair = {
-  publicKey: new Uint8Array([1, 2, 3]),
+  publicKey: TEST_PUBLIC_KEY.slice(),
   privateKey: new Uint8Array([4, 5, 6]),
   controller: "did:key:123",
   type: "Ed25519VerificationKey2020" as const,
@@ -39,12 +42,12 @@ mock.module("@/db/config", () => ({
                 type: "BadgeClass",
                 name: "Test Badge",
               },
-              recipient: { type: "email", identity: "test-recipient" },
               proof: {
                 type: "Ed25519Signature2020",
-                created: new Date().toISOString(),
+                created: "2023-01-01T00:00:00Z",
                 verificationMethod: "did:key:123#key-1",
-                proofValue: base64url.encode(new Uint8Array([7, 8, 9])),
+                proofPurpose: "assertionMethod",
+                proofValue: "test-proof-value",
               },
             },
           },
@@ -54,17 +57,14 @@ mock.module("@/db/config", () => ({
   },
 }));
 
+// Mock getSigningKey
 mock.module("@/utils/signing/keys", () => ({
-  getSigningKey: () => Promise.resolve(mockKeyPair),
+  getSigningKey: async () => mockKeyPair,
 }));
 
-mock.module("@noble/ed25519", () => ({
-  verify: () => Promise.resolve(true),
-}));
+let service: VerificationService;
 
 describe("VerificationService", () => {
-  let service: VerificationService;
-
   beforeEach(() => {
     service = new VerificationService();
   });
@@ -159,7 +159,7 @@ describe("VerificationService", () => {
                     type: "Ed25519Signature2020",
                     created: new Date().toISOString(),
                     verificationMethod: "did:key:123#key-1",
-                    proofValue: base64url.encode(new Uint8Array([7, 8, 9])),
+                    proofValue: "test-proof-value",
                   },
                 },
               },
@@ -278,7 +278,7 @@ describe("VerificationService", () => {
                     type: "Ed25519Signature2020",
                     created: new Date().toISOString(),
                     verificationMethod: "did:key:123#key-1",
-                    proofValue: base64url.encode(new Uint8Array([7, 8, 9])),
+                    proofValue: "test-proof-value",
                   },
                 },
               },

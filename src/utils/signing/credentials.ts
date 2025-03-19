@@ -44,35 +44,34 @@ async function createJws(
   };
 
   const encodedHeader = base64url.encode(JSON.stringify(header));
-  const encodedData = base64url.encode(Buffer.from(data));
+  const encodedData = base64url.encode(Buffer.from(data).toString("base64"));
   const signingInput = new TextEncoder().encode(
     `${encodedHeader}.${encodedData}`,
   );
 
   const signature = await ed.sign(signingInput, privateKey);
-
-  // Direct base64url encoding of the signature bytes
-  return `${encodedHeader}.${encodedData}.${base64url.encode(Buffer.from(signature))}`;
+  return `${encodedHeader}.${encodedData}.${base64url.encode(Buffer.from(signature).toString("base64"))}`;
 }
 
 async function verifyJws(jws: string, publicKey: Uint8Array): Promise<boolean> {
-  const [encodedHeader, encodedData, encodedSignature] = jws.split(".");
-  if (!encodedHeader || !encodedData || !encodedSignature) {
-    throw new Error("Invalid JWS format");
-  }
-
-  const signingInput = new TextEncoder().encode(
-    `${encodedHeader}.${encodedData}`,
-  );
-  // Directly decode the base64url signature to get the raw bytes
-  const signature = Buffer.from(base64url.decode(encodedSignature));
-
   try {
-    const isValid = await ed.verify(signature, signingInput, publicKey);
-    return isValid;
+    const [encodedHeader, encodedData, encodedSignature] = jws.split(".");
+    if (!encodedHeader || !encodedData || !encodedSignature) {
+      throw new Error("Invalid JWS format");
+    }
+
+    const signingInput = new TextEncoder().encode(
+      `${encodedHeader}.${encodedData}`,
+    );
+    const signature = Buffer.from(base64url.decode(encodedSignature), "base64");
+
+    // Ensure valid publicKey length (Ed25519 keys should be 32 bytes)
+    if (publicKey.length !== 32) {
+      return false;
+    }
+
+    return await ed.verify(signature, signingInput, publicKey);
   } catch (error) {
-    // Log the error for debugging
-    console.error("Signature verification error:", error);
     return false;
   }
 }
@@ -102,14 +101,21 @@ export async function signCredential(
     credential["@context"].push("https://w3id.org/security/suites/jws-2020/v1");
   }
 
+  // We create a simple proof in our updated implementation
+  // const canonicalizedCredential = { ...credential };
+
   // Create JWS using credential data
-  const credentialData = new TextEncoder().encode(JSON.stringify(credential));
-  const jws = await createJws(credentialData, options.keyPair.privateKey);
+  // We're not using credentialBytes directly in our implementation
+  // const credentialBytes = new TextEncoder().encode(JSON.stringify(credential));
+
+  // Create JWS using credential data
+  const credentialBytes = new TextEncoder().encode(JSON.stringify(credential));
+  const jws = await createJws(credentialBytes, options.keyPair.privateKey);
 
   const proof: JsonWebSignature2020Proof = {
     type: "JsonWebSignature2020",
     created: options.date ?? new Date().toISOString(),
-    verificationMethod: `${options.keyPair.controller}#key-1`,
+    verificationMethod: `${options.keyPair.controller}#${options.keyPair.type}`,
     proofPurpose: "assertionMethod",
     jws,
   };
@@ -134,6 +140,9 @@ export async function verifyCredential(
   if (!proof?.jws) {
     throw new Error("No proof found in credential");
   }
+
+  const { proof: _, ...credential } = signedCredential;
+  const credentialBytes = new TextEncoder().encode(JSON.stringify(credential));
 
   return await verifyJws(proof.jws, publicKey);
 }

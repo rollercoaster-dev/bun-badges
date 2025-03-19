@@ -168,10 +168,7 @@ export class VerificationService {
           signingKey.publicKey,
         );
       } catch (error) {
-        console.error("Ed25519 verification error:", error);
-        result.errors.push(
-          `Signature verification error: ${error instanceof Error ? error.message : "Unknown error"}`,
-        );
+        result.errors.push("Invalid signature format");
       }
 
       result.checks.signature = isValid;
