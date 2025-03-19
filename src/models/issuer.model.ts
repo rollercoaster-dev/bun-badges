@@ -90,12 +90,51 @@ export type IssuerProfile = z.infer<typeof issuerProfileSchema>;
 export type CreateIssuerDto = z.infer<typeof createIssuerSchema>;
 export type UpdateIssuerDto = z.infer<typeof updateIssuerSchema>;
 
+// Types for JSON-LD responses
+export interface IssuerJsonLdV2 {
+  "@context": "https://w3id.org/openbadges/v2";
+  type: "Profile";
+  id: string;
+  name: string;
+  url: string;
+  description?: string;
+  email?: string;
+  image?: string;
+  related?: Array<{
+    type: ["https://purl.imsglobal.org/spec/vc/ob/vocab.html#Profile"];
+    id: string;
+    version: "Open Badges v3p0";
+  }>;
+}
+
+export interface IssuerJsonLdV3 {
+  "@context": [
+    "https://www.w3.org/ns/did/v1",
+    "https://www.w3.org/ns/credentials/v2",
+    "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json",
+  ];
+  id: string;
+  type: "https://purl.imsglobal.org/spec/vc/ob/vocab.html#Profile";
+  name: string;
+  url: string;
+  description?: string;
+  email?: string;
+  image?: string;
+  alsoKnownAs: string;
+  otherIdentifier: Array<{
+    type: ["IdentifierEntry"];
+    identifier: string;
+    identifierType: "identifier";
+  }>;
+  publicKey?: IssuerProfile["publicKey"];
+}
+
 // Function to construct Open Badges 2.0 compliant Issuer JSON-LD
 export function constructIssuerJsonLd(
   hostUrl: string,
   issuerId: string,
   issuer: CreateIssuerDto | (UpdateIssuerDto & { name: string; url: string }),
-): Record<string, any> {
+): IssuerJsonLdV2 {
   return {
     "@context": "https://w3id.org/openbadges/v2",
     type: "Profile",
@@ -123,7 +162,7 @@ export function constructIssuerJsonLdV3(
   hostUrl: string,
   issuerId: string,
   issuer: CreateIssuerDto | (UpdateIssuerDto & { name: string; url: string }),
-): Record<string, any> {
+): IssuerJsonLdV3 {
   const hostname = new URL(hostUrl).hostname;
   const didId = `did:web:${hostname}:issuers:${issuerId}`;
   const httpsId = `${hostUrl}/issuers/${issuerId}`;

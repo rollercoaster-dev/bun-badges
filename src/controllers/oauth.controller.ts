@@ -177,8 +177,7 @@ export class OAuthController {
     // Render consent page with validated scopes
     const html = this.renderConsentPage({
       clientName: client.clientName,
-      clientUri: client.clientUri,
-      logoUri: client.logoUri,
+      clientUri: client.clientUri || "",
       scopes: validScopes,
       redirectUri: redirect_uri,
       state,
@@ -245,7 +244,7 @@ export class OAuthController {
   private renderConsentPage(params: {
     clientName: string;
     clientUri: string;
-    logoUri: string | null;
+    logoUri?: string;
     scopes: string[];
     redirectUri: string;
     state?: string;

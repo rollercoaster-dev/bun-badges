@@ -1,23 +1,18 @@
 import { Hono } from "hono";
 import { type Context } from "hono";
+import { Role } from "../middleware/auth";
 import {
-  IssuerController,
-  IssuerVersion,
-} from "../controllers/issuer.controller";
-import { ISSUER_ROUTES } from "./aliases";
-import {
-  type CreateIssuerDto,
-  type UpdateIssuerDto,
-} from "../models/issuer.model";
-import { ZodError } from "zod";
-import {
-  Role,
   requireAuth,
   requireRole,
   requireOwnership,
   combineMiddleware,
-  AuthUser,
+  type AuthUser,
 } from "../middleware/auth";
+import { IssuerController } from "../controllers/issuer.controller";
+import {
+  type CreateIssuerDto,
+  type UpdateIssuerDto,
+} from "../models/issuer.model";
 
 // Extend Hono's context type to include our user
 declare module "hono" {
@@ -29,22 +24,6 @@ declare module "hono" {
 const controller = new IssuerController();
 const issuers = new Hono();
 
-// Helper function to determine OB version from Accept header
-function determineVersion(accept: string | null): IssuerVersion {
-  if (!accept) return "2.0";
-
-  // Check for OB 3.0 specific media types
-  if (
-    accept.includes("application/ld+json") ||
-    accept.includes("application/credential+ld+json") ||
-    accept.includes("application/ob+3")
-  ) {
-    return "3.0";
-  }
-
-  return "2.0";
-}
-
 /**
  * Get the owner user ID for an issuer
  */
@@ -55,7 +34,7 @@ async function getIssuerOwner(c: Context): Promise<string> {
   return (issuer as any).ownerUserId;
 }
 
-// List all issuer profiles - requires ISSUER_VIEWER role
+// List issuers
 issuers.get("/", requireRole(Role.ISSUER_VIEWER), async (c) => {
   try {
     return await controller.listIssuers(c);
@@ -66,7 +45,7 @@ issuers.get("/", requireRole(Role.ISSUER_VIEWER), async (c) => {
   }
 });
 
-// Get a specific issuer by ID - requires ISSUER_VIEWER role
+// Get issuer by ID
 issuers.get("/:id", requireRole(Role.ISSUER_VIEWER), async (c) => {
   try {
     return await controller.getIssuer(c);
@@ -77,7 +56,7 @@ issuers.get("/:id", requireRole(Role.ISSUER_VIEWER), async (c) => {
   }
 });
 
-// Create a new issuer profile - requires ISSUER_ADMIN role
+// Create issuer
 issuers.post("/", requireAuth, requireRole(Role.ISSUER_ADMIN), async (c) => {
   try {
     const data = await c.req.json<CreateIssuerDto>();
@@ -93,7 +72,7 @@ issuers.post("/", requireAuth, requireRole(Role.ISSUER_ADMIN), async (c) => {
   }
 });
 
-// Update an existing issuer profile - requires ISSUER_ADMIN role or ownership
+// Update issuer
 issuers.put(
   "/:id",
   combineMiddleware(
@@ -114,7 +93,7 @@ issuers.put(
   },
 );
 
-// Delete an issuer profile - requires ISSUER_ADMIN role or ownership
+// Delete issuer
 issuers.delete(
   "/:id",
   combineMiddleware(
@@ -136,7 +115,7 @@ issuers.delete(
   },
 );
 
-// Verify an issuer profile - public access
+// Verify issuer
 issuers.get("/:id/verify", async (c) => {
   try {
     const issuer = await controller.getIssuer(c);

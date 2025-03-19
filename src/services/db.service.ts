@@ -1,14 +1,19 @@
 import { and, eq, gt, lt } from "drizzle-orm";
-import { db } from "../db/config";
-import { verificationCodes, revokedTokens } from "../db/schema/auth";
-import type { NewVerificationCode, NewRevokedToken } from "../db/schema/auth";
-import { oauthClients, authorizationCodes } from "../db/schema/oauth";
+import { db, schema } from "@/db/config";
 import { nanoid } from "nanoid";
 
+const { verificationCodes, revokedTokens, oauthClients, authorizationCodes } =
+  schema;
+
+import type { NewRevokedToken } from "@/db/schema/auth";
+
 export class DatabaseService {
+  // Re-export the db instance for direct access when needed
+  static db = db;
+
   // Verification Code Methods
   async createVerificationCode(
-    data: Omit<NewVerificationCode, "id">,
+    data: Omit<schema.NewVerificationCode, "id">,
   ): Promise<string> {
     const [result] = await db
       .insert(verificationCodes)

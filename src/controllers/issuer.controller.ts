@@ -12,6 +12,34 @@ import { type Context } from "hono";
 
 export type IssuerVersion = "2.0" | "3.0";
 
+interface PublicKeyJwk {
+  kty: string;
+  crv?: string;
+  x?: string;
+  y?: string;
+  n?: string;
+  e?: string;
+}
+
+interface PublicKey {
+  id: string;
+  type: "Ed25519VerificationKey2020" | "RsaVerificationKey2018";
+  controller: string;
+  publicKeyJwk?: PublicKeyJwk;
+  publicKeyPem?: string;
+}
+
+interface IssuerJsonLd {
+  "@context": string | string[];
+  id: string;
+  type: string;
+  name: string;
+  url: string;
+  description?: string;
+  email?: string;
+  publicKey?: PublicKey[];
+}
+
 // Helper function to convert null to undefined
 function nullToUndefined<T>(value: T | null): T | undefined {
   return value === null ? undefined : value;
@@ -53,7 +81,7 @@ export class IssuerController {
                   url: issuer.url,
                   description: nullToUndefined(issuer.description),
                   email: nullToUndefined(issuer.email),
-                  publicKey: issuer.publicKey as any,
+                  publicKey: issuer.publicKey as PublicKey[],
                 },
               )
             : constructIssuerJsonLd(
@@ -116,7 +144,7 @@ export class IssuerController {
                   url: issuer[0].url,
                   description: nullToUndefined(issuer[0].description),
                   email: nullToUndefined(issuer[0].email),
-                  publicKey: issuer[0].publicKey as any,
+                  publicKey: issuer[0].publicKey as PublicKey[],
                 },
               )
             : constructIssuerJsonLd(
@@ -260,7 +288,7 @@ export class IssuerController {
               url: updatedData.url,
               description: nullToUndefined(updatedData.description),
               email: nullToUndefined(updatedData.email),
-              publicKey: updatedData.publicKey as any,
+              publicKey: updatedData.publicKey as PublicKey[],
             })
           : constructIssuerJsonLd(hostUrl, issuerId, {
               name: updatedData.name,
@@ -364,7 +392,7 @@ export class IssuerController {
    * Verify an issuer profile against Open Badges standards
    */
   verifyIssuer(
-    issuerJson: any,
+    issuerJson: IssuerJsonLd,
     version: IssuerVersion = "2.0",
   ): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
@@ -411,7 +439,7 @@ export class IssuerController {
         if (!Array.isArray(issuerJson.publicKey)) {
           errors.push("publicKey must be an array");
         } else {
-          issuerJson.publicKey.forEach((key: any, index: number) => {
+          issuerJson.publicKey.forEach((key, index) => {
             if (!key.id) errors.push(`Public key ${index} missing id`);
             if (!key.type) errors.push(`Public key ${index} missing type`);
             if (!key.controller)

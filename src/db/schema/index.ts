@@ -1,12 +1,4 @@
-import {
-  pgTable,
-  uuid,
-  varchar,
-  text,
-  timestamp,
-  boolean,
-  jsonb,
-} from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, text, timestamp } from "drizzle-orm/pg-core";
 
 // Users table for authentication and profile management
 export const users = pgTable("users", {
@@ -41,54 +33,8 @@ export const loginTokens = pgTable("login_tokens", {
   expiresAt: timestamp("expires_at").notNull(),
 });
 
-// Issuer profiles for badge issuance
-export const issuerProfiles = pgTable("issuer_profiles", {
-  issuerId: uuid("issuer_id").primaryKey().defaultRandom(),
-  name: varchar("name", { length: 255 }).notNull(),
-  url: text("url").notNull(),
-  description: text("description"),
-  email: varchar("email", { length: 255 }),
-  ownerUserId: uuid("owner_user_id")
-    .references(() => users.userId)
-    .notNull(),
-  issuerJson: jsonb("issuer_json").notNull(), // Full Open Badges issuer JSON
-  publicKey: jsonb("public_key"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-// Badge classes (badge definitions)
-export const badgeClasses = pgTable("badge_classes", {
-  badgeId: uuid("badge_id").primaryKey().defaultRandom(),
-  issuerId: uuid("issuer_id")
-    .references(() => issuerProfiles.issuerId)
-    .notNull(),
-  name: varchar("name", { length: 255 }).notNull(),
-  description: text("description").notNull(),
-  criteria: text("criteria").notNull(),
-  imageUrl: text("image_url").notNull(),
-  badgeJson: jsonb("badge_json").notNull(), // Full Open Badges badge class JSON
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-// Badge assertions (awarded badges)
-export const badgeAssertions = pgTable("badge_assertions", {
-  assertionId: uuid("assertion_id").primaryKey().defaultRandom(),
-  badgeId: uuid("badge_id")
-    .references(() => badgeClasses.badgeId)
-    .notNull(),
-  issuerId: uuid("issuer_id")
-    .references(() => issuerProfiles.issuerId)
-    .notNull(),
-  recipientType: varchar("recipient_type", { length: 50 }).notNull(),
-  recipientIdentity: text("recipient_identity").notNull(),
-  recipientHashed: boolean("recipient_hashed").default(true).notNull(),
-  issuedOn: timestamp("issued_on").defaultNow().notNull(),
-  evidenceUrl: text("evidence_url"),
-  revoked: boolean("revoked").default(false).notNull(),
-  revocationReason: text("revocation_reason"),
-  assertionJson: jsonb("assertion_json").notNull(), // Full Open Badges assertion JSON
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+export * from "./auth";
+export * from "./oauth";
+export * from "./badges";
+export * from "./issuers";
+export * from "./signing";

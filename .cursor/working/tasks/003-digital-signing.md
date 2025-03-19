@@ -13,6 +13,40 @@ High - Critical for badge verification and security
 - Open Badges and W3C Verifiable Credentials research
 - Library selection and evaluation
 
+## Research Findings
+
+After examining the badge-engine implementation, the following approach for digital signing was identified:
+
+### Library Stack
+- **jsonld**: For JSON-LD document processing
+- **n3**: For RDF operations 
+- **@noble/curves/ed25519**: For Ed25519 digital signatures
+- **multiformats/bases/base58**: For encoding
+- **@digitalbazaar/ed25519-multikey**: For key management
+- **bnid**: For secure key seed generation
+
+### Key Management
+- Uses `createSigningKey.ts` to generate and store Ed25519 keypairs
+- Uses `getSigningKey.ts` to retrieve existing keys or create new ones
+- Keys are stored in a database table (in badge-engine, this is in a Prisma table called `multikey`)
+
+### Signing Approach
+- Uses eddsa-rdfc-2022 cryptosuite for signatures
+- Processes JSON-LD documents with canonicalization using RDFC10
+- Creates proofs that comply with W3C Data Integrity standards
+
+### Integration with Open Badges
+- Badge assertions can include a proof that verifies their authenticity
+- Public keys are managed at the issuer level
+- The implementation targets compatibility with Verifiable Credentials
+
+### Implementation Plan for bun-badges
+1. Add the required library dependencies to our project
+2. Create a database schema for key management
+3. Implement the core signing utilities
+4. Create API endpoints for signing and verification
+5. Integrate signing with the badge issuance process
+
 ## Detailed Steps
 
 ### Phase 1: Research and Specification Compliance (2-3 days)

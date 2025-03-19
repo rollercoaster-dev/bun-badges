@@ -1,13 +1,12 @@
 import { describe, expect, it, beforeEach } from "bun:test";
-import { IssuerController } from "../../controllers/issuer.controller";
 import { type Context } from "hono";
 import {
   type CreateIssuerDto,
   type UpdateIssuerDto,
 } from "../../models/issuer.model";
 
-// Define a minimal test controller implementation
-class TestIssuerController extends IssuerController {
+// Define a standalone test controller implementation that doesn't extend the actual controller
+class TestIssuerController {
   async listIssuers(c: Context) {
     const now = new Date();
     const issuerJson = {

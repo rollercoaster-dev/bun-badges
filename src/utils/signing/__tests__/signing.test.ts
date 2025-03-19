@@ -9,7 +9,7 @@ describe("Digital Signing", () => {
     expect(keyPair.publicKey).toBeDefined();
     expect(keyPair.privateKey).toBeDefined();
     expect(keyPair.controller).toContain("did:key:");
-    expect(keyPair.type).toBe("Ed25519VerificationKey2018");
+    expect(keyPair.type).toBe("Ed25519VerificationKey2020");
 
     // Create a test credential
     const credential = {

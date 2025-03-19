@@ -1,11 +1,21 @@
-import { JsonWebSignature } from "@transmute/json-web-signature";
-import { createJsonWebKey, KeyPair } from "./keys";
+import base64url from "base64url";
+import * as ed from "@noble/ed25519";
+import type {
+  JsonLdProof,
+  VerifiableCredential,
+  SignedCredential,
+} from "@/utils/signing/types";
 
-export interface SigningOptions {
+interface SigningOptions {
   /**
    * The keypair to use for signing
    */
-  keyPair: KeyPair;
+  keyPair: {
+    publicKey: Uint8Array;
+    privateKey: Uint8Array;
+    controller: string;
+    type: string;
+  };
 
   /**
    * The date to use in the proof (defaults to now)
@@ -13,154 +23,49 @@ export interface SigningOptions {
   date?: string;
 }
 
-/**
- * Represents a JSON-LD context URL or object
- */
-type JsonLdContext = string | Record<string, unknown>;
+// Document loader deliberately removed as it's not used in the current implementation
 
-/**
- * Base interface for JSON-LD documents
- */
-interface JsonLdDocument {
-  "@context": JsonLdContext | JsonLdContext[];
-  [key: string]: unknown;
-}
-
-/**
- * Interface for a JSON-LD proof
- */
-interface JsonLdProof {
-  type: string;
+interface JsonWebSignature2020Proof extends JsonLdProof {
+  type: "JsonWebSignature2020";
   created: string;
-  proofPurpose: string;
   verificationMethod: string;
-  jws?: string;
-  [key: string]: unknown;
+  proofPurpose: "assertionMethod";
+  jws: string;
 }
 
-/**
- * Interface for a credential issuer
- */
-interface CredentialIssuer {
-  id: string;
-  [key: string]: unknown;
-}
-
-/**
- * Interface for a verifiable credential
- */
-interface VerifiableCredential extends JsonLdDocument {
-  issuer: CredentialIssuer;
-  [key: string]: unknown;
-}
-
-/**
- * Interface for a signed credential
- */
-type SignedCredential = VerifiableCredential & {
-  proof: JsonLdProof;
-};
-
-/**
- * Creates a document loader for JSON-LD contexts
- */
-function createDocumentLoader() {
-  return async (iri: string) => {
-    // For now, we'll only handle the basic contexts
-    // In a production environment, you'd want to implement proper context loading
-    if (iri === "https://www.w3.org/2018/credentials/v1") {
-      return {
-        documentUrl: iri,
-        document: {
-          "@context": {
-            "@version": 1.1,
-            "@protected": true,
-            id: "@id",
-            type: "@type",
-            VerifiableCredential: {
-              "@id": "https://www.w3.org/2018/credentials#VerifiableCredential",
-              "@context": {
-                "@version": 1.1,
-                "@protected": true,
-                id: "@id",
-                type: "@type",
-                cred: "https://www.w3.org/2018/credentials#",
-                sec: "https://w3id.org/security#",
-                xsd: "http://www.w3.org/2001/XMLSchema#",
-                credentialSubject: {
-                  "@id": "cred:credentialSubject",
-                  "@type": "@id",
-                },
-                issuer: { "@id": "cred:issuer", "@type": "@id" },
-                issuanceDate: {
-                  "@id": "cred:issuanceDate",
-                  "@type": "xsd:dateTime",
-                },
-              },
-            },
-          },
-        },
-      };
-    }
-
-    if (iri === "https://w3id.org/security/suites/jws-2020/v1") {
-      return {
-        documentUrl: iri,
-        document: {
-          "@context": {
-            "@version": 1.1,
-            id: "@id",
-            type: "@type",
-            JsonWebSignature2020: {
-              "@id": "https://w3id.org/security#JsonWebSignature2020",
-              "@context": {
-                "@protected": true,
-                id: "@id",
-                type: "@type",
-                challenge: "https://w3id.org/security#challenge",
-                created: {
-                  "@id": "http://purl.org/dc/terms/created",
-                  "@type": "http://www.w3.org/2001/XMLSchema#dateTime",
-                },
-                domain: "https://w3id.org/security#domain",
-                expires: {
-                  "@id": "https://w3id.org/security#expiration",
-                  "@type": "http://www.w3.org/2001/XMLSchema#dateTime",
-                },
-                jws: "https://w3id.org/security#jws",
-                nonce: "https://w3id.org/security#nonce",
-                proofPurpose: {
-                  "@id": "https://w3id.org/security#proofPurpose",
-                  "@type": "@vocab",
-                  "@context": {
-                    "@protected": true,
-                    id: "@id",
-                    type: "@type",
-                    assertionMethod: {
-                      "@id": "https://w3id.org/security#assertionMethod",
-                      "@type": "@id",
-                      "@container": "@set",
-                    },
-                    authentication: {
-                      "@id": "https://w3id.org/security#authenticationMethod",
-                      "@type": "@id",
-                      "@container": "@set",
-                    },
-                  },
-                },
-                verificationMethod: {
-                  "@id": "https://w3id.org/security#verificationMethod",
-                  "@type": "@id",
-                },
-              },
-            },
-          },
-        },
-      };
-    }
-
-    throw new Error(`Context ${iri} not implemented`);
+async function createJws(
+  data: Uint8Array,
+  privateKey: Uint8Array,
+): Promise<string> {
+  const header = {
+    alg: "EdDSA",
+    b64: true,
+    crit: ["b64"],
   };
+
+  const encodedHeader = base64url.encode(JSON.stringify(header));
+  const encodedData = base64url.encode(Buffer.from(data).toString("base64"));
+  const signingInput = new TextEncoder().encode(
+    `${encodedHeader}.${encodedData}`,
+  );
+
+  const signature = await ed.sign(signingInput, privateKey);
+
+  return `${encodedHeader}.${encodedData}.${base64url.encode(Buffer.from(signature).toString("base64"))}`;
+}
+
+async function verifyJws(jws: string, publicKey: Uint8Array): Promise<boolean> {
+  const [encodedHeader, encodedData, encodedSignature] = jws.split(".");
+  if (!encodedHeader || !encodedData || !encodedSignature) {
+    throw new Error("Invalid JWS format");
+  }
+
+  const signingInput = new TextEncoder().encode(
+    `${encodedHeader}.${encodedData}`,
+  );
+  const signature = Buffer.from(base64url.decode(encodedSignature), "base64");
+
+  return await ed.verify(signature, signingInput, publicKey);
 }
 
 /**
@@ -173,25 +78,33 @@ export async function signCredential(
   credential: VerifiableCredential,
   options: SigningOptions,
 ): Promise<SignedCredential> {
-  const key = await createJsonWebKey(options.keyPair);
+  // Ensure credential has required context
+  if (!credential["@context"]) {
+    credential["@context"] = [];
+  }
+  if (!Array.isArray(credential["@context"])) {
+    credential["@context"] = [credential["@context"]];
+  }
+  if (
+    !credential["@context"].includes(
+      "https://w3id.org/security/suites/jws-2020/v1",
+    )
+  ) {
+    credential["@context"].push("https://w3id.org/security/suites/jws-2020/v1");
+  }
 
-  const suite = new JsonWebSignature({
-    key,
-    date: options.date || new Date().toISOString(),
-  });
+  // Create JWS using credential data
+  const credentialData = new TextEncoder().encode(JSON.stringify(credential));
+  const jws = await createJws(credentialData, options.keyPair.privateKey);
 
-  // Create the proof
-  const proof = await suite.createProof({
-    document: credential,
-    purpose: {
-      proofPurpose: "assertionMethod",
-      verificationMethod: `${options.keyPair.controller}#${options.keyPair.publicKey}`,
-      created: options.date || new Date().toISOString(),
-    },
-    documentLoader: createDocumentLoader(),
-  });
+  const proof: JsonWebSignature2020Proof = {
+    type: "JsonWebSignature2020",
+    created: options.date ?? new Date().toISOString(),
+    verificationMethod: `${options.keyPair.controller}#${options.keyPair.type}`,
+    proofPurpose: "assertionMethod",
+    jws,
+  };
 
-  // Add the proof to the credential
   return {
     ...credential,
     proof,
@@ -201,36 +114,17 @@ export async function signCredential(
 /**
  * Verifies a signed credential
  * @param signedCredential - The signed credential to verify
- * @param publicKey - The public key to verify against
- * @returns True if the signature is valid, false otherwise
+ * @param publicKey - The public key to verify with
+ * @returns Whether the credential is valid
  */
 export async function verifyCredential(
   signedCredential: SignedCredential,
-  publicKey: string,
+  publicKey: Uint8Array,
 ): Promise<boolean> {
-  try {
-    const key = await createJsonWebKey({
-      publicKey,
-      privateKey: "", // Not needed for verification
-      controller: signedCredential.issuer.id,
-      type: "Ed25519VerificationKey2018",
-    });
-
-    const suite = new JsonWebSignature({
-      key,
-    });
-
-    // Verify the proof
-    const result = await suite.verifyProof({
-      proof: signedCredential.proof,
-      document: signedCredential,
-      documentLoader: createDocumentLoader(),
-    });
-
-    return result.verified;
-  } catch (error) {
-    // Log the error for debugging but don't expose it to the caller
-    console.error("Verification failed:", error);
-    return false;
+  const { proof } = signedCredential;
+  if (!proof?.jws) {
+    throw new Error("No proof found in credential");
   }
+
+  return await verifyJws(proof.jws, publicKey);
 }
