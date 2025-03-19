@@ -195,8 +195,7 @@ describe("VerificationService", () => {
 
     expect(result.valid).toBe(false);
     expect(result.checks.signature).toBe(false);
-    expect(result.errors.length).toBeGreaterThan(0);
-    expect(result.errors[0]).toContain("Invalid signature");
+    expect(result.errors).toContain("Invalid signature");
   });
 
   it("should auto-detect and verify OB2 assertion", async () => {
@@ -248,7 +247,10 @@ describe("VerificationService", () => {
   it("should auto-detect and verify OB3 assertion", async () => {
     const assertionId = "test-assertion-id";
 
-    // Reset to default mock (includes proof)
+    // Clear any previous mocks
+    mock.restore();
+
+    // Reset database mock with proof
     mock.module("@/db/config", () => ({
       db: {
         select: () => ({
@@ -286,12 +288,17 @@ describe("VerificationService", () => {
       },
     }));
 
-    // Reset ed25519 verify mock
+    // Ensure ed25519 verify returns true
     mock.module("@noble/ed25519", () => ({
       verify: () => Promise.resolve(true),
     }));
 
-    // Recreate service after mock changes
+    // Re-add key mock
+    mock.module("@/utils/signing/keys", () => ({
+      getSigningKey: () => Promise.resolve(mockKeyPair),
+    }));
+
+    // Create a new service instance
     service = new VerificationService();
 
     const result = await service.verifyAssertion(assertionId);

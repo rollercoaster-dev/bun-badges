@@ -160,11 +160,19 @@ export class VerificationService {
       const dataToVerify = new TextEncoder().encode(canonicalData);
 
       // Verify with Ed25519
-      const isValid = await ed.verify(
-        signature,
-        dataToVerify,
-        signingKey.publicKey,
-      );
+      let isValid = false;
+      try {
+        isValid = await ed.verify(
+          signature,
+          dataToVerify,
+          signingKey.publicKey,
+        );
+      } catch (error) {
+        console.error("Ed25519 verification error:", error);
+        result.errors.push(
+          `Signature verification error: ${error instanceof Error ? error.message : "Unknown error"}`,
+        );
+      }
 
       result.checks.signature = isValid;
       if (!isValid) {

@@ -68,9 +68,11 @@ async function verifyJws(jws: string, publicKey: Uint8Array): Promise<boolean> {
   const signature = Buffer.from(base64url.decode(encodedSignature));
 
   try {
-    return await ed.verify(signature, signingInput, publicKey);
-  } catch {
-    // Silent fail for verification errors
+    const isValid = await ed.verify(signature, signingInput, publicKey);
+    return isValid;
+  } catch (error) {
+    // Log the error for debugging
+    console.error("Signature verification error:", error);
     return false;
   }
 }

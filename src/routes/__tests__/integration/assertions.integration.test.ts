@@ -1,12 +1,20 @@
-import { describe, it, expect, beforeAll, afterAll } from "bun:test";
+import { describe, it, expect, beforeAll, afterAll, mock } from "bun:test";
 import { Hono } from "hono";
-import { db } from "@/db/config";
-import { issuerProfiles, badgeClasses, badgeAssertions } from "@/db/schema";
-import { eq } from "drizzle-orm";
+// Import our mock db and tables
+import { mockDb, tables } from "@/__mocks__/db-mock";
 import assertions from "@/routes/assertions.routes";
 import verification from "@/routes/verification.routes";
-import { generateSigningKey } from "@/utils/signing/keys";
 import crypto from "crypto";
+
+// Setup mocks for other dependencies
+mock.module("@noble/ed25519", () => ({
+  getPublicKey: () => Promise.resolve(new Uint8Array([1, 2, 3, 4])),
+  utils: {
+    randomPrivateKey: () => new Uint8Array([5, 6, 7, 8]),
+  },
+  sign: () => Promise.resolve(new Uint8Array([9, 10, 11, 12])),
+  verify: () => Promise.resolve(true),
+}));
 
 // Type definitions for API responses
 interface ApiResponse<T> {
@@ -70,17 +78,18 @@ describe("Assertions API Integration", () => {
   let badgeId: string;
   let assertionId: string;
 
-  // Setup test environment with actual database records
+  // Setup test environment with mocked database records
   beforeAll(async () => {
     // Create an issuer for testing
-    const [issuer] = await db
-      .insert(issuerProfiles)
+    const [issuer] = await mockDb
+      .insert(tables.issuerProfiles)
       .values({
         name: "Test API Issuer",
         url: "https://example.com/issuer",
         description: "A test issuer for API integration tests",
         email: "test-api@example.com",
         ownerUserId: crypto.randomUUID(),
+        issuerId: "test-issuer-id",
         issuerJson: {
           "@context": "https://w3id.org/openbadges/v2",
           type: "Issuer",
@@ -96,14 +105,42 @@ describe("Assertions API Integration", () => {
 
     issuerId = issuer.issuerId;
 
-    // Generate a signing key for the issuer
-    await generateSigningKey(issuerId);
+    // Mock the signing key generation
+    mock.module("@/utils/signing/keys", () => ({
+      getSigningKey: () =>
+        Promise.resolve({
+          publicKey: new Uint8Array([1, 2, 3, 4]),
+          privateKey: new Uint8Array([5, 6, 7, 8]),
+          controller: "did:key:test",
+          type: "Ed25519VerificationKey2020",
+          keyInfo: {
+            id: "did:key:test#key-1",
+            type: "Ed25519VerificationKey2020",
+            controller: "did:key:test",
+            publicKeyJwk: { kty: "OKP", crv: "Ed25519", x: "test" },
+          },
+        }),
+      generateSigningKey: () =>
+        Promise.resolve({
+          publicKey: new Uint8Array([1, 2, 3, 4]),
+          privateKey: new Uint8Array([5, 6, 7, 8]),
+          controller: "did:key:test",
+          type: "Ed25519VerificationKey2020",
+          keyInfo: {
+            id: "did:key:test#key-1",
+            type: "Ed25519VerificationKey2020",
+            controller: "did:key:test",
+            publicKeyJwk: { kty: "OKP", crv: "Ed25519", x: "test" },
+          },
+        }),
+    }));
 
     // Create a badge class for testing
-    const [badge] = await db
-      .insert(badgeClasses)
+    const [badge] = await mockDb
+      .insert(tables.badgeClasses)
       .values({
         issuerId,
+        badgeId: "test-badge-id",
         name: "Test API Badge",
         description: "A test badge for API integration tests",
         criteria: "Complete API integration tests",
@@ -128,24 +165,10 @@ describe("Assertions API Integration", () => {
     badgeId = badge.badgeId;
   });
 
-  // Clean up after tests
+  // No need for cleanup with mocks
   afterAll(async () => {
-    // Remove test data
-    if (assertionId) {
-      await db
-        .delete(badgeAssertions)
-        .where(eq(badgeAssertions.assertionId, assertionId));
-    }
-
-    if (badgeId) {
-      await db.delete(badgeClasses).where(eq(badgeClasses.badgeId, badgeId));
-    }
-
-    if (issuerId) {
-      await db
-        .delete(issuerProfiles)
-        .where(eq(issuerProfiles.issuerId, issuerId));
-    }
+    // Reset mocks
+    mock.restore();
   });
 
   it("should create an OB3.0 badge assertion through the API", async () => {

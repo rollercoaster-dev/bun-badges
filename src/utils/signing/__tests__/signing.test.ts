@@ -47,10 +47,12 @@ describe("Digital Signing", () => {
 
     // Verify with wrong public key should fail
     const wrongKeyPair = await generateSigningKey("another-issuer-id", true);
+    // Since we're using a completely different key pair, this should fail
     const isInvalid = await verifyCredential(
       signedCredential,
       wrongKeyPair.publicKey,
     );
+    // Wrong key should return false
     expect(isInvalid).toBe(false);
   });
 });
