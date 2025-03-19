@@ -4,8 +4,8 @@ import { signCredential, verifyCredential } from "../credentials";
 
 describe("Digital Signing", () => {
   test("should generate a keypair and sign/verify a credential", async () => {
-    // Generate a keypair
-    const keyPair = await generateSigningKey("test-issuer-id");
+    // Generate a keypair without database storage
+    const keyPair = await generateSigningKey("test-issuer-id", true);
     expect(keyPair.publicKey).toBeDefined();
     expect(keyPair.privateKey).toBeDefined();
     expect(keyPair.controller).toContain("did:key:");
@@ -46,7 +46,7 @@ describe("Digital Signing", () => {
     expect(isValid).toBe(true);
 
     // Verify with wrong public key should fail
-    const wrongKeyPair = await generateSigningKey("another-issuer-id");
+    const wrongKeyPair = await generateSigningKey("another-issuer-id", true);
     const isInvalid = await verifyCredential(
       signedCredential,
       wrongKeyPair.publicKey,

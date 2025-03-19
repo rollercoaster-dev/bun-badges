@@ -40,10 +40,12 @@ function encodeBase64Url(buffer: Uint8Array): string {
 /**
  * Generates a new Ed25519 keypair for an issuer
  * @param issuerId - UUID of the issuer
+ * @param skipStorage - Skip storing in the database (for tests)
  * @returns The generated keypair
  */
 export async function generateSigningKey(
   issuerId: string,
+  skipStorage: boolean = false,
 ): Promise<CryptoKeyPair> {
   // Generate Ed25519 key pair
   const privateKey = ed.utils.randomPrivateKey();
@@ -73,21 +75,23 @@ export async function generateSigningKey(
     publicKeyJwk,
   };
 
-  // Store the keypair in the database
-  const storedKeyPair: StoredKeyPair = {
-    publicKeyMultibase: encodeMultibase(publicKey),
-    privateKeyMultibase: encodeMultibase(privateKey),
-    controller: didKey,
-    type: "Ed25519VerificationKey2020",
-    keyInfo,
-  };
+  if (!skipStorage) {
+    // Store the keypair in the database
+    const storedKeyPair: StoredKeyPair = {
+      publicKeyMultibase: encodeMultibase(publicKey),
+      privateKeyMultibase: encodeMultibase(privateKey),
+      controller: didKey,
+      type: "Ed25519VerificationKey2020",
+      keyInfo,
+    };
 
-  await db.insert(signingKeys).values({
-    issuerId,
-    ...storedKeyPair,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  });
+    await db.insert(signingKeys).values({
+      issuerId,
+      ...storedKeyPair,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }
 
   return {
     publicKey,

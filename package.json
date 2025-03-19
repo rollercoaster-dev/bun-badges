@@ -14,7 +14,8 @@
     "db:migrate": "bun run src/db/migrate.ts",
     "db:push": "drizzle-kit push:pg",
     "db:studio": "drizzle-kit studio",
-    "test": "bun test",
+    "test": "bun test --preload ./src/utils/test/setup.ts",
+    "test:docker": "bash ./run-tests.sh",
     "prepare": "husky install"
   },
   "lint-staged": {

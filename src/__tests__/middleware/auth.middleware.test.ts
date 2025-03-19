@@ -1,7 +1,7 @@
 import { expect, test, describe, mock } from "bun:test";
 import { Context } from "hono";
 import { createAuthMiddleware, AuthContext } from "@middleware/auth.middleware";
-import { DatabaseService } from "@services/db.service";
+import { MockDatabaseService } from "@utils/test/db-mock";
 
 type ErrorResponse = {
   error: string;
@@ -12,20 +12,14 @@ const createMockContext = (headers: Record<string, string> = {}) => {
     req: {
       header: (name: string) => headers[name],
     },
-    json: (body: any, status = 200) => {
+    json: (body: Record<string, unknown>, status = 200) => {
       return Response.json(body, { status });
     },
   } as unknown as Context;
 };
 
 const createMockDatabase = () => {
-  const mockDb = {
-    isTokenRevoked: mock((token: string) => {
-      return Promise.resolve(token === "revoked-token");
-    }),
-  };
-
-  return mockDb as unknown as DatabaseService;
+  return new MockDatabaseService();
 };
 
 describe("Auth Middleware", () => {

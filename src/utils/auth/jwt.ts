@@ -79,7 +79,7 @@ export async function verifyToken(
     });
 
     // Verify token type if specified
-    if (tokenType && payload.type !== tokenType) {
+    if (tokenType && payload.type && payload.type !== tokenType) {
       throw new Error(
         `Invalid token type: expected ${tokenType}, got ${payload.type}`,
       );

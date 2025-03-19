@@ -182,6 +182,58 @@ JWT_EXPIRY=15m
 REFRESH_TOKEN_EXPIRY=7d
 ```
 
+## Testing
+
+### Running Tests
+
+```bash
+# Run all tests
+bun test
+
+# Run tests with coverage
+bun test --coverage
+
+# Run specific test file
+bun test src/utils/signing/__tests__/signing.test.ts
+
+# Run tests matching a pattern
+bun test --pattern "auth"
+```
+
+### Docker Testing Environment
+
+A dedicated Docker testing environment is available to ensure consistent test execution:
+
+```bash
+# Run tests in Docker environment
+bun run test:docker
+```
+
+This uses the `docker-compose.test.yml` configuration to:
+1. Spin up a dedicated Postgres instance for testing
+2. Run database migrations
+3. Execute all tests in an isolated container
+4. Tear down the environment afterward
+
+### Test Configuration
+
+Tests use the configuration in `test.env` instead of the main `.env` file. This allows for:
+- Using a separate test database
+- Different JWT secrets for testing
+- Safe testing of authentication flows
+
+If you're adding new environment variables, remember to update both `.env.example` and `test.env`.
+
+### Writing Tests
+
+Tests are organized alongside their implementation files in `__tests__` directories. Follow the existing patterns:
+
+- Unit tests: Test individual functions and components
+- Integration tests: Test API routes and database interactions
+- Edge case tests: Handle error conditions and boundary values
+
+See `docs/TESTING.md` for more detailed testing guidelines.
+
 ## Contributing
 
 1. Fork the repository

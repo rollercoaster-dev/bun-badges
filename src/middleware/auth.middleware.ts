@@ -1,6 +1,8 @@
 import { Context, Next } from "hono";
 import { verifyToken } from "@utils/auth/jwt";
-import { DatabaseService } from "@services/db.service";
+
+// Import as type-only to avoid circular dependency
+import type { DatabaseService } from "@services/db.service";
 
 export interface AuthContext extends Context {
   user?: {

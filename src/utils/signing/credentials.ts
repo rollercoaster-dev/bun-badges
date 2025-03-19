@@ -44,14 +44,15 @@ async function createJws(
   };
 
   const encodedHeader = base64url.encode(JSON.stringify(header));
-  const encodedData = base64url.encode(Buffer.from(data).toString("base64"));
+  const encodedData = base64url.encode(Buffer.from(data));
   const signingInput = new TextEncoder().encode(
     `${encodedHeader}.${encodedData}`,
   );
 
   const signature = await ed.sign(signingInput, privateKey);
 
-  return `${encodedHeader}.${encodedData}.${base64url.encode(Buffer.from(signature).toString("base64"))}`;
+  // Direct base64url encoding of the signature bytes
+  return `${encodedHeader}.${encodedData}.${base64url.encode(Buffer.from(signature))}`;
 }
 
 async function verifyJws(jws: string, publicKey: Uint8Array): Promise<boolean> {
@@ -63,9 +64,15 @@ async function verifyJws(jws: string, publicKey: Uint8Array): Promise<boolean> {
   const signingInput = new TextEncoder().encode(
     `${encodedHeader}.${encodedData}`,
   );
-  const signature = Buffer.from(base64url.decode(encodedSignature), "base64");
+  // Directly decode the base64url signature to get the raw bytes
+  const signature = Buffer.from(base64url.decode(encodedSignature));
 
-  return await ed.verify(signature, signingInput, publicKey);
+  try {
+    return await ed.verify(signature, signingInput, publicKey);
+  } catch {
+    // Silent fail for verification errors
+    return false;
+  }
 }
 
 /**
@@ -100,7 +107,7 @@ export async function signCredential(
   const proof: JsonWebSignature2020Proof = {
     type: "JsonWebSignature2020",
     created: options.date ?? new Date().toISOString(),
-    verificationMethod: `${options.keyPair.controller}#${options.keyPair.type}`,
+    verificationMethod: `${options.keyPair.controller}#key-1`,
     proofPurpose: "assertionMethod",
     jws,
   };

@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  test-db:
+    image: postgres:15
+    container_name: bun-badges-test-db
+    environment:
+      POSTGRES_DB: bun_badges_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data_test:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d bun_badges_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bun-badges-test-network
+
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: bun-badges-test-runner
+    depends_on:
+      - test-db
+    environment:
+      NODE_ENV: test
+      PORT: 3001
+      DATABASE_URL: postgres://postgres:postgres@test-db:5432/bun_badges_test
+      JWT_SECRET: test-secret-key-for-testing-do-not-use-in-production
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: bun test --preload ./src/utils/test/setup.ts
+    networks:
+      - bun-badges-test-network
+
+volumes:
+  postgres_data_test:
+
+networks:
+  bun-badges-test-network:
+    driver: bridge

@@ -52,6 +52,9 @@ lockfile_required = true
 allow_only_exact_versions = false
 security_audit_level = "high"
 
+[commands]
+bun = { execute = "bun" }
+
 [testing]
 framework = "bun:test"
 require_tests = true
