@@ -35,12 +35,12 @@ const createMockContext = (body: any, ip: string = "test-ip") => {
 };
 
 describe("Auth Controller Integration Tests", () => {
-  let testData: TestData;
+  let _testData: TestData;
 
   // Set up before each test
   beforeEach(async () => {
     // Seed the database with test data
-    testData = await seedTestData();
+    _testData = await seedTestData();
   });
 
   // Clean up after each test

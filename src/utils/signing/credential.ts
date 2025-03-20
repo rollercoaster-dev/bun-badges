@@ -23,7 +23,7 @@ export interface SigningOptions {
  */
 export interface VerificationResult {
   verified: boolean;
-  results?: unknown[];
+  results?: Record<string, boolean>;
   error?: string;
 }
 
@@ -90,7 +90,7 @@ export async function signCredential<T extends Record<string, unknown>>(
 export async function verifyCredential<T extends Record<string, unknown>>(
   credential: T,
   publicKey: string | Uint8Array,
-): Promise<{ verified: boolean; results?: any; error?: string }> {
+): Promise<VerificationResult> {
   // Check if the credential has a proof
   if (!credential.proof) {
     return { verified: false, error: "No proof found in credential" };

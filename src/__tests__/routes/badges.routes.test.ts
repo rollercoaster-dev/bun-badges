@@ -61,7 +61,7 @@ mock.module("../../db/config", () => ({
 
 // Mock the Hono context - used in test setup
 // @ts-expect-error - used in test setup
-const createMockContext = (options: any = {}) => {
+const _createMockContext = (options: any = {}) => {
   const {
     params = {},
     query = {},
@@ -84,7 +84,7 @@ const createMockContext = (options: any = {}) => {
 
 // Mock database service - used in test setup
 // @ts-expect-error - used in test setup
-const createMockDatabase = () => {
+const _createMockDatabase = () => {
   const mockDbFn = mock(() => Promise.resolve(mockBadges));
 
   const mockDb = {

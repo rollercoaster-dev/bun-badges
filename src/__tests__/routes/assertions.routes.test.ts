@@ -82,7 +82,7 @@ crypto.randomBytes = randomBytesMock as any;
 
 // Mock the Hono context - used in test setup
 // @ts-expect-error - used in test setup
-const createMockContext = (options: any = {}) => {
+const _createMockContext = (options: any = {}) => {
   const {
     params = {},
     query = {},
