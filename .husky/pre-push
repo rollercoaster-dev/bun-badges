@@ -1,3 +1,5 @@
 # Run TypeScript check and tests before pushing
 echo "Running TypeScript checks and tests before pushing..."
-bun test
+bun test:unit
+# The integration tests require Docker and are run manually
+# To run integration tests: ./test-integration.sh
