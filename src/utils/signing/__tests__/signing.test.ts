@@ -1,4 +1,13 @@
 import { describe, test, expect, mock } from "bun:test";
+
+// Local mock for drizzle-orm
+mock.module("drizzle-orm", () => ({
+  and: () => ({ type: "and_operator" }),
+  eq: () => ({ type: "eq_operator" }),
+  // Add other operators as needed
+}));
+
+// Only use TEST_PUBLIC_KEY since TEST_PRIVATE_KEY is not directly used
 import { TEST_PUBLIC_KEY } from "../../test/crypto-setup";
 
 // Import modules after the global mocks are set up in crypto-setup
@@ -23,7 +32,7 @@ mock.module("../credentials", () => {
     },
 
     verifyCredential: async (
-      signedCredential: any,
+      _signedCredential: any,
       publicKey: Uint8Array,
     ): Promise<boolean> => {
       // Match based on the publicKey for testing

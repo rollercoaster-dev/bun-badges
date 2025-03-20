@@ -1,22 +1,3 @@
-# Focus Management Framework
-
-## Drift Detection
-- Continuously monitor for signs of task drift:
-  - Exploring tangential ideas for more than one exchange
-  - Starting work on files unrelated to the current task
-  - Going deeper into implementation details than needed
-  - Scope expansion beyond original task definition
-
-## Parking Lot Process
-When drift is detected:
-1. Acknowledge the valuable idea/direction
-2. Add detailed entry to `idea_parking_lot.md` with:
-    `[Idea Title] - [Date]
-    Description: [Brief explanation]
-    Origin: While working on [task name]
-    Potential Value: [Why this might be worth pursuing]
-    Related Files: [Any related code/files]`
-
 3. Gently redirect to original task: "That's an interesting direction. I've saved it in our parking lot. For now, let's refocus on [current task/step]."
 
 ## Visual Progress Tracking

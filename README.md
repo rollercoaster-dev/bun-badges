@@ -184,55 +184,61 @@ REFRESH_TOKEN_EXPIRY=7d
 
 ## Testing
 
-### Running Tests
+This project uses Bun's built-in test runner.
+
+### Running Unit Tests (Recommended)
+
+The simplest way to run tests is to use the unit tests, which don't require a database:
 
 ```bash
-# Run all tests
-bun test
-
-# Run tests with coverage
-bun test --coverage
-
-# Run specific test file
-bun test src/utils/signing/__tests__/signing.test.ts
-
-# Run tests matching a pattern
-bun test --pattern "auth"
+# Run unit tests only
+./test.sh
+# or
+bun test:unit
 ```
 
-### Docker Testing Environment
+### Running Integration Tests
 
-A dedicated Docker testing environment is available to ensure consistent test execution:
+Integration tests require a PostgreSQL database. You can run them in two ways:
+
+#### Option 1: All-in-one script (Recommended)
+```bash
+# This will start the database, run tests, and clean up
+bun test:integration:full
+# or
+./integration-test.sh
+```
+
+#### Option 2: Manual steps
+If you need more control:
+
+1. Start the test database:
+   ```bash
+   docker-compose -f docker-compose.test.yml up -d
+   ```
+
+2. Run the integration tests:
+   ```bash
+   bun test:integration
+   ```
+
+3. When done, stop the database:
+   ```bash
+   docker-compose -f docker-compose.test.yml down
+   ```
+
+### Running All Tests
+
+To run both unit and integration tests in sequence:
 
 ```bash
-# Run tests in Docker environment
-bun run test:docker
+# This will run unit tests, then start the database and run integration tests
+bun test:all
+# or
+./test-all.sh
 ```
 
-This uses the `docker-compose.test.yml` configuration to:
-1. Spin up a dedicated Postgres instance for testing
-2. Run database migrations
-3. Execute all tests in an isolated container
-4. Tear down the environment afterward
-
-### Test Configuration
-
-Tests use the configuration in `test.env` instead of the main `.env` file. This allows for:
-- Using a separate test database
-- Different JWT secrets for testing
-- Safe testing of authentication flows
-
-If you're adding new environment variables, remember to update both `.env.example` and `test.env`.
-
-### Writing Tests
-
-Tests are organized alongside their implementation files in `__tests__` directories. Follow the existing patterns:
-
-- Unit tests: Test individual functions and components
-- Integration tests: Test API routes and database interactions
-- Edge case tests: Handle error conditions and boundary values
-
-See `docs/TESTING.md` for more detailed testing guidelines.
+Note: Integration tests may fail if the database is not properly set up.
 
 ## Contributing
 

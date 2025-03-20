@@ -1,11 +1,10 @@
 import { describe, test, expect } from "bun:test";
 import { CredentialService } from "@/services/credential.service";
 import { badgeClasses, badgeAssertions } from "@/db/schema";
-import { testDb } from "@/utils/test/integration-setup";
+import { testDb, pool } from "@/utils/test/integration-setup";
 import { issuerProfiles } from "@/db/schema/issuers";
 import { eq } from "drizzle-orm";
 import { OpenBadgeCredential } from "@/models/credential.model";
-import { sql } from "drizzle-orm";
 
 describe("Credential Service Integration Tests", () => {
   // Create a service
@@ -17,13 +16,16 @@ describe("Credential Service Integration Tests", () => {
   // Helper to check if tables exist
   async function tableExists(tableName: string): Promise<boolean> {
     try {
-      const result = await testDb.execute(sql`
+      const result = await pool.query(
+        `
         SELECT EXISTS (
           SELECT FROM pg_tables 
           WHERE schemaname = 'public' 
-          AND tablename = ${tableName}
+          AND tablename = $1
         );
-      `);
+      `,
+        [tableName],
+      );
       return result?.rows?.[0]?.exists === true;
     } catch (error) {
       console.error(`Error checking if table ${tableName} exists:`, error);

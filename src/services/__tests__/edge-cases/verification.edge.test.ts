@@ -206,11 +206,23 @@ describe("Verification Edge Cases", () => {
         ...assertionMock,
         assertionJson: {
           ...assertionMock.assertionJson,
+          id: "https://example.com/assertions/test-assertion-id",
+          type: "Assertion",
+          badge: {
+            id: "https://example.com/badges/test-badge-id",
+            type: "BadgeClass",
+            name: "Test Badge",
+          },
+          recipient: { type: "email", identity: "test@example.com" },
         },
       };
 
       // Delete the proof property
       delete noProofAssertion.assertionJson.proof;
+
+      // Ensure the assertion doesn't have any OB3 markers
+      delete noProofAssertion.assertionJson["@context"];
+      delete noProofAssertion.assertionJson.credentialSubject;
 
       mockAssertion(noProofAssertion);
 
@@ -290,12 +302,30 @@ describe("Verification Edge Cases", () => {
         verify: () => Promise.resolve(true),
       }));
 
+      // Mock key retrieval
+      mock.module("@/utils/signing/keys", () => ({
+        getSigningKey: () =>
+          Promise.resolve({
+            publicKey: new Uint8Array([1, 2, 3, 4]),
+            privateKey: new Uint8Array([5, 6, 7, 8]),
+            controller: "did:key:123",
+            type: "Ed25519VerificationKey2020",
+            keyInfo: {
+              id: "did:key:123#key-1",
+              type: "Ed25519VerificationKey2020",
+              controller: "did:key:123",
+              publicKeyJwk: { kty: "OKP", crv: "Ed25519", x: "test" },
+            },
+          }),
+      }));
+
       // Recreate service with updated mocks
       service = new VerificationService();
 
       const result = await service.verifyAssertion("test-assertion-id");
       expect(result.valid).toBe(true);
       expect(result.checks.signature).toBe(true);
+      expect(result.checks.structure).toBe(true);
     });
 
     it("should handle malformed JSON in credential", async () => {

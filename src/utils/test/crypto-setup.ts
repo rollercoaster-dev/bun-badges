@@ -14,7 +14,7 @@ mock.module("@noble/ed25519", () => {
   return {
     etc: {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      sha512Sync: (data: Uint8Array) => {
+      sha512Sync: (_data: Uint8Array) => {
         // Return a consistent hash for testing
         const hash = new Uint8Array(64);
         hash.fill(9);
@@ -26,7 +26,7 @@ mock.module("@noble/ed25519", () => {
         return TEST_PRIVATE_KEY.slice();
       },
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      sha512: async (data: Uint8Array) => {
+      sha512: async (_data: Uint8Array) => {
         // Return a consistent hash for testing
         const hash = new Uint8Array(64);
         hash.fill(9);
@@ -34,22 +34,22 @@ mock.module("@noble/ed25519", () => {
       },
     },
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    getPublicKey: async (privateKey: Uint8Array): Promise<Uint8Array> => {
+    getPublicKey: async (_privateKey: Uint8Array): Promise<Uint8Array> => {
       // Return consistent test public key
       return TEST_PUBLIC_KEY.slice();
     },
 
     sign: async (
-      message: Uint8Array,
-      privateKey: Uint8Array,
+      _message: Uint8Array,
+      _privateKey: Uint8Array,
     ): Promise<Uint8Array> => {
       // Return consistent test signature
       return TEST_SIGNATURE.slice();
     },
 
     verify: async (
-      signature: Uint8Array,
-      message: Uint8Array,
+      _signature: Uint8Array,
+      _message: Uint8Array,
       publicKey: Uint8Array,
     ): Promise<boolean> => {
       // For testing, always verify if using the test public key
@@ -66,24 +66,24 @@ mock.module("@scure/base", () => {
   return {
     base64url: {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      decode: (str: string): Uint8Array => {
+      decode: (_str: string): Uint8Array => {
         // Return test signature for any base64 input
         return TEST_SIGNATURE.slice();
       },
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      encode: (bytes: Uint8Array): string => {
+      encode: (_bytes: Uint8Array): string => {
         // Return consistent base64 string
         return "TEST_BASE64_SIGNATURE";
       },
     },
     base58: {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      decode: (str: string): Uint8Array => {
+      decode: (_str: string): Uint8Array => {
         // Return test key for any base58 input
         return TEST_PUBLIC_KEY.slice();
       },
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      encode: (bytes: Uint8Array): string => {
+      encode: (_bytes: Uint8Array): string => {
         // Return consistent base58 string
         return "TEST_BASE58_KEY";
       },

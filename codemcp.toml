@@ -18,7 +18,7 @@ semicolons = true
 
 [patterns]
 src_dir = "src"
-test_dir = "src/__tests__"
+test_dir = ["src/__tests__", "tests/unit", "tests/integration"]
 build_dir = "dist"
 docs_dir = "docs"
 
@@ -54,11 +54,21 @@ security_audit_level = "high"
 
 [commands]
 bun = { execute = "bun" }
+test = { execute = "bun test" }
+test_unit = { execute = "bun test:unit" }
+test_integration = { execute = "bun test:integration:full" }
+test_all = { execute = "bun test:all" }
 
 [testing]
 framework = "bun:test"
 require_tests = true
 coverage_tool = "bun:coverage"
+setup_file = "./tests/setup.ts"
+unit_test_pattern = ["'src/__tests__/' 'tests/unit/' 'src/tests/' 'src/utils/**/__tests__/' 'src/services/__tests__/'"]
+integration_test_pattern = ["tests/integration", "src/**/*.integration.test.ts", "src/services/__tests__/integration/", "src/routes/__tests__/integration/"]
+exclude_pattern = ["src/**/*.integration.test.ts", "src/services/__tests__/integration/", "src/routes/__tests__/integration/"]
+test_db_url = "postgres://postgres:postgres@localhost:5434/bun_badges_test"
+test_docker_compose = "docker-compose.test.yml"
 
 [documentation]
 api_docs = true

@@ -1,111 +1,164 @@
-# Testing Open Badges 3.0 Implementation
+# Testing Strategy for Bun Badges
 
-This document outlines the testing approach for the Open Badges 3.0 implementation in Bun Badges. The test suite is designed to ensure comprehensive coverage of all critical components and edge cases.
+This project uses a comprehensive testing approach with both unit tests and integration tests to ensure code reliability.
 
-## Test Coverage
-
-The test suite covers the following aspects of the Open Badges 3.0 implementation:
-
-### Core Functionality Tests
-
-- **Credential Creation**: Tests for creating Open Badges 3.0 verifiable credentials from badge assertions
-- **Credential Signing**: Tests for cryptographically signing credentials with Ed25519 keys
-- **Credential Verification**: Tests for verifying signatures and credential integrity
-- **Credential Revocation**: Tests for revoking credentials and checking revocation status
-- **Format Conversion**: Tests for converting between OB2.0 and OB3.0 formats
-
-### API Integration Tests
-
-- **Badge Issuance**: Tests for issuing badges through the API in OB3.0 format
-- **Badge Retrieval**: Tests for retrieving badges in both OB2.0 and OB3.0 formats
-- **Badge Verification**: Tests for verifying badges through the API
-- **Badge Revocation**: Tests for revoking badges and checking status through the API
-
-### Edge Case Tests
-
-- **Tampered Credentials**: Tests for detecting modified credential content
-- **Invalid Signatures**: Tests for detecting invalid or tampered proofs
-- **Malformed Data**: Tests for handling malformed JSON and other data issues
-- **Mixed Contexts**: Tests for handling credentials with mixed context versions
-- **Future Revocation**: Tests for handling future-dated revocation status
-
-## Running Tests
-
-```bash
-# Run all tests
-bun test
-
-# Run specific test files
-bun test src/services/__tests__/credential.service.test.ts
-bun test src/routes/__tests__/integration/assertions.integration.test.ts
-bun test src/services/__tests__/edge-cases/verification.edge.test.ts
-
-# Run tests with coverage
-bun test --coverage
-```
-
-## Test Components
+## Test Types
 
 ### Unit Tests
 
-Unit tests focus on individual functions and methods in isolation, ensuring each component correctly performs its specific task. These tests typically mock dependencies to isolate the component being tested.
+Unit tests are focused on testing individual functions and components in isolation. They use mocks to avoid external dependencies like databases.
 
-Key unit test files:
-- `src/services/__tests__/credential.service.test.ts`: Tests for basic credential operations
-- `src/services/__tests__/verification.service.test.ts`: Tests for verification logic
-- `src/utils/__tests__/signing/signing.test.ts`: Tests for cryptographic operations
+- **Location**: Files named `*.test.ts` (excluding `*.integration.test.ts`)
+- **Run Command**: `npm run test:unit`
+- **Mock Strategy**: Mocks for Drizzle ORM and database operations are provided via `src/utils/test/setup.ts`
+- **Best For**: Testing pure logic, utility functions, and components without external dependencies
 
 ### Integration Tests
 
-Integration tests verify that components work together correctly. These tests use the actual database and exercise the entire credential flow from creation to verification.
+Integration tests check that components work together correctly. They use a real PostgreSQL database to test actual database interactions.
 
-Key integration test files:
-- `src/services/__tests__/integration/credential.integration.test.ts`: Tests credential service with real DB interactions
-- `src/routes/__tests__/integration/assertions.integration.test.ts`: Tests API endpoints with real data flow
+- **Location**: Files named `*.integration.test.ts` or in `*/integration/` directories
+- **Run Command**: `npm run test:integration`
+- **Database Strategy**: A Docker container with PostgreSQL is started for tests and migrations are run
+- **Best For**: Testing database interactions, controllers, routes, and other components that rely on external services
 
-### Edge Case Tests
+## Test Organization
 
-Edge case tests focus on unusual scenarios and error conditions to ensure the system is robust against unexpected inputs or failure modes.
+```
+src/
+├── __tests__/             # Top-level tests
+│   ├── controllers/       # Controller tests
+│   │   ├── integration/   # Controller integration tests
+│   │   └── ...            # Regular controller unit tests
+│   ├── middleware/        # Middleware tests
+│   └── routes/            # Route tests
+│       ├── integration/   # Route integration tests
+│       └── ...            # Route unit tests
+└── utils/
+    └── test/              # Test utilities
+        ├── db-helpers.ts  # Database helpers for seeding and cleanup
+        ├── setup.ts       # Main test setup file
+        └── ...            # Other test utilities
+```
 
-Key edge case test files:
-- `src/services/__tests__/edge-cases/verification.edge.test.ts`: Tests unusual verification scenarios
+## Running Tests
 
-## Testing Standards Compliance
+- **Run All Tests**: `npm run test:all`
+- **Run Unit Tests Only**: `npm run test:unit`
+- **Run Integration Tests Only**: `npm run test:integration`
 
-The tests verify compliance with the Open Badges 3.0 and W3C Verifiable Credentials specifications:
+## Testing Infrastructure
 
-- Proper JSON-LD context usage
-- Required credential properties
-- Cryptographic proof validation
-- Revocation mechanism
-- Backward compatibility with OB2.0
+### Unit Testing Setup (`src/utils/test/setup.ts`)
 
-## Test Data Management
+The unit test setup provides mocks for:
+- Drizzle ORM operations (queries, filters, tables)
+- Database connections and services
+- Cryptographic operations for deterministic results
 
-The test suite creates isolated test data for each test run to avoid interference between tests. All test data is cleaned up after test completion to maintain a clean database state.
+### Integration Testing Setup
 
-## Continuous Integration
+Integration tests use:
+- A real PostgreSQL database via Docker
+- Real Drizzle ORM operations against this database
+- Migrations to create actual tables
+- Helper functions for seeding test data in `src/utils/test/db-helpers.ts`
+- Deterministic cryptographic operations
 
-The test suite is integrated with CI/CD to run on every pull request and merge to ensure ongoing quality and prevent regressions.
+#### Integration Test Flow
 
-## Future Test Enhancements
+1. Start PostgreSQL Docker container
+2. Run database migrations
+3. Execute tests with database seeding before each test
+4. Clean up and stop Docker container
 
-Planned enhancements to the test suite include:
+## When to Use Integration vs. Unit Tests
 
-1. **Interoperability Tests**: Testing compatibility with third-party badge wallets and verifiers
-2. **Performance Tests**: Benchmarking credential issuance and verification under load
-3. **Security Tests**: Additional tests for security vulnerabilities
-4. **Browser Compatibility**: Tests for badge display and verification in different browsers
-5. **Conformance Tests**: Automated tests against official Open Badges 3.0 test suite
+### Use Integration Tests For:
 
-## Test Development Guidelines
+- **Database-Dependent Code**: Controllers, services, or utilities that interact with the database
+- **Route Handlers**: API endpoints that need to be tested with real data flow
+- **Authentication Tests**: Where you need to verify token generation and validation
+- **Complex Data Flows**: Tests that need to verify entire workflows across components
 
-When adding new tests, follow these guidelines:
+### Use Unit Tests For:
 
-1. **Isolation**: Tests should not depend on the state left by other tests
-2. **Cleanup**: All tests should clean up after themselves
-3. **Readability**: Test cases should clearly indicate what they're testing
-4. **Coverage**: Aim for comprehensive coverage of both success and failure scenarios
-5. **Performance**: Keep tests efficient to avoid slowing down the test suite
+- **Pure Utility Functions**: Functions without external dependencies
+- **Isolated Components**: Components that can be tested with mocks
+- **Business Logic**: Core logic that doesn't depend on external systems
+- **Edge Cases**: Testing various input combinations for specific functions
 
-By following this comprehensive testing approach, the Bun Badges Open Badges 3.0 implementation maintains high quality, security, and standards compliance.
+## Writing New Tests
+
+### New Unit Tests
+
+1. Create a file named `yourfeature.test.ts`
+2. Import from `bun:test`
+3. Use mocks for external dependencies
+
+Example:
+
+```typescript
+import { describe, test, expect } from "bun:test";
+import { YourUtility } from "@/utils/your-utility";
+
+describe("YourUtility", () => {
+  test("should do something", () => {
+    const result = YourUtility.doSomething();
+    expect(result).toBe(expectedValue);
+  });
+});
+```
+
+### New Integration Tests
+
+1. Create a file named `yourfeature.integration.test.ts` or place it in an `integration/` directory
+2. Import test helpers from `@/utils/test/db-helpers`
+3. Use `beforeEach` to seed test data and `afterEach` to clean up
+
+Example:
+
+```typescript
+import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { YourController } from "@/controllers/your-controller";
+import { seedTestData, clearTestData } from "@/utils/test/db-helpers";
+import { testDb } from "@/utils/test/integration-setup";
+
+describe("YourController Integration Tests", () => {
+  beforeEach(async () => {
+    await seedTestData();
+  });
+  
+  afterEach(async () => {
+    await clearTestData();
+  });
+
+  test("should interact with the database", async () => {
+    const controller = new YourController();
+    // Test with real database interaction
+  });
+});
+```
+
+## Addressing Common Issues
+
+### Unit Test Mocking Issues
+
+If you're trying to test database-dependent code as a unit test and experiencing mocking issues:
+
+1. Consider converting the test to an integration test
+2. Review the mocking approach in `src/utils/test/setup.ts`
+3. Add additional mocks if needed, but be careful of complexity
+
+### Integration Testing Database
+
+Integration tests require a running PostgreSQL instance. If you encounter database connection issues:
+
+1. Make sure Docker is running
+2. Check the `docker-compose.test.yml` configuration
+3. Verify that the `DATABASE_URL` environment variable is correct
+4. Run migrations manually: `BUN_ENV=test npm run db:migrate`
+
+### Cryptographic Testing
+
+Cryptography is mocked to provide deterministic results in both unit and integration tests. This ensures that signatures and keys are consistent across test runs.

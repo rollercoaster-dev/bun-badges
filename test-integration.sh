@@ -45,13 +45,13 @@ fi
 # Run database migrations
 echo -e "${YELLOW}Running database migrations...${NC}"
 # Use the proper migration command
-BUN_ENV=test DATABASE_URL=postgres://postgres:postgres@localhost:5432/bun_badges_test bun run db:migrate
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/bun_badges_test bun run db:migrate
 echo -e "${GREEN}Database migrations completed.${NC}"
 
 # Run the integration tests
 echo -e "${GREEN}Running integration tests...${NC}"
-# Use our integration-specific preload file instead of the regular setup
-BUN_ENV=test DATABASE_URL=postgres://postgres:postgres@localhost:5432/bun_badges_test bun test --preload ./src/utils/test/integration-preload.ts src/services/__tests__/credential.integration.test.ts
+# Use our dedicated integration setup
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/bun_badges_test bun test --preload ./src/utils/test/integration-setup.ts "src/**/*.integration.test.ts"
 TEST_EXIT_CODE=$?
 
 # Stop the test database

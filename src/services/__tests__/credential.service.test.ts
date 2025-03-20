@@ -1,4 +1,13 @@
 import { describe, it, expect, beforeEach, mock } from "bun:test";
+
+// Local mock for drizzle-orm
+mock.module("drizzle-orm", () => ({
+  and: () => ({ type: "and_operator" }),
+  eq: () => ({ type: "eq_operator" }),
+  // Add other operators as needed
+}));
+
+// Continue with the rest of the imports
 import { CredentialService } from "@/services/credential.service";
 import { base64url } from "@scure/base";
 

@@ -141,8 +141,5 @@ export async function verifyCredential(
     throw new Error("No proof found in credential");
   }
 
-  const { proof: _, ...credential } = signedCredential;
-  const credentialBytes = new TextEncoder().encode(JSON.stringify(credential));
-
   return await verifyJws(proof.jws, publicKey);
 }
