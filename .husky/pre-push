@@ -1,6 +1,6 @@
 # Run TypeScript check and tests before pushing
-echo "Running TypeScript checks and tests before pushing..."
-INTEGRATION_TEST=false NODE_ENV=test bun test:unit || true
+echo "Running TypeScript checks and unit tests before pushing..."
+bash ./test-unit.sh
 # The integration tests require Docker and are run manually
 # To run integration tests: ./test-integration.sh
 # Allow push even if tests fail for now
