@@ -38,3 +38,7 @@ export * from "./oauth";
 export * from "./badges";
 export * from "./issuers";
 export * from "./signing";
+
+// Explicit re-export of signingKeys to fix integration tests
+import { signingKeys } from "./signing";
+export { signingKeys };
