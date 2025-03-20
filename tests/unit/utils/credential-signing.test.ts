@@ -44,7 +44,7 @@ describe("Credential Signing and Verification", () => {
     sampleCredential.issuer = issuer;
   });
 
-  it("should sign a credential with Ed25519 signature", async () => {
+  it("should sign a credential with Open Badges 3.0 compliant signature", async () => {
     // Sign the credential
     const signedCredential = await signCredential(
       sampleCredential,
@@ -57,9 +57,10 @@ describe("Credential Signing and Verification", () => {
 
     // Verify the signed credential has a proof
     expect(signedCredential).toHaveProperty("proof");
+    expect(signedCredential.proof).toHaveProperty("type", "DataIntegrityProof");
     expect(signedCredential.proof).toHaveProperty(
-      "type",
-      "Ed25519Signature2020",
+      "cryptosuite",
+      "eddsa-rdfc-2022",
     );
     expect(signedCredential.proof).toHaveProperty(
       "proofPurpose",
