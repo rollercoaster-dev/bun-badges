@@ -1,8 +1,10 @@
 import { sql } from "drizzle-orm";
+import { NodePgDatabase } from "drizzle-orm/node-postgres";
+import * as schema from "../schema";
 
 //  These imports are marked as unused and are commented for linting purposes
 // import { _pgTable, _uuid, _timestamp, _jsonb } from "drizzle-orm/pg-core";
-export async function up(db: any) {
+export async function up(db: NodePgDatabase<typeof schema>): Promise<void> {
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS status_lists (
       status_list_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -19,7 +21,7 @@ export async function up(db: any) {
       status_index INTEGER NOT NULL,
       created_at TIMESTAMP NOT NULL DEFAULT NOW()
     );
-    
+
     -- Add indices for faster lookups
     CREATE INDEX idx_status_lists_issuer_id ON status_lists(issuer_id);
     CREATE INDEX idx_status_list_indices_assertion_id ON status_list_indices(assertion_id);
@@ -27,7 +29,7 @@ export async function up(db: any) {
   `);
 }
 
-export async function down(db: any) {
+export async function down(db: NodePgDatabase<typeof schema>): Promise<void> {
   await db.execute(sql`
     DROP TABLE IF EXISTS status_list_indices;
     DROP TABLE IF EXISTS status_lists;

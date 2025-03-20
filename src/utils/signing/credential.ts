@@ -23,7 +23,7 @@ export interface SigningOptions {
  */
 export interface VerificationResult {
   verified: boolean;
-  results?: any[];
+  results?: unknown[];
   error?: string;
 }
 
@@ -179,7 +179,7 @@ export async function verifyCredential<T extends Record<string, unknown>>(
  * @param credential The credential to sign
  * @returns A test signature string
  */
-function _createTestSignature(credential: any): string {
+function _createTestSignature(credential: Record<string, unknown>): string {
   // Create a deterministic string from the credential
   const credentialString = JSON.stringify(credential);
 
