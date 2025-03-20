@@ -43,15 +43,14 @@ These unit tests use database mocks but might benefit from being converted to in
 | File Path | Current Test Type | Migration Status | DB Mock Usage | Notes |
 |-----------|-------------------|------------------|---------------|-------|
 | `/src/utils/signing/__tests__/signing.test.ts` | Unit | 🔍 Evaluate | Low | Has mock setup but skips when run in test suite |
-| `/src/__tests__/controllers/auth.controller.test.ts` | Unit | 🔍 Evaluate | Medium | Tests auth operations, could benefit from real DB |
+| `/src/__tests__/controllers/auth.controller.test.ts` | Unit | ✅ Migrated | Medium | Migrated to integration test at `src/__tests__/controllers/integration/auth.controller.integration.test.ts` |
 | `/src/__tests__/controllers/issuer.controller.test.ts` | Unit | 🔍 Evaluate | Medium | Tests issuer operations, real DB would be more thorough |
 | `/src/__tests__/controllers/oauth.controller.test.ts` | Unit | 🔍 Evaluate | Medium | Tests OAuth operations, real DB would validate flows better |
 | `/src/__tests__/middleware/auth.middleware.test.ts` | Unit | 🔍 Evaluate | Low | Tests auth middleware, may need real DB for token validation |
 | `/src/__tests__/routes/assertions.routes.test.ts` | Unit | 🔍 Evaluate | Medium | Tests assertion routes, should verify with real DB |
 | `/src/__tests__/routes/badges.routes.test.ts` | Unit | 🔍 Evaluate | Medium | Tests badge routes, should verify with real DB |
-| `/src/services/__tests__/credential.service.test.ts` | Unit | 🔍 Evaluate | High | Tests credential operations directly with DB mocks |
+| `/src/services/__tests__/credential.service.test.ts` | Unit | ✅ Migrated | High | Converted to integration test with real DB interactions |
 | `/src/services/__tests__/verification.service.test.ts` | Unit | 🔍 Evaluate | High | Tests verification operations with DB mocks |
-| `/src/__tests__/controllers/auth.controller.test.ts` | Unit | 🔍 Evaluate | Medium | Tests auth operations, could benefit from real DB |
 | `/src/__tests__/controllers/issuer.controller.test.ts` | Unit | 🔍 Evaluate | Medium | Tests issuer operations, real DB would be more thorough |
 | `/src/__tests__/controllers/oauth.controller.test.ts` | Unit | 🔍 Evaluate | Medium | Tests OAuth operations, real DB would validate flows better |
 | `/src/__tests__/middleware/auth.middleware.test.ts` | Unit | 🔍 Evaluate | Low | Tests auth middleware, may need real DB for token validation |
@@ -59,7 +58,6 @@ These unit tests use database mocks but might benefit from being converted to in
 | `/src/__tests__/routes/assertions.routes.test.ts` | Unit | 🔍 Evaluate | Medium | Tests assertion routes, should verify with real DB |
 | `/src/__tests__/routes/badges.routes.test.ts` | Unit | 🔍 Evaluate | Medium | Tests badge routes, should verify with real DB |
 | `/src/__tests__/routes/issuers.test.ts` | Unit | 🔍 Evaluate | Medium | Tests issuer routes, should verify with real DB |
-| `/src/services/__tests__/credential.service.test.ts` | Unit | ✅ Migrated | High | Converted to integration test with real DB interactions |
 | `/src/services/__tests__/verification.service.test.ts` | Unit | 🔍 Evaluate | High | Tests verification operations with DB mocks |
 
 ## Test Utility Files
@@ -88,9 +86,11 @@ Tests should be migrated to integration tests if they:
 
 - [x] Fixed TypeScript errors in integration-setup.ts
 - [x] Fixed TypeScript errors in db-helpers.ts
-- [ ] Fix remaining TypeScript errors in test utility files
-- [ ] Complete inventory of all test files
-- [ ] Migrate first test to integration pattern
+- [x] Fix remaining TypeScript errors in test utility files
+- [x] Complete inventory of all test files
+- [x] Migrate first test to integration pattern (credential.service.test.ts)
+- [x] Migrate auth.controller.test.ts to integration test
+- [ ] Identify next test for migration
 - [ ] Update test scripts to verify pattern works
 
 ## Test Organization Guidelines

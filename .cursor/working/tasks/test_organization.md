@@ -31,6 +31,7 @@
   - Convert tests that verify complex DB interactions to integration tests
   - Keep pure logic and component tests as unit tests with mocks
   - Leverage existing DB helper functions for integration test data setup
+  - Remove old tast file
   
 - **Potential Issues:**
   - Tests may fail when moving from mocks to real DB (different behavior)
