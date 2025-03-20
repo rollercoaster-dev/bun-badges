@@ -10,6 +10,51 @@ import {
   OB3_BADGE_SCHEMA_URL,
 } from "@/constants/context-urls";
 
+// Type definitions for badge JSON
+interface BadgeClassJson {
+  "@context": string;
+  type: string;
+  id: string;
+  name: string;
+  description: string;
+  image: string;
+  criteria: {
+    narrative: string;
+  };
+  issuer: string;
+}
+
+interface OB3BadgeClassJson {
+  "@context": string[];
+  id: string;
+  type: string[];
+  name: string;
+  description: string;
+  image: {
+    id: string;
+    type: string;
+  };
+  achievementCriteria: {
+    narrative: string;
+  };
+  issuer: {
+    id: string;
+    type: string;
+  };
+  credentialSchema: {
+    id: string;
+    type: string;
+  };
+}
+
+// Type for recipient object
+interface RecipientObject {
+  type: string;
+  identity: string;
+  hashed: boolean;
+  salt?: string;
+}
+
 export class BadgeController {
   async hasBadgeAssertions(badgeId: string): Promise<boolean> {
     const result = await db
@@ -33,7 +78,7 @@ export class BadgeController {
       criteria: string;
       imageUrl: string;
     },
-  ) {
+  ): BadgeClassJson {
     return {
       "@context": OB2_CONTEXT_URL,
       type: "BadgeClass",
@@ -61,7 +106,7 @@ export class BadgeController {
       criteria: string;
       imageUrl: string;
     },
-  ) {
+  ): OB3BadgeClassJson {
     return {
       "@context": OB3_CREDENTIAL_CONTEXT,
       id: `${hostUrl}/badges/${badge.badgeId}`,
@@ -101,11 +146,11 @@ export class BadgeController {
       issuedOn: Date;
       evidenceUrl?: string | null;
     },
-    badgeJson: any,
+    badgeJson: BadgeClassJson,
     // issuerJson param is retained for API consistency but not used in implementation
-    _issuerJson: any,
+    _issuerJson: Record<string, unknown>,
   ) {
-    const recipientObj: any = {
+    const recipientObj: RecipientObject = {
       type: assertion.recipientType,
       identity: assertion.recipientIdentity,
       hashed: assertion.recipientHashed,
@@ -151,17 +196,18 @@ export class BadgeController {
       issuedOn: Date;
       evidenceUrl?: string | null;
     },
-    badgeJson: any,
+    badgeJson: OB3BadgeClassJson,
     // issuerJson param is retained for API consistency but not used in implementation
-    _issuerJson: any,
+    _issuerJson: Record<string, unknown>,
   ) {
     // Create the base assertion
-    const recipientObj: any = {
+    const recipientObj: RecipientObject = {
       type:
         assertion.recipientType === "email"
           ? "EmailCredentialSubject"
           : "IdentityObject",
       identity: assertion.recipientIdentity,
+      hashed: assertion.recipientHashed,
     };
 
     // Add salt if recipient is hashed
