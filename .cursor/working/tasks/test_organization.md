@@ -116,9 +116,9 @@
     - Improved test robustness with more accurate assertions
 
 - **Context Resume Point:**
-  Last working on: Fixed database mock implementation to support integration tests
-  Next planned action: Run integration tests to verify fixes and continue test migration
-  Current blockers: None - Mock implementation has been fixed
+  Last working on: Ran tests to identify remaining files that need migration
+  Next planned action: Convert identified unit tests to integration tests
+  Current blockers: Need to fix export issues in integration setup, particularly for signingKeys and pool exports
 
 ## 6. Next Actions & Blockers
 - **Immediate Next Actions:**
@@ -132,14 +132,15 @@
   - [x] Fix database mock implementation (60 mins):
     - [x] Update mockStorage with correct table names
     - [x] Add missing execute function
-  - [ ] Run integration tests to verify fixes (15 mins)
-  - [ ] Identify and list all remaining tests using DB mocks (30 mins)
+  - [x] Run integration tests to verify fixes (15 mins)
+  - [x] Identify and list all remaining tests using DB mocks (30 mins)
   - [ ] Create migration plan for remaining tests (30 mins)
   - [ ] Continue migrating tests according to inventory (ongoing)
 
 - **Current Blockers:**
-  - None - Database mock implementation has been fixed
-  - Need to verify integration test fixes work as expected
+  - Missing exports in schema files and integration setup
+  - Database pool management issues (pool already closed errors)
+  - Foreign key constraints failing in test data seeding
 
 ## 7. User Experience & Reflection
 - **Friction Points:** 
@@ -166,3 +167,60 @@
   - Successfully migrated credential.service.test.ts to integration test
   - Documented the test organization strategy and migration process
   - Improved project documentation in README.md and TESTING.md
+
+## 8. Remaining Unit Tests to Migrate
+Based on the analysis of tests run, the following unit tests still use database mocks and should be migrated to integration tests:
+
+### Controller Tests:
+1. `src/controllers/auth/auth.controller.test.ts`
+   - Heavy DB interactions with authentication codes and tokens
+   - Should be migrated to integration tests to verify actual token persistence
+
+2. `src/controllers/oauth/oauth.controller.test.ts`
+   - Complex interactions with client registration, authorization codes, token exchange
+   - Uses `createMockDatabase()` throughout
+
+### Route Tests:
+1. `src/routes/badges/badges.routes.test.ts`
+   - Uses mock database for badge CRUD operations
+   - Should verify actual badge persistence with real DB
+
+2. `src/routes/assertions/assertions.routes.test.ts`
+   - Tests assertion API endpoints with mock database
+   - Should be migrated to verify credential issuance with real DB
+
+### Service Tests:
+1. `src/services/__tests__/verification.service.test.ts`
+   - Heavily mocks database for credential verification
+   - Tests are failing due to mocked data not matching real-world scenarios
+   - Critical to migrate to ensure actual verification logic works with real data
+
+2. `src/services/__tests__/edge-cases/verification.edge.test.ts`
+   - Tests edge cases with mock database
+   - Should use real DB to verify behavior with actual constraints
+
+### Middleware Tests:
+1. `src/middleware/auth.middleware/auth.middleware.test.ts`
+   - Uses `MockDatabaseService` for token validation
+   - Would benefit from real DB to verify token checks against actual stored tokens
+
+### Critical Issues to Fix First:
+1. Export missing in schema files:
+   - Need to add `export { signingKeys }` in `/src/db/schema/index.ts`
+
+2. Database connection pool management:
+   - Need to fix `pool` export in integration-setup.ts
+   - Ensure proper pool cleanup between tests to avoid "Cannot use a pool after calling end" errors
+
+3. Foreign key constraints:
+   - Test data seeding needs to create parent records before children
+   - Current error: "Key (owner_user_id) is not present in table \"users\""
+
+### Migration Priority Order:
+1. Fix infrastructure issues (exports, pool management)
+2. Migrate verification service tests (most critical for functionality)
+3. Migrate controller tests (auth, oauth)
+4. Migrate route tests
+5. Migrate middleware tests
+
+This migration will significantly improve test reliability by using real database interactions instead of mocks for these database-dependent operations.
