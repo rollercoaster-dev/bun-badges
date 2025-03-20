@@ -145,7 +145,7 @@ export async function verifyCredential<T extends Record<string, unknown>>(
     try {
       // Try to decode as base64url first
       publicKeyBytes = base64url.decode(publicKey);
-    } catch (e) {
+    } catch (_e) {
       // If that fails, try multibase format
       if (publicKey.startsWith("z")) {
         publicKeyBytes = base64url.decode(publicKey.substring(1));
@@ -179,7 +179,7 @@ export async function verifyCredential<T extends Record<string, unknown>>(
  * @param credential The credential to sign
  * @returns A test signature string
  */
-function createTestSignature(credential: any): string {
+function _createTestSignature(credential: any): string {
   // Create a deterministic string from the credential
   const credentialString = JSON.stringify(credential);
 
@@ -201,7 +201,7 @@ function createTestSignature(credential: any): string {
  * @param verificationMethod The verification method from the proof
  * @returns True if the key is associated with the method
  */
-function checkKeyUsedInMethod(
+function _checkKeyUsedInMethod(
   publicKeyMultibase: string,
   verificationMethod: string,
 ): boolean {

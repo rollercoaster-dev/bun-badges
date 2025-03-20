@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import assertions from "@/routes/assertions.routes";
 
 // Define the expected response structure
-interface ApiErrorResponse {
+interface _ApiErrorResponse {
   status: string;
   error: {
     code: string;

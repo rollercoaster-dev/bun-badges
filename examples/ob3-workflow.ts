@@ -17,7 +17,6 @@ import {
 } from "../src/utils/signing/credential";
 import {
   createStatusListCredential,
-  _createEncodedBitString,
   updateCredentialStatus,
   getIndexFromUuid,
   isCredentialRevoked,

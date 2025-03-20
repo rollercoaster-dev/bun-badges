@@ -12,11 +12,9 @@ import { base64url } from "@scure/base";
 import { isValidUuid } from "@/utils/validation";
 import {
   isCredentialRevoked,
-  getIndexFromUuid,
 } from "@/utils/signing/status-list";
 import {
   OpenBadgeCredential,
-  CredentialProof,
   isOpenBadgeCredential,
   StatusList2021Entry,
   StatusList2021Credential,
@@ -133,7 +131,7 @@ export class VerificationService {
       if (typeof assertion.assertionJson === "string") {
         try {
           assertionJson = JSON.parse(assertion.assertionJson);
-        } catch (error) {
+        } catch (_error) {
           result.errors.push("Invalid JSON format in credential");
           return result;
         }
@@ -177,10 +175,10 @@ export class VerificationService {
 
       // For OB2.0, hosted verification is considered valid if the badge exists and is not revoked
       result.valid = result.errors.length === 0;
-    } catch (error) {
+    } catch (_error) {
       result.errors.push(
         `Verification error: ${
-          error instanceof Error ? error.message : "Unknown error"
+          _error instanceof Error ? _error.message : "Unknown error"
         }`,
       );
     }
@@ -234,7 +232,7 @@ export class VerificationService {
       if (typeof assertion.assertionJson === "string") {
         try {
           assertionJson = JSON.parse(assertion.assertionJson);
-        } catch (error) {
+        } catch (_error) {
           result.errors.push("Invalid JSON format in credential");
           return result;
         }
@@ -367,7 +365,7 @@ export class VerificationService {
             if (typeof statusList.statusListJson === "string") {
               try {
                 statusListCredential = JSON.parse(statusList.statusListJson);
-              } catch (error) {
+              } catch (_error) {
                 result.errors.push("Invalid status list JSON format");
                 result.checks.statusList = false;
                 return result;
@@ -463,14 +461,14 @@ export class VerificationService {
           dataToVerify,
           signingKey.publicKey,
         );
-
+        // Verify the signature
         result.checks.signature = signatureValid;
         if (!signatureValid) {
           result.errors.push("Invalid signature");
         }
-      } catch (error) {
-        console.error("Signature verification error:", error);
-        result.errors.push(`Signature verification error: ${error}`);
+      } catch (_error) {
+        console.error("Signature verification error:", _error);
+        result.errors.push(`Signature verification error: ${_error}`);
         result.checks.signature = false;
       }
 
@@ -485,10 +483,10 @@ export class VerificationService {
         result.checks.signature === true &&
         result.checks.revocation !== false &&
         result.checks.expiration !== false;
-    } catch (error) {
+    } catch (_error) {
       result.errors.push(
         `Verification error: ${
-          error instanceof Error ? error.message : "Unknown error"
+          _error instanceof Error ? _error.message : "Unknown error"
         }`,
       );
     }

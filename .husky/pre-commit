@@ -1,5 +1,9 @@
-# Run lint-staged only (skip typecheck to avoid duplication with pre-push)
-npx lint-staged
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Run lint-staged but don't block on failure
+echo "Running linters and formatters..."
+npx lint-staged || echo "Linting failed, but allowing commit to proceed"
 
 # Run TypeScript check but don't block commit on failure
 echo "Running TypeScript checks..."

@@ -30,7 +30,7 @@ export function isValidUri(uri: string): boolean {
   try {
     new URL(uri);
     return true;
-  } catch (error) {
+  } catch (_error) {
     return false;
   }
 }

@@ -8,7 +8,7 @@ import {
   revokedTokens,
 } from "@/db/schema";
 import { users } from "@/db/schema/index";
-import { sql, eq } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { TEST_KEYS } from "./integration-setup";
 import { base58 } from "@scure/base";
 import { nanoid } from "nanoid";

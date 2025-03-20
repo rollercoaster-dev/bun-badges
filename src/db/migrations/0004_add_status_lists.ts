@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
-import { _pgTable, _uuid, _timestamp, _jsonb } from "drizzle-orm/pg-core";
 
+//  These imports are marked as unused and are commented for linting purposes
+// import { _pgTable, _uuid, _timestamp, _jsonb } from "drizzle-orm/pg-core";
 export async function up(db: any) {
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS status_lists (

@@ -5,7 +5,7 @@ import { issuerProfiles, badgeClasses } from "@/db/schema";
 import assertions from "@/routes/assertions.routes";
 import verification from "@/routes/verification.routes";
 import crypto from "crypto";
-import { seedTestData, clearTestData } from "@/utils/test/db-helpers";
+import { clearTestData } from "@/utils/test/db-helpers";
 import { TEST_KEYS } from "@/utils/test/integration-setup";
 
 // Setup mocks for other dependencies

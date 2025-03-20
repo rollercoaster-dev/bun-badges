@@ -1,6 +1,5 @@
 import { config } from "dotenv";
 import * as path from "path";
-import { base58 } from "@scure/base";
 import { beforeAll, afterAll, afterEach, mock, beforeEach } from "bun:test";
 import { runMigrations } from "@/db/migrate";
 import { clearTestData, seedTestData } from "./db-helpers";

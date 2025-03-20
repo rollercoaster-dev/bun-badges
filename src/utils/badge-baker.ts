@@ -364,7 +364,7 @@ export async function verifyPngBaking(imageBuffer: Buffer): Promise<boolean> {
     // Simple verification - check if buffer contains the openbadges keyword
     const content = imageBuffer.toString("latin1");
     return content.includes("openbadges");
-  } catch (error) {
+  } catch (_error) {
     return false;
   }
 }

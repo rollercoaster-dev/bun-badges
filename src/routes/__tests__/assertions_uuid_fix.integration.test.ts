@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { Hono } from "hono";
-import { db } from "@/db/config";
 import assertions from "@/routes/assertions.routes";
 import { clearTestData } from "@/utils/test/db-helpers";
 

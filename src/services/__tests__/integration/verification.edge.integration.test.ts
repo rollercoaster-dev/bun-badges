@@ -4,7 +4,6 @@ import { seedTestData, clearTestData, TestData } from "@/utils/test/db-helpers";
 import { testDb } from "@/utils/test/integration-setup";
 import { badgeAssertions } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { base64url } from "@scure/base";
 
 /**
  * Integration tests for edge cases in credential verification

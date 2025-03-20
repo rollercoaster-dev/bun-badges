@@ -1,5 +1,4 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { testDb } from "@/utils/test/integration-setup";
 import { seedTestData, clearTestData } from "@/utils/test/db-helpers";
 import { IssuerController } from "@/controllers/issuer.controller";
 
