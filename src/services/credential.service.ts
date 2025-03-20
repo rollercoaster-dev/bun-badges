@@ -7,9 +7,24 @@ import { base64url } from "@scure/base";
 import {
   OpenBadgeCredential,
   OpenBadgeAchievement,
+  CredentialProof,
+  isOpenBadgeCredential,
 } from "@/models/credential.model";
 import { isValidUuid } from "@/utils/validation";
 
+/**
+ * Interface for a signable credential document without proof
+ */
+export interface SignableCredential {
+  "@context": string[];
+  id: string;
+  type: string[];
+  [key: string]: unknown;
+}
+
+/**
+ * Service for managing and processing Open Badge Credentials
+ */
 export class CredentialService {
   /**
    * Create a new issuer key pair if one doesn't exist
@@ -110,7 +125,7 @@ export class CredentialService {
       );
 
       // Create the credential without proof
-      const credential: Omit<OpenBadgeCredential, "proof"> = {
+      const credential: SignableCredential = {
         "@context": [
           "https://www.w3.org/2018/credentials/v1",
           "https://w3id.org/vc/status-list/2021/v1",
@@ -130,23 +145,25 @@ export class CredentialService {
               : "IdentityObject",
           achievement,
         },
-        evidence: assertion.evidenceUrl
-          ? [
-              {
-                id: assertion.evidenceUrl,
-                type: "Evidence",
-              },
-            ]
-          : undefined,
       };
+
+      // Add evidence if it exists
+      if (assertion.evidenceUrl) {
+        credential.evidence = [
+          {
+            id: assertion.evidenceUrl,
+            type: "Evidence",
+          },
+        ];
+      }
 
       // Add revocation status if the credential is revoked
       if (assertion.revoked) {
-        credential["credentialStatus"] = {
+        credential.credentialStatus = {
           id: `${hostUrl}/status/${assertion.assertionId}`,
           type: "RevocationList2020Status",
-          revocationListIndex: assertion.assertionId,
-          revocationListCredential: `${hostUrl}/status/list`,
+          statusListIndex: assertion.assertionId,
+          statusListCredential: `${hostUrl}/status/list`,
         };
       }
 
@@ -154,7 +171,17 @@ export class CredentialService {
       await this.ensureIssuerKeyExists(assertion.issuerId);
 
       // Sign the credential
-      return this.signCredential(assertion.issuerId, credential);
+      const signedCredential = await this.signCredential(
+        assertion.issuerId,
+        credential,
+      );
+
+      // Validate the result is a proper OpenBadgeCredential
+      if (!isOpenBadgeCredential(signedCredential)) {
+        throw new Error("Failed to create a valid OpenBadgeCredential");
+      }
+
+      return signedCredential;
     } catch (error) {
       console.error("Error creating credential:", error);
       if (error instanceof Error && error.message === "Badge not found") {
@@ -172,10 +199,10 @@ export class CredentialService {
   /**
    * Sign a credential with issuer's private key
    */
-  async signCredential<T extends Record<string, any>>(
+  async signCredential<T extends SignableCredential>(
     issuerId: string,
     credential: T,
-  ): Promise<T & { proof: any }> {
+  ): Promise<T & { proof: CredentialProof }> {
     const signingKey = await getSigningKey(issuerId);
     if (!signingKey) {
       throw new Error("Issuer signing key not found");
@@ -208,19 +235,28 @@ export class CredentialService {
   /**
    * Verify a credential's signature
    */
-  async verifySignature<T extends Record<string, any>>(
-    credential: T & { proof: any },
-  ): Promise<boolean> {
+  async verifySignature<
+    T extends SignableCredential & { proof: CredentialProof },
+  >(credential: T): Promise<boolean> {
     if (!credential.proof) {
       return false;
     }
 
     try {
       // Extract issuer ID from the credential
-      const issuerId =
-        typeof credential.issuer === "string"
-          ? credential.issuer.split("/").pop()
-          : credential.issuer.id.split("/").pop();
+      let issuerId: string | undefined;
+
+      if (typeof credential.issuer === "string") {
+        const parts = credential.issuer.split("/");
+        issuerId = parts[parts.length - 1];
+      } else if (
+        typeof credential.issuer === "object" &&
+        credential.issuer !== null &&
+        typeof credential.issuer.id === "string"
+      ) {
+        const parts = credential.issuer.id.split("/");
+        issuerId = parts[parts.length - 1];
+      }
 
       if (!issuerId) {
         return false;

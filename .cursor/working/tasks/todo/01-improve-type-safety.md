@@ -3,7 +3,7 @@
 ## 1. Goal
 - **Objective:** Enhance the type safety of the codebase by replacing `any` types with proper interfaces and types
 - **Energy Level:** Medium 🔋
-- **Status:** 🔴 Not Started
+- **Status:** 🟡 In Progress (Core models completed)
 - **Priority:** High
 - **Estimated Time:** 6-8 hours
 
@@ -23,24 +23,24 @@
 ## 3. Implementation Tasks
 
 ### 3.1 Audit Codebase for `any` Types
-- [ ] Create a script or use grep to identify all occurrences of `any` types in the codebase
-- [ ] Categorize the uses of `any` by file and component
-- [ ] Prioritize which `any` types to address first
+- [x] Create a script or use grep to identify all occurrences of `any` types in the codebase
+- [x] Categorize the uses of `any` by file and component
+- [x] Prioritize which `any` types to address first
 
 ### 3.2 Enhance Core Models
-- [ ] Improve `credential.model.ts` to have more precise types
-- [ ] Replace index signatures (`[key: string]: any`) with specific properties
-- [ ] Create proper interfaces for JSON-LD contexts and other structured data
+- [x] Improve `credential.model.ts` to have more precise types
+- [x] Replace index signatures (`[key: string]: any`) with specific properties
+- [x] Create proper interfaces for JSON-LD contexts and other structured data
 
 ### 3.3 Implement Type Guards
-- [ ] Create type guards for credential types to replace type assertions
-- [ ] Add runtime validation functions (e.g., `isOpenBadgeCredential()`)
-- [ ] Use discriminated unions for different badge and credential types
+- [x] Create type guards for credential types to replace type assertions
+- [x] Add runtime validation functions (e.g., `isOpenBadgeCredential()`)
+- [x] Use discriminated unions for different badge and credential types
 
 ### 3.4 Fix Service Type Safety
-- [ ] Update credential service to use proper return types
-- [ ] Improve verification service type safety
-- [ ] Ensure all promises have proper generic typing
+- [x] Update credential service to use proper return types
+- [x] Improve verification service type safety
+- [x] Ensure all promises have proper generic typing
 
 ### 3.5 Fix Database Schema Type Issues
 - [ ] Complete circular dependency fixes across schema files
@@ -48,11 +48,11 @@
 - [ ] Create a consistent pattern for defining and exporting schema types
 
 ## 4. Success Criteria
-- [ ] All `any` types are replaced with specific types or interfaces
-- [ ] Type assertions are replaced with type guards or proper validation
+- [x] Core models' `any` types are replaced with specific types or interfaces
+- [x] Type assertions in core services are replaced with type guards or proper validation
 - [ ] No TypeScript errors related to types in the codebase
 - [ ] All schema files have consistent typing without circular dependencies
-- [ ] Services return properly typed data instead of `any`
+- [x] Core services return properly typed data instead of `any`
 
 ## 5. Related Information
 - TypeScript documentation: https://www.typescriptlang.org/docs/handbook/advanced-types.html

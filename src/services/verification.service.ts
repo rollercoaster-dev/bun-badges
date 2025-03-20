@@ -5,6 +5,11 @@ import { getSigningKey } from "@/utils/signing/keys";
 import * as ed from "@noble/ed25519";
 import { base64url } from "@scure/base";
 import { isValidUuid } from "@/utils/validation";
+import {
+  OpenBadgeCredential,
+  CredentialProof,
+  isOpenBadgeCredential,
+} from "@/models/credential.model";
 
 export interface VerificationResult {
   valid: boolean;
@@ -15,6 +20,48 @@ export interface VerificationResult {
     structure?: boolean;
   };
   errors: string[];
+}
+
+/**
+ * Represents a possibly unstructured badge assertion from OB2.0
+ */
+export interface OB2BadgeAssertion {
+  "@context": string;
+  type: string;
+  id: string;
+  recipient: {
+    type: string;
+    identity: string;
+    hashed: boolean;
+    salt?: string;
+  };
+  badge: unknown;
+  verification?: {
+    type: string;
+    verificationProperty?: string;
+    url?: string;
+  };
+  issuedOn: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Type guard for OB2 badge assertions
+ */
+export function isOB2BadgeAssertion(obj: unknown): obj is OB2BadgeAssertion {
+  if (!obj || typeof obj !== "object") return false;
+
+  const assertion = obj as Partial<OB2BadgeAssertion>;
+  return (
+    typeof assertion["@context"] === "string" &&
+    assertion["@context"] === "https://w3id.org/openbadges/v2" &&
+    assertion.type === "Assertion" &&
+    typeof assertion.id === "string" &&
+    typeof assertion.recipient === "object" &&
+    assertion.recipient !== null &&
+    typeof assertion.badge === "object" &&
+    assertion.badge !== null
+  );
 }
 
 /**
@@ -57,7 +104,7 @@ export class VerificationService {
       }
 
       // Parse assertion JSON - handle string or object
-      let assertionJson: any;
+      let assertionJson: unknown;
       if (typeof assertion.assertionJson === "string") {
         try {
           assertionJson = JSON.parse(assertion.assertionJson);
@@ -66,7 +113,7 @@ export class VerificationService {
           return result;
         }
       } else {
-        assertionJson = assertion.assertionJson as any;
+        assertionJson = assertion.assertionJson;
       }
 
       // Check for revocation
@@ -98,7 +145,7 @@ export class VerificationService {
       }
 
       // Structure validation for OB2
-      result.checks.structure = this.validateOB2Structure(assertionJson);
+      result.checks.structure = isOB2BadgeAssertion(assertionJson);
       if (!result.checks.structure) {
         result.errors.push("Invalid OB2 assertion structure");
       }
@@ -114,20 +161,6 @@ export class VerificationService {
     }
 
     return result;
-  }
-
-  /**
-   * Validate the structure of an OB2 assertion
-   */
-  private validateOB2Structure(assertion: any): boolean {
-    if (!assertion) return false;
-
-    // Check essential fields for OB2.0
-    return Boolean(
-      assertion.id &&
-        (assertion.type === "Assertion" || assertion.badge) &&
-        assertion.recipient,
-    );
   }
 
   /**
@@ -171,7 +204,7 @@ export class VerificationService {
       }
 
       // Parse assertion JSON - handle string or object
-      let assertionJson: any;
+      let assertionJson: unknown;
       if (typeof assertion.assertionJson === "string") {
         try {
           assertionJson = JSON.parse(assertion.assertionJson);
@@ -180,17 +213,25 @@ export class VerificationService {
           return result;
         }
       } else {
-        assertionJson = assertion.assertionJson as any;
+        assertionJson = assertion.assertionJson;
       }
 
-      // Check if this is an OB3.0 assertion with cryptographic proof
-      if (!assertionJson.proof) {
+      // Validate it's an OB3 credential
+      if (!isOpenBadgeCredential(assertionJson)) {
+        result.errors.push("Not an OB3.0 credential - invalid format");
+        return result;
+      }
+
+      const credential = assertionJson as OpenBadgeCredential;
+
+      // Check if this has cryptographic proof
+      if (!credential.proof) {
         result.errors.push("Not an OB3.0 credential - no proof found");
         return result;
       }
 
       // Validate proof format
-      const proof = assertionJson.proof;
+      const proof = credential.proof;
       if (!proof.type || !proof.proofValue || !proof.verificationMethod) {
         result.errors.push(
           "Invalid proof format - missing required properties",
@@ -231,15 +272,9 @@ export class VerificationService {
       }
 
       // Extract data to verify
-      let proofValue: string;
-      try {
-        proofValue = proof.proofValue;
-        if (!proofValue) {
-          result.errors.push("Missing proof value");
-          return result;
-        }
-      } catch (error) {
-        result.errors.push("Invalid proof value format");
+      const proofValue = proof.proofValue;
+      if (!proofValue) {
+        result.errors.push("Missing proof value");
         return result;
       }
 
@@ -254,10 +289,8 @@ export class VerificationService {
 
       // For verification, we need to create a canonical document without the proof value
       // Create a deep copy to avoid modifying the original
-      const documentToVerify = JSON.parse(JSON.stringify(assertionJson));
-
-      // For Ed25519Signature2020, we remove the entire proof object for verification
-      delete documentToVerify.proof;
+      const documentToVerify = { ...credential };
+      delete (documentToVerify as Partial<OpenBadgeCredential>).proof;
 
       // Convert to canonical form (sorted, no whitespace)
       const canonicalData = JSON.stringify(documentToVerify);
@@ -283,10 +316,7 @@ export class VerificationService {
       }
 
       // Structure validation
-      result.checks.structure = this.validateCredentialStructure(assertionJson);
-      if (!result.checks.structure) {
-        result.errors.push("Invalid credential structure");
-      }
+      result.checks.structure = true; // Already validated with isOpenBadgeCredential
 
       // Valid if all checks pass
       result.valid = result.errors.length === 0;
@@ -299,29 +329,6 @@ export class VerificationService {
     }
 
     return result;
-  }
-
-  /**
-   * Validate the structure of a credential
-   */
-  private validateCredentialStructure(credential: any): boolean {
-    // Basic structure validation for OB3 credential
-    if (!credential) return false;
-
-    // Check essential fields
-    const hasRequiredFields = Boolean(
-      credential.id &&
-        credential.type &&
-        // Check for OB3.0 fields
-        ((Array.isArray(credential.type) &&
-          (credential.type.includes("VerifiableCredential") ||
-            credential.type.includes("OpenBadgeCredential"))) ||
-          // Allow OB2.0 Assertion type as well for compatibility
-          credential.type === "Assertion" ||
-          credential.type === "BadgeClass"),
-    );
-
-    return hasRequiredFields;
   }
 
   /**
@@ -340,6 +347,7 @@ export class VerificationService {
         errors: ["Invalid assertion ID format"],
       };
     }
+
     // Get the assertion to determine format
     const [assertion] = await db
       .select()
@@ -359,7 +367,7 @@ export class VerificationService {
     }
 
     // Parse assertion JSON - handle string or object
-    let assertionJson: any;
+    let assertionJson: unknown;
     if (typeof assertion.assertionJson === "string") {
       try {
         assertionJson = JSON.parse(assertion.assertionJson);
@@ -375,44 +383,39 @@ export class VerificationService {
         };
       }
     } else {
-      assertionJson = assertion.assertionJson as any;
+      assertionJson = assertion.assertionJson;
     }
 
     // Determine the badge format and verification method
-    let isOB3 = false;
-
-    // Check for OB3 proof
-    if (assertionJson.proof) {
-      isOB3 = true;
-    }
-
-    // Check for OB3 context
-    if (
-      assertionJson["@context"] &&
-      Array.isArray(assertionJson["@context"]) &&
-      assertionJson["@context"].some(
-        (ctx: string) =>
-          ctx.includes("credentials/v1") ||
-          ctx.includes("security/suites/ed25519-2020"),
-      )
-    ) {
-      isOB3 = true;
-    }
-
-    // Check for OB3 credential type
-    if (
-      assertionJson.type &&
-      Array.isArray(assertionJson.type) &&
-      (assertionJson.type.includes("VerifiableCredential") ||
-        assertionJson.type.includes("OpenBadgeCredential"))
-    ) {
-      isOB3 = true;
-    }
-
-    // Verify according to detected format
-    if (isOB3) {
+    if (isOpenBadgeCredential(assertionJson)) {
       return this.verifyOB3Assertion(assertionId);
+    } else if (isOB2BadgeAssertion(assertionJson)) {
+      return this.verifyOB2Assertion(assertionId);
     } else {
+      // Check for OB3 format indicators even if it's not a perfect match
+      const maybeOB3 = assertionJson as Record<string, unknown>;
+
+      const hasOB3Context =
+        Array.isArray(maybeOB3["@context"]) &&
+        maybeOB3["@context"].some(
+          (ctx: unknown) =>
+            typeof ctx === "string" &&
+            (ctx.includes("credentials/v1") || ctx.includes("badges/v3")),
+        );
+
+      const hasOB3Type =
+        Array.isArray(maybeOB3.type) &&
+        maybeOB3.type.some(
+          (type: unknown) =>
+            typeof type === "string" &&
+            (type === "VerifiableCredential" || type === "OpenBadgeCredential"),
+        );
+
+      if (hasOB3Context || hasOB3Type || maybeOB3.proof) {
+        return this.verifyOB3Assertion(assertionId);
+      }
+
+      // Default to OB2 verification for legacy support
       return this.verifyOB2Assertion(assertionId);
     }
   }

@@ -1,6 +1,25 @@
 import * as pngitxt from "png-itxt";
 import { Readable, Writable } from "stream";
 import { readTextFromBlob } from "@larswander/png-text";
+import {
+  OpenBadgeCredential,
+  isOpenBadgeCredential,
+} from "@/models/credential.model";
+
+/**
+ * Types of badge assertion metadata
+ */
+export type BadgeAssertion = OpenBadgeCredential | Record<string, unknown>;
+
+/**
+ * Result of badge extraction, containing either a credential or error information
+ */
+export interface BadgeExtractionResult {
+  credential: BadgeAssertion | null;
+  format: "OB3.0" | "OB2.0" | "unknown";
+  valid: boolean;
+  error?: string;
+}
 
 /**
  * Bakes an Open Badges assertion into a PNG image.
@@ -11,7 +30,7 @@ import { readTextFromBlob } from "@larswander/png-text";
  */
 export async function bakePngBadge(
   imageBuffer: Buffer,
-  assertion: any,
+  assertion: BadgeAssertion,
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     try {
@@ -58,9 +77,11 @@ export async function bakePngBadge(
  * Extracts an Open Badges assertion from a baked PNG image.
  *
  * @param imageBuffer Buffer containing the baked PNG image
- * @returns Promise resolving to the extracted assertion
+ * @returns Promise resolving to the extracted assertion result
  */
-export async function extractPngBadge(imageBuffer: Buffer): Promise<any> {
+export async function extractPngBadge(
+  imageBuffer: Buffer,
+): Promise<BadgeExtractionResult> {
   try {
     // Convert buffer to blob - using the global Blob constructor (web standard)
     // Use type assertion to handle Bun's Blob implementation
@@ -73,16 +94,54 @@ export async function extractPngBadge(imageBuffer: Buffer): Promise<any> {
 
     // Look for openbadges entry
     if (!entries || !entries.openbadges) {
-      return null;
+      return {
+        credential: null,
+        format: "unknown",
+        valid: false,
+        error: "No OpenBadges data found in image",
+      };
     }
 
     // Parse the assertion JSON
-    return JSON.parse(entries.openbadges);
-  } catch (error) {
-    if (error instanceof Error) {
-      throw new Error(`Failed to extract PNG badge: ${error.message}`);
+    const parsedCredential = JSON.parse(entries.openbadges) as unknown;
+
+    // Determine credential format
+    if (isOpenBadgeCredential(parsedCredential)) {
+      return {
+        credential: parsedCredential,
+        format: "OB3.0",
+        valid: true,
+      };
+    } else {
+      // Check if it's OB2.0 by looking for common properties
+      const maybeOB2 = parsedCredential as Record<string, unknown>;
+      if (
+        maybeOB2["@context"] === "https://w3id.org/openbadges/v2" ||
+        (maybeOB2.type === "Assertion" && maybeOB2.badge && maybeOB2.recipient)
+      ) {
+        return {
+          credential: maybeOB2,
+          format: "OB2.0",
+          valid: true,
+        };
+      }
+
+      return {
+        credential: maybeOB2,
+        format: "unknown",
+        valid: false,
+        error: "Extracted data is not a valid OpenBadge format",
+      };
     }
-    throw new Error("Failed to extract PNG badge: Unknown error");
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    return {
+      credential: null,
+      format: "unknown",
+      valid: false,
+      error: `Failed to extract PNG badge: ${errorMessage}`,
+    };
   }
 }
 
@@ -93,7 +152,10 @@ export async function extractPngBadge(imageBuffer: Buffer): Promise<any> {
  * @param assertion The Open Badges assertion to embed
  * @returns String containing the baked SVG
  */
-export function bakeSvgBadge(svgContent: string, assertion: any): string {
+export function bakeSvgBadge(
+  svgContent: string,
+  assertion: BadgeAssertion,
+): string {
   try {
     // Add namespace to svg tag if it doesn't exist
     const svgWithNamespace = svgContent.includes(
@@ -106,7 +168,20 @@ export function bakeSvgBadge(svgContent: string, assertion: any): string {
         );
 
     // Create assertion element with verification URL
-    const verifyUrl = assertion.verification?.url || "";
+    const hasVerification =
+      typeof assertion === "object" &&
+      assertion !== null &&
+      "verification" in assertion &&
+      typeof assertion.verification === "object" &&
+      assertion.verification !== null;
+
+    const verifyUrl =
+      hasVerification &&
+      "url" in assertion.verification &&
+      typeof assertion.verification.url === "string"
+        ? assertion.verification.url
+        : "";
+
     const assertionData = `
       <openbadges:assertion verify="${verifyUrl}">
         <![CDATA[
@@ -129,9 +204,9 @@ export function bakeSvgBadge(svgContent: string, assertion: any): string {
  * Extracts an Open Badges assertion from a baked SVG image.
  *
  * @param svgContent String containing the baked SVG image
- * @returns The extracted assertion or null if not found
+ * @returns The extracted assertion result
  */
-export function extractSvgBadge(svgContent: string): any {
+export function extractSvgBadge(svgContent: string): BadgeExtractionResult {
   try {
     // Look for the assertion element
     const assertionMatch = svgContent.match(
@@ -139,23 +214,66 @@ export function extractSvgBadge(svgContent: string): any {
     );
 
     if (!assertionMatch || !assertionMatch[1]) {
-      return null;
+      return {
+        credential: null,
+        format: "unknown",
+        valid: false,
+        error: "No OpenBadges data found in SVG",
+      };
     }
 
     // Extract the assertion JSON from CDATA
     const cdataMatch = assertionMatch[1].match(/<!\[CDATA\[([\s\S]*?)\]\]>/);
 
     if (!cdataMatch || !cdataMatch[1]) {
-      return null;
+      return {
+        credential: null,
+        format: "unknown",
+        valid: false,
+        error: "No CDATA section found in OpenBadges assertion",
+      };
     }
 
     // Parse the assertion JSON
-    return JSON.parse(cdataMatch[1].trim());
-  } catch (error: unknown) {
-    if (error instanceof Error) {
-      throw new Error(`Failed to extract SVG badge: ${error.message}`);
+    const parsedCredential = JSON.parse(cdataMatch[1].trim()) as unknown;
+
+    // Determine credential format
+    if (isOpenBadgeCredential(parsedCredential)) {
+      return {
+        credential: parsedCredential,
+        format: "OB3.0",
+        valid: true,
+      };
+    } else {
+      // Check if it's OB2.0 by looking for common properties
+      const maybeOB2 = parsedCredential as Record<string, unknown>;
+      if (
+        maybeOB2["@context"] === "https://w3id.org/openbadges/v2" ||
+        (maybeOB2.type === "Assertion" && maybeOB2.badge && maybeOB2.recipient)
+      ) {
+        return {
+          credential: maybeOB2,
+          format: "OB2.0",
+          valid: true,
+        };
+      }
+
+      return {
+        credential: maybeOB2,
+        format: "unknown",
+        valid: false,
+        error: "Extracted data is not a valid OpenBadge format",
+      };
     }
-    throw new Error("Failed to extract SVG badge: Unknown error");
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    return {
+      credential: null,
+      format: "unknown",
+      valid: false,
+      error: `Failed to extract SVG badge: ${errorMessage}`,
+    };
   }
 }
 
@@ -187,7 +305,7 @@ export function isSvg(fileBuffer: Buffer | string): boolean {
  */
 export async function bakeImage(
   fileData: Buffer | string,
-  assertion: any,
+  assertion: BadgeAssertion,
 ): Promise<Buffer | string> {
   if (isSvg(fileData)) {
     const svgContent =
@@ -207,9 +325,11 @@ export async function bakeImage(
  * Automatically detects image type (PNG or SVG) and uses appropriate extraction method.
  *
  * @param fileData Buffer or string containing the baked image
- * @returns Promise resolving to the extracted assertion or null if not found
+ * @returns Promise resolving to the extracted assertion result
  */
-export async function extractImage(fileData: Buffer | string): Promise<any> {
+export async function extractImage(
+  fileData: Buffer | string,
+): Promise<BadgeExtractionResult> {
   if (isSvg(fileData)) {
     const svgContent =
       typeof fileData === "string" ? fileData : fileData.toString("utf8");

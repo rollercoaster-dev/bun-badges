@@ -4,6 +4,20 @@
  */
 
 /**
+ * JSON-LD Context type
+ */
+export type JsonLdContext = string | string[] | Record<string, string>;
+
+/**
+ * Base type for all JSON-LD objects
+ */
+export interface JsonLdObject {
+  "@context": JsonLdContext;
+  id: string;
+  type: string | string[];
+}
+
+/**
  * Base type for credential subject
  */
 export interface CredentialSubject {
@@ -22,6 +36,28 @@ export interface EmailCredentialSubject extends CredentialSubject {
 }
 
 /**
+ * Evidence for an achievement
+ */
+export interface Evidence {
+  id: string;
+  type: string;
+  narrative?: string;
+  genre?: string;
+  audience?: string;
+  description?: string;
+}
+
+/**
+ * Credential status for revocation
+ */
+export interface CredentialStatus {
+  id: string;
+  type: string;
+  statusListIndex: string;
+  statusListCredential: string;
+}
+
+/**
  * Proof for verifiable credentials
  */
 export interface CredentialProof {
@@ -37,6 +73,17 @@ export interface CredentialProof {
  */
 export interface Ed25519Signature extends CredentialProof {
   type: "Ed25519Signature2020";
+}
+
+/**
+ * Image object for badge display
+ */
+export interface ImageObject {
+  id: string;
+  type: string;
+  width?: number;
+  height?: number;
+  caption?: string;
 }
 
 /**
@@ -59,12 +106,19 @@ export interface PublicKey {
   id: string;
   type: string;
   controller: string;
-  publicKeyJwk?: {
-    kty: string;
-    crv: string;
-    x: string;
-    [key: string]: any;
-  };
+  publicKeyJwk?: PublicKeyJwk;
+}
+
+/**
+ * JSON Web Key
+ */
+export interface PublicKeyJwk {
+  kty: string;
+  crv: string;
+  x: string;
+  kid?: string;
+  alg?: string;
+  use?: string;
 }
 
 /**
@@ -72,7 +126,23 @@ export interface PublicKey {
  */
 export interface AchievementCriteria {
   narrative: string;
-  [key: string]: any;
+  required?: boolean;
+  threshold?: {
+    min?: number;
+    max?: number;
+  };
+}
+
+/**
+ * Achievement definition
+ */
+export interface Achievement {
+  id: string;
+  type: string[];
+  name: string;
+  description?: string;
+  criteria?: AchievementCriteria;
+  image?: ImageObject;
 }
 
 /**
@@ -86,28 +156,21 @@ export interface OpenBadgeCredential {
   issuanceDate: string;
   name?: string;
   description?: string;
-  credentialSubject: {
-    id?: string;
-    type: string;
-    achievement: {
-      id: string;
-      type: string[];
-      name: string;
-      description?: string;
-      criteria?: AchievementCriteria;
-      image?: {
-        id: string;
-        type: string;
-      };
-    };
-    [key: string]: any;
-  };
-  evidence?: Array<{
-    id: string;
-    type: string;
-    [key: string]: any;
-  }>;
+  credentialSubject: OpenBadgeCredentialSubject;
+  evidence?: Evidence[];
+  credentialStatus?: CredentialStatus;
   proof?: CredentialProof;
+}
+
+/**
+ * Credential subject with achievement
+ */
+export interface OpenBadgeCredentialSubject extends CredentialSubject {
+  achievement: Achievement;
+  identity?: string;
+  hashed?: boolean;
+  salt?: string;
+  email?: string;
 }
 
 /**
@@ -119,10 +182,7 @@ export interface OpenBadgeAchievement {
   type: string[];
   name: string;
   description?: string;
-  image?: {
-    id: string;
-    type: string;
-  };
+  image?: ImageObject;
   criteria?: AchievementCriteria;
   issuer: IssuerProfile | string;
 }
@@ -135,4 +195,54 @@ export interface RevocationStatus {
   type: "RevocationList2020Status";
   statusListIndex: string;
   statusListCredential: string;
+}
+
+/**
+ * Type guard to check if an object is an OpenBadgeCredential
+ */
+export function isOpenBadgeCredential(
+  obj: unknown,
+): obj is OpenBadgeCredential {
+  if (!obj || typeof obj !== "object") return false;
+
+  const credential = obj as Partial<OpenBadgeCredential>;
+
+  return (
+    Array.isArray(credential["@context"]) &&
+    typeof credential.id === "string" &&
+    Array.isArray(credential.type) &&
+    (credential.type.includes("VerifiableCredential") ||
+      credential.type.includes("OpenBadgeCredential")) &&
+    typeof credential.issuanceDate === "string" &&
+    (typeof credential.issuer === "string" ||
+      (typeof credential.issuer === "object" && credential.issuer !== null)) &&
+    typeof credential.credentialSubject === "object" &&
+    credential.credentialSubject !== null
+  );
+}
+
+/**
+ * Type guard to check if an object is an Evidence
+ */
+export function isEvidence(obj: unknown): obj is Evidence {
+  if (!obj || typeof obj !== "object") return false;
+
+  const evidence = obj as Partial<Evidence>;
+
+  return typeof evidence.id === "string" && typeof evidence.type === "string";
+}
+
+/**
+ * Type guard to check if an object is an Achievement
+ */
+export function isAchievement(obj: unknown): obj is Achievement {
+  if (!obj || typeof obj !== "object") return false;
+
+  const achievement = obj as Partial<Achievement>;
+
+  return (
+    typeof achievement.id === "string" &&
+    Array.isArray(achievement.type) &&
+    typeof achievement.name === "string"
+  );
 }

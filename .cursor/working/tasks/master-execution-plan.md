@@ -18,15 +18,15 @@ This plan coordinates all tasks from todo and implementation details, organizing
 ### Week 1: Type System Foundations
 **Energy Level Needed**: High 🔋🔋🔋
 1. Initial Type Safety Setup (2-3 days)
-   - [ ] Run type analysis
-   - [ ] Set up core type definitions
-   - [ ] Implement basic type guards
+   - [x] Run type analysis
+   - [x] Set up core type definitions
+   - [x] Implement basic type guards
    - Related: `01-improve-type-safety.md`
 
 2. Core Model Enhancement (2-3 days)
-   - [ ] Update credential models
-   - [ ] Implement JSON-LD types
-   - [ ] Fix service layer types
+   - [x] Update credential models
+   - [x] Implement JSON-LD types
+   - [x] Fix service layer types
    - Related: `implementation_details/typescript_error_fixes.md`
 
 ### Week 2: Schema & Test Infrastructure
