@@ -127,6 +127,23 @@ export interface UuidIndexMapping {
 }
 
 /**
+ * Interface for the StatusList2021Credential structure
+ */
+export interface StatusList2021Credential {
+  "@context": string[];
+  id: string;
+  type: string[];
+  issuer: string | object;
+  issuanceDate: string;
+  credentialSubject: {
+    id: string;
+    type: string;
+    statusPurpose: "revocation" | "suspension";
+    encodedList: string;
+  };
+}
+
+/**
  * Create a StatusList2021 credential for Open Badges 3.0
  * @param issuer Issuer URI or profile
  * @param id Credential ID
@@ -138,7 +155,7 @@ export function createStatusListCredential(
   id: string,
   purpose: "revocation" | "suspension" = "revocation",
   size: number = 16384,
-): any {
+): StatusList2021Credential {
   return {
     "@context": [
       "https://www.w3.org/2018/credentials/v1",

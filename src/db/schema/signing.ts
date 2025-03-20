@@ -12,6 +12,8 @@ import {
 export const signingKeys = pgTable("signing_keys", {
   keyId: uuid("key_id").primaryKey().defaultRandom(),
   issuerId: uuid("issuer_id")
+    // Using any is necessary due to circular dependency issues in Drizzle ORM
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .references((): any => ({ table: "issuer_profiles", column: "issuer_id" }))
     .notNull(),
   publicKeyMultibase: text("public_key_multibase").notNull(), // Base58-encoded public key

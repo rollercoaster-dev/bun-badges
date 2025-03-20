@@ -6,8 +6,13 @@
  */
 import { mock } from "bun:test";
 
+// Define types for storage and tables
+type TableName = string;
+type TableRow = Record<string, unknown>;
+type MockStorage = Record<TableName, TableRow[]>;
+
 // Mock data storage
-const mockStorage: Record<string, any[]> = {
+const mockStorage: MockStorage = {
   users: [],
   webauthn_credentials: [],
   login_tokens: [],
@@ -19,13 +24,23 @@ const mockStorage: Record<string, any[]> = {
   revoked_tokens: [],
 };
 
+interface Table {
+  name: string;
+}
+
+interface QueryCondition {
+  field: string;
+  operator: string;
+  value: unknown;
+}
+
 // Mock database operations
 const mockDb = {
-  insert: (table: any) => {
+  insert: (table: Table) => {
     const tableName = table.name || Object.keys(mockStorage)[0];
 
     return {
-      values: (data: any) => {
+      values: (data: TableRow | TableRow[]) => {
         if (Array.isArray(data)) {
           mockStorage[tableName].push(...data);
         } else {
@@ -39,7 +54,7 @@ const mockDb = {
     };
   },
 
-  execute: async (query: any) => {
+  execute: async (query: { toString(): string }) => {
     // Mock the execute function to handle session_replication_role
     if (query.toString().includes("session_replication_role")) {
       return Promise.resolve();
@@ -49,11 +64,11 @@ const mockDb = {
 
   select: () => {
     return {
-      from: (table: any) => {
+      from: (table: Table) => {
         const tableName = table.name || Object.keys(mockStorage)[0];
 
         return {
-          where: (_condition: any) => {
+          where: (_condition: QueryCondition) => {
             // For simple mock implementation, just return the first item
             // In a more complex mock, you could implement actual filtering
             return mockStorage[tableName].length > 0
@@ -68,11 +83,11 @@ const mockDb = {
     };
   },
 
-  delete: (table: any) => {
+  delete: (table: Table) => {
     const tableName = table.name || Object.keys(mockStorage)[0];
 
     return {
-      where: (_condition: any) => {
+      where: (_condition: QueryCondition) => {
         // For simple implementation, just clear the table
         mockStorage[tableName] = [];
         return { numDeletedRows: 1 };

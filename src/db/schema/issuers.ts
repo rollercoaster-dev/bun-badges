@@ -15,7 +15,8 @@ export const issuerProfiles = pgTable("issuer_profiles", {
   description: text("description"),
   email: varchar("email", { length: 255 }),
   ownerUserId: uuid("owner_user_id")
-    // Use function reference with any type to avoid circular dependency
+    // Using any is necessary due to circular dependency issues in Drizzle ORM
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .references((): any => ({ table: "users", column: "user_id" }))
     .notNull(),
   issuerJson: jsonb("issuer_json").notNull(), // Full Open Badges issuer JSON
