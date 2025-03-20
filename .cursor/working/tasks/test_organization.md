@@ -24,14 +24,24 @@
   - All `*.test.ts` files that interact with the database
   - All existing `*.integration.test.ts` files
 
+- **Testing Commands:**
+  - Run all tests: `bun test`
+  - Run unit tests only: `bun test:unit`
+  - Run integration tests (all): `./test-integration.sh`
+  - Run specific integration tests: `./test-integration.sh <file-path>`
+  - Run multiple integration test files: `./test-integration.sh <file-path1> <file-path2>`
+  - Example commands:
+    - `./test-integration.sh src/services/__tests__/integration/verification.integration.test.ts`
+    - `./test-integration.sh src/services/__tests__/integration/verification.edge.integration.test.ts`
+
 ## 3. Ideas & Challenges
 - **Approaches:**
   - Use file naming pattern (`*.integration.test.ts`) for tests that need real DB
   - Create `/integration/` subdirectories within test folders for organization
   - Convert tests that verify complex DB interactions to integration tests
   - Keep pure logic and component tests as unit tests with mocks
-  - Leverage existing DB helper functions for integration test data setup
-  - Remove old tast file
+  - Leverage existing DB helper functions for integration test setup
+  - Remove old test files after successful migration
   
 - **Potential Issues:**
   - Tests may fail when moving from mocks to real DB (different behavior)
@@ -120,11 +130,13 @@
     - Fixed auth.controller.integration.test.ts to match controller behavior
     - Fixed schema exports issue with signingKeys
     - Updated verification tests to match actual system behavior
+    - Successfully fixed verification.integration.test.ts and verification.edge.integration.test.ts 
+    - Confirmed successful verification tests with targeted test runs
 
 - **Context Resume Point:**
-  Last working on: Fixed the signingKeys export issue in schema/index.ts to fix integration tests
-  Next planned action: Identify next tests to migrate and update remaining integration tests
-  Current blockers: None - previous blockers with missing exports resolved
+  Last working on: Fixed the verification integration tests by updating schema exports and test expectations
+  Next planned action: Fix remaining integration test failures, starting with assertions endpoint 404 handling
+  Current blockers: None - verification tests now pass, remaining failures in other integration tests
 
 ## 6. Next Actions & Blockers
 - **Immediate Next Actions:**
@@ -142,6 +154,8 @@
   - [x] Identify and list all remaining tests using DB mocks (30 mins)
   - [x] Fix export issues in schema files (30 mins)
   - [x] Fix verification integration tests to match actual behavior (60 mins)
+  - [ ] Fix assertions endpoint 404 handling for invalid IDs (45 mins)
+  - [ ] Fix credential.service.integration.test.ts 'pool' import issue (30 mins)
   - [ ] Create migration plan for remaining tests (30 mins)
   - [ ] Continue migrating tests according to inventory (ongoing)
 
@@ -155,6 +169,7 @@
   - Determining which DB-dependent tests truly need real DB interactions
   - Integration tests failing due to missing schema exports
   - Different behavior between mocked tests and actual system behavior
+  - Invalid UUID handling causing 500 errors instead of 404 in some endpoints
 
 - **Flow Moments:**
   - Well-organized test scripts in package.json
@@ -162,6 +177,7 @@
   - Robust DB helpers for seeding test data
   - Successfully migrated first test from unit to integration pattern
   - Fixed schema exports to make integration tests pass
+  - Verification tests now successfully passing with real database connections
 
 - **Observations:**
   - The project has a solid foundation for testing with both unit and integration approaches
@@ -170,6 +186,7 @@
   - Test files follow consistent patterns that make migrations straightforward
   - The documentation (TESTING.md) now provides clear guidance on test organization
   - Mocked tests sometimes have unrealistic expectations compared to actual behavior
+  - Test-specific commands like `./test-integration.sh` allow for targeted testing of specific files
 
 - **Celebration Notes:** 🎉
   - Fixed all TypeScript errors in test utilities
@@ -180,6 +197,7 @@
   - Updated verification integration tests to match actual behavior
   - Documented the test organization strategy and migration process
   - Improved project documentation in README.md and TESTING.md
+  - Successfully fixed verification tests that are now passing with real database
 
 ## 8. Remaining Unit Tests to Migrate
 Based on the analysis of tests run, the following unit tests still use database mocks and should be migrated to integration tests:
@@ -206,8 +224,10 @@ Based on the analysis of tests run, the following unit tests still use database 
 ### Migration Priority Order:
 1. ✅ Fix infrastructure issues (exports, pool management) - DONE
 2. ✅ Fix verification service tests (most critical for functionality) - DONE
-3. Next: Migrate controller tests (oauth)
-4. Next: Migrate route tests
-5. Last: Migrate middleware tests
+3. Next: Fix assertions endpoint 404 handling for invalid UUIDs
+4. Next: Fix credential service import issue with 'pool'
+5. Next: Migrate controller tests (oauth)
+6. Next: Migrate route tests
+7. Last: Migrate middleware tests
 
 This migration will significantly improve test reliability by using real database interactions instead of mocks for these database-dependent operations.
