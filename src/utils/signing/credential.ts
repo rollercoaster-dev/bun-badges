@@ -33,7 +33,7 @@ const TEST_SIGNING_SECRET = "test-signing-secret-do-not-use-in-production";
 
 /**
  * Sign a credential with a private key
- * 
+ *
  * @param credential The credential to sign
  * @param privateKey The private key as a string (base64url encoded)
  * @param options Additional signing options
@@ -45,7 +45,7 @@ export async function signCredential<T extends Record<string, unknown>>(
   options: {
     verificationMethod: string;
     proofPurpose: string;
-  }
+  },
 ): Promise<T & { proof: CredentialProof }> {
   // Create a copy of the credential without proof
   const documentToSign = { ...credential };
@@ -82,14 +82,14 @@ export async function signCredential<T extends Record<string, unknown>>(
 
 /**
  * Verify a signed credential
- * 
+ *
  * @param credential The signed credential with proof
  * @param publicKey The public key as a string (base64url or multibase encoded)
  * @returns Verification result
  */
 export async function verifyCredential<T extends Record<string, unknown>>(
   credential: T,
-  publicKey: string | Uint8Array
+  publicKey: string | Uint8Array,
 ): Promise<{ verified: boolean; results?: any; error?: string }> {
   // Check if the credential has a proof
   if (!credential.proof) {
@@ -100,28 +100,31 @@ export async function verifyCredential<T extends Record<string, unknown>>(
   const { proof } = credential as T & { proof: CredentialProof };
 
   // Check proof type
-  if (proof.type !== "Ed25519Signature2020" && 
-      proof.type !== "DataIntegrityProof") {
-    return { 
-      verified: false, 
-      error: `Unsupported proof type: ${proof.type}. Support types are Ed25519Signature2020 and DataIntegrityProof` 
+  if (
+    proof.type !== "Ed25519Signature2020" &&
+    proof.type !== "DataIntegrityProof"
+  ) {
+    return {
+      verified: false,
+      error: `Unsupported proof type: ${proof.type}. Support types are Ed25519Signature2020 and DataIntegrityProof`,
     };
   }
 
   // For DataIntegrityProof, check cryptosuite
   if (proof.type === "DataIntegrityProof") {
-    const dataIntegrityProof = proof as import("@/models/credential.model").DataIntegrityProof;
+    const dataIntegrityProof =
+      proof as import("@/models/credential.model").DataIntegrityProof;
     if (!dataIntegrityProof.cryptosuite) {
       return {
         verified: false,
-        error: `Unsupported cryptosuite: Missing cryptosuite. Supported cryptosuites are eddsa-rdfc-2022`
+        error: `Unsupported cryptosuite: Missing cryptosuite. Supported cryptosuites are eddsa-rdfc-2022`,
       };
     }
 
     if (dataIntegrityProof.cryptosuite !== "eddsa-rdfc-2022") {
       return {
         verified: false,
-        error: `Unsupported cryptosuite: ${dataIntegrityProof.cryptosuite}. Supported cryptosuites are eddsa-rdfc-2022`
+        error: `Unsupported cryptosuite: ${dataIntegrityProof.cryptosuite}. Supported cryptosuites are eddsa-rdfc-2022`,
       };
     }
   }
@@ -166,9 +169,9 @@ export async function verifyCredential<T extends Record<string, unknown>>(
 
     return { verified, results: { signatureVerification: verified } };
   } catch (error) {
-    return { 
-      verified: false, 
-      error: `Verification error: ${error instanceof Error ? error.message : "Unknown error"}` 
+    return {
+      verified: false,
+      error: `Verification error: ${error instanceof Error ? error.message : "Unknown error"}`,
     };
   }
 }
