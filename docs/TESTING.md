@@ -1,164 +1,101 @@
-# Testing Strategy for Bun Badges
+# Testing Guide
 
-This project uses a comprehensive testing approach with both unit tests and integration tests to ensure code reliability.
+This document describes the testing approach and infrastructure for the bun-badges project.
 
 ## Test Types
 
-### Unit Tests
-
-Unit tests are focused on testing individual functions and components in isolation. They use mocks to avoid external dependencies like databases.
-
-- **Location**: Files named `*.test.ts` (excluding `*.integration.test.ts`)
-- **Run Command**: `npm run test:unit`
-- **Mock Strategy**: Mocks for Drizzle ORM and database operations are provided via `src/utils/test/setup.ts`
-- **Best For**: Testing pure logic, utility functions, and components without external dependencies
-
-### Integration Tests
-
-Integration tests check that components work together correctly. They use a real PostgreSQL database to test actual database interactions.
-
-- **Location**: Files named `*.integration.test.ts` or in `*/integration/` directories
-- **Run Command**: `npm run test:integration`
-- **Database Strategy**: A Docker container with PostgreSQL is started for tests and migrations are run
-- **Best For**: Testing database interactions, controllers, routes, and other components that rely on external services
+1. **Unit Tests**: Tests that verify individual components in isolation, using mocks for dependencies like the database.
+2. **Integration Tests**: Tests that verify components working together with real infrastructure such as a database.
 
 ## Test Organization
 
-```
-src/
-├── __tests__/             # Top-level tests
-│   ├── controllers/       # Controller tests
-│   │   ├── integration/   # Controller integration tests
-│   │   └── ...            # Regular controller unit tests
-│   ├── middleware/        # Middleware tests
-│   └── routes/            # Route tests
-│       ├── integration/   # Route integration tests
-│       └── ...            # Route unit tests
-└── utils/
-    └── test/              # Test utilities
-        ├── db-helpers.ts  # Database helpers for seeding and cleanup
-        ├── setup.ts       # Main test setup file
-        └── ...            # Other test utilities
-```
+Tests are organized in the following structure:
+
+- `src/__tests__` - Top-level tests for core functionality
+- `src/services/__tests__` - Tests for services
+- `src/routes/__tests__/integration` - API route integration tests
+- `src/utils/test` - Test utilities and helpers
+
+Integration tests are identified by:
+- File naming: `*.integration.test.ts`
+- Directory paths: `integration/` subdirectories
 
 ## Running Tests
 
-- **Run All Tests**: `npm run test:all`
-- **Run Unit Tests Only**: `npm run test:unit`
-- **Run Integration Tests Only**: `npm run test:integration`
+### Running All Tests
 
-## Testing Infrastructure
+```bash
+# Run all tests (unit and integration)
+npm run test:all
 
-### Unit Testing Setup (`src/utils/test/setup.ts`)
+# Run only unit tests (much faster)
+npm run test:unit
 
-The unit test setup provides mocks for:
-- Drizzle ORM operations (queries, filters, tables)
-- Database connections and services
-- Cryptographic operations for deterministic results
+# Run all integration tests
+npm run test:integration
 
-### Integration Testing Setup
-
-Integration tests use:
-- A real PostgreSQL database via Docker
-- Real Drizzle ORM operations against this database
-- Migrations to create actual tables
-- Helper functions for seeding test data in `src/utils/test/db-helpers.ts`
-- Deterministic cryptographic operations
-
-#### Integration Test Flow
-
-1. Start PostgreSQL Docker container
-2. Run database migrations
-3. Execute tests with database seeding before each test
-4. Clean up and stop Docker container
-
-## When to Use Integration vs. Unit Tests
-
-### Use Integration Tests For:
-
-- **Database-Dependent Code**: Controllers, services, or utilities that interact with the database
-- **Route Handlers**: API endpoints that need to be tested with real data flow
-- **Authentication Tests**: Where you need to verify token generation and validation
-- **Complex Data Flows**: Tests that need to verify entire workflows across components
-
-### Use Unit Tests For:
-
-- **Pure Utility Functions**: Functions without external dependencies
-- **Isolated Components**: Components that can be tested with mocks
-- **Business Logic**: Core logic that doesn't depend on external systems
-- **Edge Cases**: Testing various input combinations for specific functions
-
-## Writing New Tests
-
-### New Unit Tests
-
-1. Create a file named `yourfeature.test.ts`
-2. Import from `bun:test`
-3. Use mocks for external dependencies
-
-Example:
-
-```typescript
-import { describe, test, expect } from "bun:test";
-import { YourUtility } from "@/utils/your-utility";
-
-describe("YourUtility", () => {
-  test("should do something", () => {
-    const result = YourUtility.doSomething();
-    expect(result).toBe(expectedValue);
-  });
-});
+# Run integration tests with Docker (includes setup/teardown)
+npm run test:docker
 ```
 
-### New Integration Tests
+### Running Individual Tests
 
-1. Create a file named `yourfeature.integration.test.ts` or place it in an `integration/` directory
-2. Import test helpers from `@/utils/test/db-helpers`
-3. Use `beforeEach` to seed test data and `afterEach` to clean up
+We provide several ways to run individual test files:
 
-Example:
+#### Automatic Test Type Detection
 
-```typescript
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { YourController } from "@/controllers/your-controller";
-import { seedTestData, clearTestData } from "@/utils/test/db-helpers";
-import { testDb } from "@/utils/test/integration-setup";
-
-describe("YourController Integration Tests", () => {
-  beforeEach(async () => {
-    await seedTestData();
-  });
-  
-  afterEach(async () => {
-    await clearTestData();
-  });
-
-  test("should interact with the database", async () => {
-    const controller = new YourController();
-    // Test with real database interaction
-  });
-});
+```bash
+# Automatically detect test type and run appropriate command
+./test-file.sh path/to/test/file.ts
 ```
 
-## Addressing Common Issues
+This script will:
+1. Check if the file exists
+2. Automatically detect if it's an integration or unit test based on the filename
+3. Run the appropriate test command
 
-### Unit Test Mocking Issues
+#### Manual Test Type Specification
 
-If you're trying to test database-dependent code as a unit test and experiencing mocking issues:
+```bash
+# Run a specific unit test
+npm run test:unit:file path/to/unit/test.ts
 
-1. Consider converting the test to an integration test
-2. Review the mocking approach in `src/utils/test/setup.ts`
-3. Add additional mocks if needed, but be careful of complexity
+# Run a specific integration test
+npm run test:integration:file path/to/integration/test.ts
+```
 
-### Integration Testing Database
+## Test Setup
 
-Integration tests require a running PostgreSQL instance. If you encounter database connection issues:
+### Unit Tests
 
-1. Make sure Docker is running
-2. Check the `docker-compose.test.yml` configuration
-3. Verify that the `DATABASE_URL` environment variable is correct
-4. Run migrations manually: `BUN_ENV=test npm run db:migrate`
+Unit tests use mock database implementations found in `src/utils/test/unit-setup.ts`. These tests are fast but don't verify actual database behavior.
 
-### Cryptographic Testing
+### Integration Tests
 
-Cryptography is mocked to provide deterministic results in both unit and integration tests. This ensures that signatures and keys are consistent across test runs.
+Integration tests use a real PostgreSQL database running in Docker. The `test-integration.sh` script handles:
+
+1. Starting the test database container
+2. Running migrations
+3. Running tests with the correct database URL
+4. Stopping the database container
+
+## Test Data
+
+For integration tests, test data is managed through helpers in `src/utils/test/db-helpers.ts`:
+
+- `seedTestData()` - Creates test users, issuers, badges, and assertions
+- `clearTestData()` - Cleans up the database between tests
+
+## Troubleshooting
+
+### Database Connection Issues
+
+- Ensure Docker is running
+- Verify that port 5434 is not in use by another application
+- Check if the database container is already running: `docker ps | grep bun-badges-test-db`
+
+### Test Failures
+
+- Integration tests should handle their own cleanup in beforeEach/afterEach hooks
+- Check the test logs for specific errors
+- Verify the database schema matches what tests expect

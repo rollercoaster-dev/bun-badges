@@ -1,28 +1,77 @@
 import { config } from "dotenv";
 import * as path from "path";
 import { base58 } from "@scure/base";
-import { beforeAll, afterAll, afterEach, mock } from "bun:test";
-
-// Import the db and schema from the application config
-import { db, dbPool, schema } from "@/db/config";
-import { issuerProfiles } from "@/db/schema/issuers";
-import { signingKeys } from "@/db/schema/signing";
+import { beforeAll, afterAll, afterEach, mock, beforeEach } from "bun:test";
+import { runMigrations } from "@/db/migrate";
+import { clearTestData, seedTestData } from "./db-helpers";
+import { sql } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool, QueryResult } from "pg";
 
 // Load test environment variables
 config({ path: path.resolve(process.cwd(), "test.env") });
 
 console.log("🔧 Integration test setup loading...");
 
-// Test keys for deterministic cryptography
-export const TEST_KEYS = {
+// Log database connection info
+console.log(`Database URL: ${process.env.DATABASE_URL || "Not set"}`);
+
+// Handle database connection with retries
+function createDatabaseConnection() {
+  const maxRetries = 5;
+  let retryCount = 0;
+  let lastError: Error | null = null;
+
+  return {
+    connect: async (): Promise<Pool> => {
+      while (retryCount < maxRetries) {
+        try {
+          console.log(
+            `Attempting to connect to database (attempt ${retryCount + 1}/${maxRetries})...`,
+          );
+          const pool = new Pool({
+            connectionString: process.env.DATABASE_URL,
+            max: 25,
+            idleTimeoutMillis: 30000,
+          });
+
+          // Test the connection
+          await pool.query("SELECT 1");
+          console.log("✅ Database connection successful");
+          return pool;
+        } catch (error) {
+          retryCount++;
+          lastError = error as Error;
+          console.error(
+            `❌ Database connection failed (${retryCount}/${maxRetries}):`,
+            error,
+          );
+
+          if (retryCount < maxRetries) {
+            const delay = retryCount * 1000; // Increasing delay with each retry
+            console.log(`Retrying in ${delay}ms...`);
+            await new Promise((resolve) => setTimeout(resolve, delay));
+          }
+        }
+      }
+
+      throw new Error(
+        `Failed to connect to database after ${maxRetries} attempts: ${lastError?.message}`,
+      );
+    },
+  };
+}
+
+// Create database connection
+let globalPool: Pool;
+let testDb: ReturnType<typeof drizzle>;
+
+// Create test keys for deterministic cryptography
+const TEST_KEYS = {
   privateKey: new Uint8Array(32).fill(1), // Fixed for tests
   publicKey: new Uint8Array(32).fill(2), // Fixed for tests
   signature: new Uint8Array(64).fill(3), // Fixed for tests
 };
-
-// Export the db for use in tests
-export const testDb = db;
-export const pool = dbPool;
 
 // Create deterministic crypto mocks
 mock.module("@noble/ed25519", () => {
@@ -103,162 +152,226 @@ mock.module("@scure/base", () => {
   };
 });
 
-// Global setup - runs once before all tests that import this file
+// Run migrations before all tests
 beforeAll(async () => {
-  console.log("🔄 Setting up integration test database");
-
   try {
-    // Seed initial test data
-    await seedTestData();
+    // Establish database connection with retries
+    const dbConnection = createDatabaseConnection();
+    globalPool = await dbConnection.connect();
+    testDb = drizzle(globalPool);
 
-    console.log("✅ Test database setup complete");
+    console.log("✅ Database connection established");
+
+    // Run migrations (if not already run by the script)
+    try {
+      console.log("Checking if migrations are needed...");
+      // Simple check to see if tables exist
+      const result = await testDb.execute(sql`
+        SELECT EXISTS (
+          SELECT FROM pg_tables 
+          WHERE schemaname = 'public' 
+          AND tablename = 'users'
+        );
+      `);
+
+      const tablesExist = result.rows[0]?.exists;
+      if (!tablesExist) {
+        console.log("Tables don't exist yet, running migrations...");
+        await runMigrations();
+        console.log("Migrations completed");
+      } else {
+        console.log("Tables already exist, skipping migrations");
+      }
+
+      // Check if signing_keys table exists, if not create it
+      const signingKeysResult = await testDb.execute(sql`
+        SELECT EXISTS (
+          SELECT FROM pg_tables 
+          WHERE schemaname = 'public' 
+          AND tablename = 'signing_keys'
+        );
+      `);
+
+      const signingKeysExist = signingKeysResult.rows[0]?.exists;
+      if (!signingKeysExist) {
+        console.log("Creating signing_keys table...");
+        await testDb.execute(sql`
+          CREATE TABLE "signing_keys" (
+            "key_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+            "issuer_id" uuid NOT NULL,
+            "public_key_multibase" text NOT NULL,
+            "private_key_multibase" text NOT NULL,
+            "controller" text NOT NULL,
+            "type" varchar(50) NOT NULL DEFAULT 'Ed25519VerificationKey2020',
+            "key_info" jsonb NOT NULL,
+            "revoked" boolean DEFAULT false NOT NULL,
+            "revoked_at" timestamp,
+            "created_at" timestamp DEFAULT now() NOT NULL,
+            "updated_at" timestamp DEFAULT now() NOT NULL
+          );
+        `);
+
+        // Add foreign key constraint
+        await testDb.execute(sql`
+          ALTER TABLE "signing_keys" 
+          ADD CONSTRAINT "signing_keys_issuer_id_issuer_profiles_issuer_id_fk" 
+          FOREIGN KEY ("issuer_id") 
+          REFERENCES "issuer_profiles"("issuer_id") 
+          ON DELETE NO ACTION 
+          ON UPDATE NO ACTION;
+        `);
+
+        console.log("✅ signing_keys table created");
+      }
+
+      // Ensure schema matches our model definitions
+      await ensureSchemaMatch();
+      console.log("✅ Schema checked and updated if needed");
+
+      console.log("✅ Setup complete, tests are ready to run");
+    } catch (error) {
+      console.error("❌ Error in migrations:", error);
+      throw error;
+    }
   } catch (error) {
-    console.error("❌ Error setting up test database:", error);
-    throw error;
+    console.error("❌ Fatal error in test setup:", error);
+    throw error; // Re-throw to fail tests if setup fails
   }
 });
 
 // Global teardown - runs once after all tests that import this file
 afterAll(async () => {
-  console.log("🧹 Cleaning up integration test database");
+  console.log("🧹 Cleaning up integration test environment");
   try {
-    console.log("✅ Test database cleanup complete");
+    if (testDb) {
+      // Clear all test data at the end
+      await clearTestData();
+    }
+
+    // Close the global pool only in the afterAll hook
+    if (globalPool) {
+      await globalPool.end();
+      console.log("✅ Database connection closed");
+    }
+
+    console.log("✅ Test environment cleanup complete");
   } catch (error) {
-    console.error("❌ Error cleaning up test database:", error);
+    console.error("❌ Error cleaning up test environment:", error);
   }
 });
 
-// Optional: Reset database between tests if needed
-// Comment this out if you want test data to persist between test cases
+// Reset database state before each test
+beforeEach(async () => {
+  console.log("🔄 Setting up fresh test state...");
+  try {
+    // We only want to clear data if tables exist
+    // But we don't need to seed data before each test - tests should seed their own specific data if needed
+    const tablesExist = await tableExists(testDb, "users");
+
+    if (tablesExist) {
+      // Clear existing data
+      await clearTestData();
+    } else {
+      console.log("⚠️ Tables don't exist yet, skipping data clearing");
+    }
+  } catch (error) {
+    console.error("❌ Error setting up test state:", error);
+    // Don't throw here - let the test continue even if clearing fails
+    // Tests will fail naturally if they need a clean state and can't get it
+  }
+});
+
+// Clear test data after each test
 afterEach(async () => {
-  await clearDatabase();
-  await seedTestData();
+  console.log("🧹 Cleaning up after test...");
+  try {
+    // Only attempt to clear data if tables exist
+    const tablesExist = await tableExists(testDb, "users");
+
+    if (tablesExist) {
+      await clearTestData();
+      console.log("✅ Test data cleared");
+    } else {
+      console.log("⚠️ Tables don't exist, skipping data clearing");
+    }
+  } catch (error) {
+    console.error("❌ Error clearing test data:", error);
+    // Don't throw here - let the next test run anyway
+  }
 });
 
 // Helper function to safely check if a table exists
-async function tableExists(tableName: string): Promise<boolean> {
+async function tableExists(
+  db: ReturnType<typeof drizzle>,
+  tableName: string,
+): Promise<boolean> {
   try {
-    const result = await pool.query(
-      `
+    const result: QueryResult<{ exists: boolean }> = await db.execute(sql`
       SELECT EXISTS (
         SELECT FROM pg_tables 
         WHERE schemaname = 'public' 
-        AND tablename = $1
+        AND tablename = ${tableName}
       );
-    `,
-      [tableName],
-    );
-
-    return result?.rows?.[0]?.exists === true;
+    `);
+    return result.rows[0]?.exists ?? false;
   } catch (error) {
     console.error(`Error checking if table ${tableName} exists:`, error);
     return false;
   }
 }
 
-// Helper function to clear data from tables that exist
-async function clearDatabase() {
-  try {
-    // Disable foreign key checks (for PostgreSQL)
-    await pool.query(`SET session_replication_role = 'replica'`);
-
-    // List of tables to clear in proper order
-    const tables = [
-      "signing_keys",
-      "badge_assertions",
-      "badge_classes",
-      "issuer_profiles",
-      "login_tokens",
-      "webauthn_credentials",
-      "users",
-    ];
-
-    // Clear tables that exist
-    for (const table of tables) {
-      const exists = await tableExists(table);
-      if (exists) {
-        console.log(`Clearing table: ${table}`);
-        await pool.query(`TRUNCATE TABLE "${table}" CASCADE`);
-      }
-    }
-
-    // Re-enable foreign key checks
-    await pool.query(`SET session_replication_role = 'origin'`);
-  } catch (error) {
-    console.error("Error clearing database:", error);
-    // Don't throw here, just log the error and continue
-  }
+// Create a function to get a new pool instance (for tests that need isolation)
+function createTestPool() {
+  return new Pool({
+    connectionString: process.env.DATABASE_URL,
+    max: 10,
+    idleTimeoutMillis: 30000,
+  });
 }
 
-// Helper function to seed test data
-async function seedTestData() {
-  try {
-    // Skip if users table doesn't exist yet
-    const usersExist = await tableExists("users");
-    if (!usersExist) {
-      console.log("Tables don't exist yet, skipping data seeding");
-      return;
-    }
-
-    console.log("Seeding test data...");
-
-    // Create a test user first
-    const [user] = await db
-      .insert(schema.users)
-      .values({
-        email: "test@example.com",
-        name: "Test User",
-      })
-      .returning();
-
-    // Check if issuer_profiles table exists
-    const issuerProfilesExist = await tableExists("issuer_profiles");
-    if (issuerProfilesExist) {
-      // Add a test issuer with the proper schema
-      const [issuer] = await db
-        .insert(issuerProfiles)
-        .values({
-          name: "Test Issuer",
-          url: "https://test-issuer.example.com",
-          description: "A test issuer for integration tests",
-          email: "test@example.com",
-          ownerUserId: user.userId,
-          issuerJson: {
-            "@context": "https://w3id.org/openbadges/v2",
-            id: "https://test-issuer.example.com",
-            type: "Issuer",
-            name: "Test Issuer",
-            url: "https://test-issuer.example.com",
-            email: "test@example.com",
-          },
-        })
-        .returning();
-
-      // Check if signing_keys table exists
-      const signingKeysExist = await tableExists("signing_keys");
-      if (signingKeysExist) {
-        // Add test signing keys - convert binary keys to base58 strings
-        await db.insert(signingKeys).values({
-          issuerId: issuer.issuerId,
-          publicKeyMultibase: base58.encode(TEST_KEYS.publicKey),
-          privateKeyMultibase: base58.encode(TEST_KEYS.privateKey),
-          controller: "did:key:test",
-          keyInfo: {
-            "@context": ["https://w3id.org/security/v2"],
-            id: "did:key:test#key-1",
-            type: "Ed25519VerificationKey2020",
-            controller: "did:key:test",
-          },
-          revoked: false,
-        });
-      }
-    }
-
-    console.log("Test data seeded successfully");
-  } catch (error) {
-    console.error("Error seeding test data:", error);
-    // Don't throw, just log and continue
-  }
+// Create a function to get a new drizzle instance
+function createTestDb(pool: Pool) {
+  return drizzle(pool);
 }
 
 console.log("✅ Integration test setup complete");
+
+// Export singleton instance, functions and constants
+export {
+  testDb, // Export the global DB instance for most tests
+  globalPool, // Export the global pool for direct access
+  createTestPool, // For tests that need isolation
+  createTestDb,
+  tableExists,
+  TEST_KEYS,
+};
+
+// Ensure the database schema includes all columns in our models
+async function ensureSchemaMatch() {
+  try {
+    console.log("Checking database schema...");
+
+    // Check if issuer_profiles has public_key column
+    const publicKeyExists = await testDb.execute(sql`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_name = 'issuer_profiles'
+      AND column_name = 'public_key'
+    `);
+
+    // Add the column if it doesn't exist
+    if (publicKeyExists.rows.length === 0) {
+      console.log("Adding missing public_key column to issuer_profiles...");
+      await testDb.execute(sql`
+        ALTER TABLE issuer_profiles
+        ADD COLUMN IF NOT EXISTS public_key jsonb
+      `);
+      console.log("✅ public_key column added");
+    } else {
+      console.log("✅ public_key column already exists");
+    }
+  } catch (error) {
+    console.error("❌ Error checking/updating schema:", error);
+    throw error;
+  }
+}

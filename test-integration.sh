@@ -1,68 +1,82 @@
 #!/bin/bash
 
-# Test Integration Script
-# Runs integration tests with Docker Compose test database
-
-# Color codes for output formatting
+# Colors for better output
 GREEN='\033[0;32m'
+BLUE='\033[0;34m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
-echo -e "${YELLOW}Starting test database...${NC}"
+# Check if a specific test file was provided
+if [ "$#" -eq 1 ]; then
+  TEST_FILE="$1"
+  echo -e "${BLUE}=== Running Single Integration Test: ${TEST_FILE} ===${NC}"
+  SINGLE_TEST=true
+else
+  echo -e "${BLUE}=== Running All Integration Tests ===${NC}"
+  SINGLE_TEST=false
+fi
 
 # Start the test database
-docker-compose -f docker-compose.test.yml up -d test-db
+echo -e "${YELLOW}Starting test database...${NC}"
+docker compose -f docker-compose.test.yml up -d test-db
 
 # Wait for the database to be ready
 echo -e "${YELLOW}Waiting for database to be ready...${NC}"
-sleep 5
-
-# Check if the database is ready
-echo -e "${YELLOW}Checking database connection...${NC}"
-RETRIES=10
-RETRY_COUNT=0
-
-while [ $RETRY_COUNT -lt $RETRIES ]; do
-  docker exec bun-badges-test-db pg_isready -U postgres -d bun_badges_test
-  if [ $? -eq 0 ]; then
+for i in {1..20}; do
+  echo "Checking database connection..."
+  if docker exec bun-badges-test-db pg_isready -U postgres -d bun_badges_test; then
     echo -e "${GREEN}Database is ready!${NC}"
     break
   fi
-  
-  echo -e "${YELLOW}Database not ready yet, waiting...${NC}"
-  RETRY_COUNT=$((RETRY_COUNT+1))
+  if [ $i -eq 20 ]; then
+    echo -e "${RED}Database didn't start within the expected time.${NC}"
+    docker compose -f docker-compose.test.yml logs test-db
+    docker compose -f docker-compose.test.yml down
+    exit 1
+  fi
   sleep 2
 done
 
-if [ $RETRY_COUNT -eq $RETRIES ]; then
-  echo -e "${RED}Failed to connect to the database. Please check if it's running.${NC}"
-  docker-compose -f docker-compose.test.yml logs test-db
-  docker-compose -f docker-compose.test.yml down
-  exit 1
-fi
-
 # Run database migrations
-echo -e "${YELLOW}Running database migrations...${NC}"
-# Use the proper migration command
-DATABASE_URL=postgres://postgres:postgres@localhost:5434/bun_badges_test bun run db:migrate
+echo -e "${GREEN}Running database migrations...${NC}"
+DATABASE_URL=postgres://postgres:postgres@localhost:5434/bun_badges_test bun run src/db/migrate.ts
 echo -e "${GREEN}Database migrations completed.${NC}"
 
-# Run the integration tests
-echo -e "${GREEN}Running integration tests...${NC}"
-# Use our dedicated integration setup
-DATABASE_URL=postgres://postgres:postgres@localhost:5434/bun_badges_test bun test --preload ./src/utils/test/integration-setup.ts ./src/__tests__/routes/assertions.routes.test.ts
-TEST_EXIT_CODE=$?
-
-# Stop the test database
-echo -e "${YELLOW}Stopping test database...${NC}"
-docker-compose -f docker-compose.test.yml down
-
-# Exit with the test exit code
-if [ $TEST_EXIT_CODE -eq 0 ]; then
-  echo -e "${GREEN}Integration tests passed!${NC}"
+# Find test files to run
+if [ "$SINGLE_TEST" = true ]; then
+  # Use the provided test file
+  TEST_FILES="$TEST_FILE"
+  
+  # Check if the file exists
+  if [ ! -f "$TEST_FILE" ]; then
+    echo -e "${RED}Error: Test file '${TEST_FILE}' not found${NC}"
+    docker compose -f docker-compose.test.yml down
+    exit 1
+  fi
 else
-  echo -e "${RED}Integration tests failed!${NC}"
+  # Find all integration test files
+  echo -e "${YELLOW}Finding integration test files...${NC}"
+  TEST_FILES=$(find src -name "*.integration.test.ts" | tr '\n' ' ')
 fi
 
-exit $TEST_EXIT_CODE 
+echo -e "${YELLOW}Test files to run:${NC}"
+echo "$TEST_FILES"
+
+# Run the tests with the database URL pointing to the Docker container
+echo -e "${GREEN}Running tests...${NC}"
+DATABASE_URL=postgres://postgres:postgres@localhost:5434/bun_badges_test bun test --preload ./src/utils/test/integration-setup.ts $TEST_FILES
+TEST_EXIT_CODE=$?
+
+# Stop and remove the test database
+echo -e "${YELLOW}Stopping test database...${NC}"
+docker compose -f docker-compose.test.yml down
+
+# Exit with the test result
+if [ $TEST_EXIT_CODE -eq 0 ]; then
+  echo -e "${GREEN}Integration tests passed!${NC}"
+  exit 0
+else
+  echo -e "${RED}Integration tests failed!${NC}"
+  exit 1
+fi 

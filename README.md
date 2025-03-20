@@ -185,89 +185,31 @@ REFRESH_TOKEN_EXPIRY=7d
 
 ## Testing
 
-This project uses Bun's built-in test runner with a comprehensive dual-approach testing strategy:
-
-- **Unit Tests**: Fast tests using mocks for external dependencies
-- **Integration Tests**: Complete tests with real database connections
-
-For detailed information about testing strategy, see [TESTING.md](TESTING.md).
-
-### Running Unit Tests (Recommended)
-
-The simplest way to run tests is to use the unit tests, which don't require a database:
+The project includes both unit tests and integration tests. Use these commands to run tests:
 
 ```bash
-# Run unit tests only
-./test.sh
-# or
-bun test:unit
-```
-
-### Running Integration Tests
-
-Integration tests require a PostgreSQL database. You can run them in two ways:
-
-#### Option 1: All-in-one script (Recommended)
-```bash
-# This will start the database, run tests, and clean up
-bun test:integration:full
-# or
-./integration-test.sh
-```
-
-#### Option 2: Manual steps
-If you need more control:
-
-1. Start the test database:
-   ```bash
-   docker-compose -f docker-compose.test.yml up -d
-   ```
-
-2. Run the integration tests:
-   ```bash
-   bun test:integration
-   ```
-
-3. When done, stop the database:
-   ```bash
-   docker-compose -f docker-compose.test.yml down
-   ```
-
-### Running All Tests
-
-To run both unit and integration tests in sequence:
-
-```bash
-# This will run unit tests, then start the database and run integration tests
+# Run all tests (unit + integration)
 bun test:all
-# or
-./test-all.sh
+
+# Run unit tests only (fast)
+bun test:unit
+
+# Run integration tests only (requires Docker)
+bun test:integration
+
+# Run a specific test file (auto-detects test type)
+bun test:file path/to/test/file.ts
+
+# Run a specific unit test file
+bun test:unit:file path/to/unit/test.ts
+
+# Run a specific integration test file
+bun test:integration:file path/to/integration/test.ts
 ```
 
-### Test Organization
+Integration tests require Docker to run a PostgreSQL database container.
 
-Tests are organized as follows:
-
-```
-src/
-├── __tests__/             # Top-level unit tests
-│   ├── controllers/       # Controller tests
-│   │   ├── integration/   # Controller integration tests
-│   │   └── ...            # Controller unit tests
-│   ├── middleware/        # Middleware tests
-│   └── routes/            # Route tests
-│       ├── integration/   # Route integration tests
-│       └── ...            # Route unit tests
-├── services/
-│   └── __tests__/         # Service tests
-│       ├── integration/   # Service integration tests
-│       └── ...            # Service unit tests
-└── utils/
-    └── test/              # Test utilities
-        ├── db-helpers.ts  # Database helpers for tests
-        ├── setup.ts       # Main test setup file
-        └── ...            # Other test utilities
-```
+For more details about testing, see [TESTING.md](docs/TESTING.md).
 
 ## Contributing
 

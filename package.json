@@ -17,9 +17,12 @@
     "test": "bun test --preload ./tests/setup.ts",
     "test:watch": "bun test --preload ./tests/setup.ts --watch",
     "test:all": "bash ./test-all.sh",
+    "test:file": "bash ./test-file.sh",
     "test:unit": "bun test 'src/__tests__/' 'tests/unit/' 'src/tests/' 'src/utils/**/__tests__/' 'src/services/__tests__/' --exclude 'src/**/*.integration.test.ts' --exclude 'src/services/__tests__/integration/' --exclude 'src/routes/__tests__/integration/' --preload ./tests/setup.ts",
+    "test:unit:file": "bun test --preload ./tests/setup.ts",
     "test:integration": "DATABASE_URL=postgres://postgres:postgres@localhost:5434/bun_badges_test bun test --preload ./tests/setup.ts tests/integration 'src/**/*.integration.test.ts' 'src/services/__tests__/integration/' 'src/routes/__tests__/integration/'",
     "test:integration:full": "bash ./integration-test.sh",
+    "test:integration:file": "bash ./test-integration.sh",
     "test:docker": "bash ./test-integration.sh",
     "prepare": "husky install"
   },
