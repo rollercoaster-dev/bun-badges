@@ -87,7 +87,23 @@ app.get("/health", (c) => {
 
 // Log server startup
 const port = parseInt(process.env.PORT || "7777", 10);
-console.log(`Server will start on port ${port}...`);
+const isDevEnv = process.env.NODE_ENV === "development";
+console.log(
+  `Server starting on port ${port} in ${process.env.NODE_ENV || "development"} mode...`,
+);
+
+if (isDevEnv && !process.env.DOCKER_CONTAINER) {
+  console.log("\nDevelopment Tips:");
+  console.log(
+    '• For local database development, run: "bun run dev:docker" to use Docker Compose',
+  );
+  console.log(
+    "• Access API documentation at: http://localhost:" + port + "/docs",
+  );
+  console.log(
+    '• Try the Open Badges 3.0 example: "bun run examples/ob3-workflow.ts"\n',
+  );
+}
 
 // Export the app without manually calling serve()
 // Bun will automatically serve this when using 'bun run'

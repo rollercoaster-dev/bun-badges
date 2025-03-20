@@ -2,25 +2,28 @@ version: '3.8'
 
 services:
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
-    container_name: bun-badges-api-dev
+    image: oven/bun:1
+    container_name: bun-badges-api-dev-light
     restart: unless-stopped
     depends_on:
       - db
-    env_file:
-      - .env.docker
+    environment:
+      NODE_ENV: development
+      PORT: 7777
+      DATABASE_URL: postgres://${POSTGRES_USER:-badges_user}:${POSTGRES_PASSWORD:-badges_password}@db:5432/${POSTGRES_DB:-badges}
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key}
+      JWT_EXPIRY: ${JWT_EXPIRY:-15m}
+      REFRESH_TOKEN_EXPIRY: ${REFRESH_TOKEN_EXPIRY:-7d}
+      DOCKER_CONTAINER: 'true'
+      SKIP_CANVAS: 'true'
     ports:
       - "${PORT:-7777}:7777"
     volumes:
       - .:/app
       - /app/node_modules
+    working_dir: /app
     command: >
-      sh -c "bun install &&
-             sleep 5 &&
-             bun run db:migrate &&
-             bun run db:migrate:status &&
+      sh -c "bun install --no-optional &&
              bun run dev"
     networks:
       - bun-badges-network-dev
@@ -28,8 +31,10 @@ services:
   db:
     image: postgres:15
     container_name: bun-badges-db-dev
-    env_file:
-      - .env.docker
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-badges}
+      POSTGRES_USER: ${POSTGRES_USER:-badges_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-badges_password}
     ports:
       - "${DB_PORT:-5432}:5432"
     volumes:
@@ -47,4 +52,4 @@ volumes:
 
 networks:
   bun-badges-network-dev:
-    driver: bridge 
+    driver: bridge

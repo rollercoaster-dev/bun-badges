@@ -65,14 +65,22 @@ bun run start
 ### Using Docker for Development
 
 ```bash
-# Start development environment with hot-reloading
-docker-compose -f docker-compose.dev.yml up -d
+# Full development environment (includes Canvas for image processing)
+bun run dev:docker
 
-# View logs
-docker-compose -f docker-compose.dev.yml logs -f
+# Start with rebuild (after dependency changes)
+bun run dev:docker:build
+
+# Lightweight development environment (no Canvas dependency)
+bun run dev:light
+
+# Lightweight environment with rebuild
+bun run dev:light:build
 
 # Stop containers
-docker-compose -f docker-compose.dev.yml down
+bun run dev:docker:down
+# or
+bun run dev:light:down
 ```
 
 ## Deployment

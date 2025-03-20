@@ -4,7 +4,7 @@
  */
 
 // For efficiently handling bit operations in status lists
-import { BitSet } from "fast-bitset";
+import FastBitSet from "fast-bitset";
 
 /**
  * Create a new bitstring for a status list credential
@@ -13,7 +13,7 @@ import { BitSet } from "fast-bitset";
  */
 export function createEncodedBitString(size: number = 16384): string {
   // Create a BitSet of the specified size with all bits set to 0 (not revoked)
-  const bitSet = new BitSet(size);
+  const bitSet = new FastBitSet(size);
   return encodeBitString(bitSet);
 }
 
@@ -22,7 +22,7 @@ export function createEncodedBitString(size: number = 16384): string {
  * @param bitSet BitSet representing status
  * @returns Base64 encoded bitstring
  */
-export function encodeBitString(bitSet: BitSet): string {
+export function encodeBitString(bitSet: FastBitSet): string {
   const bitString = bitSet.toString();
   const buffer = Buffer.from(bitString, "binary");
   return buffer.toString("base64");
@@ -33,10 +33,10 @@ export function encodeBitString(bitSet: BitSet): string {
  * @param encoded Base64 encoded bitstring
  * @returns BitSet object
  */
-export function decodeBitString(encoded: string): BitSet {
+export function decodeBitString(encoded: string): FastBitSet {
   const buffer = Buffer.from(encoded, "base64");
   const bitString = buffer.toString("binary");
-  return BitSet.fromString(bitString);
+  return FastBitSet.fromString(bitString);
 }
 
 /**

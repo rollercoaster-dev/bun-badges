@@ -48,21 +48,26 @@ privacy and security features.
 
 ### In Progress
 
-- [ ] Creating migration for status list tables
-  - Database schema for status lists is defined
-  - Migration file is created but not yet applied
-
-### To Do
-
-- [ ] Add unit tests for new Open Badges 3.0 components
-  - Test status list utilities
-  - Test credential signing and verification
-  - Test API endpoints
-
 - [ ] Create integration tests for Open Badges 3.0 workflows
   - Test end-to-end issuance and verification
   - Test revocation via status lists
   - Test different recipient types
+
+### Completed
+
+- [x] Created migration for status list tables
+  - Database schema for status lists is defined
+  - Migration file is created with `db:migrate:status` command 
+
+- [x] Added unit tests for new Open Badges 3.0 components
+  - Created tests for status list utilities
+  - Implemented tests for credential signing and verification
+  - Test API endpoints still to be added
+
+- [x] Created example script for OB3.0 workflow
+  - End-to-end example from issuance to verification
+  - Includes revocation via status lists
+  - Demonstrates full badge lifecycle
 
 - [ ] Implement additional cryptographic suites (optional)
   - Currently only Ed25519Signature2020 is implemented
