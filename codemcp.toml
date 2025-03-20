@@ -54,10 +54,13 @@ security_audit_level = "high"
 
 [commands]
 bun = { execute = "bun" }
-test = { execute = "bun test" }
-test_unit = { execute = "bun test:unit" }
-test_integration = { execute = "bun test:integration:full" }
-test_all = { execute = "bun test:all" }
+test = { execute = "bun test --preload ./tests/setup.ts" }
+test_unit = { execute = "bun test 'src/__tests__/' 'tests/unit/' 'src/tests/' 'src/utils/**/__tests__/' 'src/services/__tests__/'" }
+test_integration = { execute = "DATABASE_URL=postgres://postgres:postgres@localhost:5434/bun_badges_test bun test --preload ./tests/setup.ts tests/integration 'src/**/*.integration.test.ts'" }
+test_all = { execute = "bash ./test-all.sh" }
+docker_test_up = { execute = "docker-compose -f docker-compose.test.yml up -d" }
+docker_test_down = { execute = "docker-compose -f docker-compose.test.yml down" }
+docker_test_restart = { execute = "docker-compose -f docker-compose.test.yml down && docker-compose -f docker-compose.test.yml up -d" }
 
 [testing]
 framework = "bun:test"
