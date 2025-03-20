@@ -136,6 +136,10 @@ GET /api/status/list/{issuerId}
       }
     }
   },
+  "credentialSchema": {
+    "id": "https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json",
+    "type": "JsonSchemaValidator2018"
+  },
   "proof": {
     "type": "Ed25519Signature2020",
     "created": "2025-03-19T12:05:00Z",
@@ -179,6 +183,19 @@ GET /api/status/list/{issuerId}
 ### Signing Keys
 
 The system automatically generates Ed25519 key pairs for issuers when they first create an OB3.0 badge. These keys are securely stored and used for signing all badges issued by that entity.
+
+### Credential Schema
+
+All Open Badges 3.0 credentials include a `credentialSchema` property that points to the official JSON Schema for validation:
+
+```json
+"credentialSchema": {
+  "id": "https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json",
+  "type": "JsonSchemaValidator2018"
+}
+```
+
+This schema reference enables verifiers to validate the structure of the credential against the official IMS Global Open Badges 3.0 schema.
 
 ### Verification Process
 

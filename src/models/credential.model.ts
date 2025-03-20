@@ -170,6 +170,14 @@ export interface PublicKeyJwk {
 }
 
 /**
+ * Credential Schema
+ */
+export interface CredentialSchema {
+  id: string;
+  type: string;
+}
+
+/**
  * Achievement criteria
  */
 export interface AchievementCriteria {
@@ -230,6 +238,7 @@ export interface OpenBadgeCredential {
   credentialSubject: OpenBadgeCredentialSubject;
   evidence?: Evidence[] | Evidence;
   credentialStatus?: CredentialStatus;
+  credentialSchema?: CredentialSchema;
   proof?: CredentialProof;
   expirationDate?: string;
   refreshService?: {
@@ -272,9 +281,45 @@ export interface OpenBadgeAchievement {
 }
 
 /**
+ * Base Verifiable Credential interface without specific credential subject requirements
+ * This allows StatusList2021Credential to share properties with OpenBadgeCredential
+ * without requiring the achievement property
+ */
+export interface BaseVerifiableCredential {
+  "@context": string[];
+  id: string;
+  type: string[];
+  issuer: IssuerProfile | string;
+  issuanceDate: string;
+  name?: string;
+  description?: string;
+  credentialSubject: {
+    id: string;
+    type: string;
+    [key: string]: unknown;
+  };
+  evidence?: Evidence[] | Evidence;
+  credentialStatus?: CredentialStatus;
+  credentialSchema?: CredentialSchema;
+  proof?: CredentialProof;
+  expirationDate?: string;
+  refreshService?: {
+    id: string;
+    type: string;
+  };
+  termsOfUse?: {
+    id?: string;
+    type: string;
+    obligation?: string;
+    prohibition?: string;
+    permission?: string;
+  }[];
+}
+
+/**
  * Status List 2021 Credential
  */
-export interface StatusList2021Credential extends OpenBadgeCredential {
+export interface StatusList2021Credential extends BaseVerifiableCredential {
   type: ["VerifiableCredential", "StatusList2021Credential"];
   credentialSubject: {
     id: string;
@@ -314,13 +359,23 @@ export function isOpenBadgeCredential(
 export function isStatusList2021Credential(
   obj: unknown,
 ): obj is StatusList2021Credential {
-  if (!isOpenBadgeCredential(obj)) return false;
+  if (!obj || typeof obj !== "object") return false;
 
-  const credential = obj as Partial<StatusList2021Credential>;
+  // Check if it has the basic structure of a BaseVerifiableCredential
+  const credential = obj as Partial<BaseVerifiableCredential>;
 
   if (!Array.isArray(credential.type)) return false;
   if (!credential.type.includes("StatusList2021Credential")) return false;
+  if (typeof credential["@context"] !== "object") return false;
+  if (typeof credential.id !== "string") return false;
+  if (typeof credential.issuanceDate !== "string") return false;
+  if (
+    typeof credential.credentialSubject !== "object" ||
+    credential.credentialSubject === null
+  )
+    return false;
 
+  // Check the specific StatusList2021 subject properties
   const subject = credential.credentialSubject as Partial<
     StatusList2021Credential["credentialSubject"]
   >;

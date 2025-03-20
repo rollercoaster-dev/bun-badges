@@ -23,7 +23,10 @@ import {
   isCredentialRevoked,
 } from "../src/utils/signing/status-list";
 import * as crypto from "crypto";
-import { OB3_CREDENTIAL_CONTEXT } from "../src/constants/context-urls";
+import {
+  OB3_CREDENTIAL_CONTEXT,
+  OB3_CREDENTIAL_SCHEMA_URL,
+} from "../src/constants/context-urls";
 
 async function runOB3Workflow() {
   console.log("🏆 Open Badges 3.0 Workflow Example");
@@ -99,6 +102,10 @@ async function runOB3Workflow() {
       statusPurpose: "revocation",
       statusListIndex: `${statusIndex}`,
       statusListCredential: statusListId,
+    },
+    credentialSchema: {
+      id: OB3_CREDENTIAL_SCHEMA_URL,
+      type: "JsonSchemaValidator2018",
     },
   };
 

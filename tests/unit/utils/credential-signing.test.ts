@@ -5,7 +5,10 @@ import {
   signCredential,
   verifyCredential,
 } from "../../../src/utils/signing/credential";
-import { OB3_CREDENTIAL_CONTEXT } from "../../../src/constants/context-urls";
+import {
+  OB3_CREDENTIAL_CONTEXT,
+  OB3_CREDENTIAL_SCHEMA_URL,
+} from "../../../src/constants/context-urls";
 
 describe("Credential Signing and Verification", () => {
   let keyPair: { publicKey: string; privateKey: string };
@@ -27,6 +30,10 @@ describe("Credential Signing and Verification", () => {
         name: "Test Achievement",
         description: "A test achievement for unit testing",
       },
+    },
+    credentialSchema: {
+      id: OB3_CREDENTIAL_SCHEMA_URL,
+      type: "JsonSchemaValidator2018",
     },
   };
 

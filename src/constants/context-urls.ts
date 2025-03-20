@@ -31,6 +31,18 @@ export const STATUS_LIST_CONTEXT_URL =
 export const JWS_CONTEXT_URL = "https://w3id.org/security/suites/jws-2020/v1";
 
 /**
+ * Open Badges 3.0 Credential Schema URL
+ */
+export const OB3_CREDENTIAL_SCHEMA_URL =
+  "https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json";
+
+/**
+ * Open Badges 3.0 Badge Schema URL
+ */
+export const OB3_BADGE_SCHEMA_URL =
+  "https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_badge_schema.json";
+
+/**
  * Common context arrays for different credential types
  */
 export const OB3_CREDENTIAL_CONTEXT = [

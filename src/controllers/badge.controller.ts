@@ -7,6 +7,7 @@ import { base64url } from "@scure/base";
 import {
   OB2_CONTEXT_URL,
   OB3_CREDENTIAL_CONTEXT,
+  OB3_BADGE_SCHEMA_URL,
 } from "@/constants/context-urls";
 
 export class BadgeController {
@@ -77,6 +78,10 @@ export class BadgeController {
       issuer: {
         id: `${hostUrl}/issuers/${badge.issuerId}`,
         type: "Profile",
+      },
+      credentialSchema: {
+        id: OB3_BADGE_SCHEMA_URL,
+        type: "JsonSchemaValidator2018",
       },
     };
   }

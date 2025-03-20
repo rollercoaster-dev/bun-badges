@@ -27,6 +27,7 @@ import { isValidUuid } from "@/utils/validation";
 import {
   OB3_CREDENTIAL_CONTEXT,
   OB3_ACHIEVEMENT_CONTEXT,
+  OB3_CREDENTIAL_SCHEMA_URL,
 } from "@/constants/context-urls";
 
 /**
@@ -36,6 +37,11 @@ export interface SignableCredential {
   "@context": string[];
   id: string;
   type: string[];
+  issuer: { id: string; type: string; [key: string]: unknown } | string;
+  issuanceDate: string;
+  credentialSubject: {
+    [key: string]: unknown;
+  };
   [key: string]: unknown;
 }
 
@@ -161,6 +167,11 @@ export class CredentialService {
                     : "IdentityObject",
           achievement,
         },
+        // Add credential schema for OB3.0 compliance
+        credentialSchema: {
+          id: OB3_CREDENTIAL_SCHEMA_URL,
+          type: "JsonSchemaValidator2018",
+        },
       };
 
       // Add evidence if it exists
@@ -270,10 +281,10 @@ export class CredentialService {
         issuerId = parts[parts.length - 1];
       } else if (
         typeof credential.issuer === "object" &&
-        credential.issuer !== null &&
-        typeof credential.issuer.id === "string"
+        credential.issuer !== null
       ) {
-        const parts = credential.issuer.id.split("/");
+        const issuerObj = credential.issuer as { id: string };
+        const parts = issuerObj.id.split("/");
         issuerId = parts[parts.length - 1];
       }
 
@@ -297,7 +308,9 @@ export class CredentialService {
 
       // Create canonical form for verification without the proof
       const documentToVerify = { ...credential };
-      delete documentToVerify.proof;
+      if ("proof" in documentToVerify) {
+        delete (documentToVerify as any).proof;
+      }
 
       const canonicalData = JSON.stringify(documentToVerify);
       const dataToVerify = new TextEncoder().encode(canonicalData);
@@ -347,10 +360,11 @@ export class CredentialService {
       );
 
       // Sign the status list credential
-      const signedStatusList = await this.signCredential(
+      // Cast to SignableCredential to ensure type compatibility
+      const signedStatusList = (await this.signCredential(
         issuerId,
-        newStatusList,
-      );
+        newStatusList as unknown as SignableCredential,
+      )) as unknown as StatusList2021Credential;
 
       // Store in the database
       await db.insert(statusLists).values({
@@ -423,10 +437,10 @@ export class CredentialService {
     statusListCredential.credentialSubject.encodedList = updatedEncodedList;
 
     // Re-sign the status list
-    const signedStatusList = await this.signCredential(
+    const signedStatusList = (await this.signCredential(
       assertion.issuerId,
-      statusListCredential,
-    );
+      statusListCredential as unknown as SignableCredential,
+    )) as unknown as StatusList2021Credential;
 
     // Update in the database
     await db
