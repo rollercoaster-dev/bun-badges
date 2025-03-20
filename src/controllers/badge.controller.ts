@@ -4,6 +4,10 @@ import { badgeAssertions, badgeClasses, issuerProfiles } from "@/db/schema";
 import { getSigningKey } from "@/utils/signing/keys";
 import * as ed from "@noble/ed25519";
 import { base64url } from "@scure/base";
+import {
+  OB2_CONTEXT_URL,
+  OB3_CREDENTIAL_CONTEXT,
+} from "@/constants/context-urls";
 
 export class BadgeController {
   async hasBadgeAssertions(badgeId: string): Promise<boolean> {
@@ -30,7 +34,7 @@ export class BadgeController {
     },
   ) {
     return {
-      "@context": "https://w3id.org/openbadges/v2",
+      "@context": OB2_CONTEXT_URL,
       type: "BadgeClass",
       id: `${hostUrl}/badges/${badge.badgeId}`,
       name: badge.name,
@@ -58,11 +62,7 @@ export class BadgeController {
     },
   ) {
     return {
-      "@context": [
-        "https://www.w3.org/2018/credentials/v1",
-        "https://w3id.org/vc/status-list/2021/v1",
-        "https://w3id.org/badges/v3",
-      ],
+      "@context": OB3_CREDENTIAL_CONTEXT,
       id: `${hostUrl}/badges/${badge.badgeId}`,
       type: ["VerifiableCredential", "OpenBadgeCredential"],
       name: badge.name,
@@ -112,7 +112,7 @@ export class BadgeController {
     }
 
     return {
-      "@context": "https://w3id.org/openbadges/v2",
+      "@context": OB2_CONTEXT_URL,
       type: "Assertion",
       id: `${hostUrl}/assertions/${assertion.assertionId}`,
       badge: badgeJson,
@@ -165,11 +165,7 @@ export class BadgeController {
     }
 
     const credential = {
-      "@context": [
-        "https://www.w3.org/2018/credentials/v1",
-        "https://w3id.org/vc/status-list/2021/v1",
-        "https://w3id.org/badges/v3",
-      ],
+      "@context": OB3_CREDENTIAL_CONTEXT,
       id: `${hostUrl}/assertions/${assertion.assertionId}`,
       type: ["VerifiableCredential", "OpenBadgeCredential"],
       issuer: {

@@ -19,13 +19,14 @@ import {
 } from "@/services/verification.service";
 
 import { SignableCredential } from "@/services/credential.service";
+import {
+  OB3_CREDENTIAL_CONTEXT,
+  OB2_CONTEXT_URL,
+} from "@/constants/context-urls";
 
 // Example OB3 credential for testing
 const testCredential: OpenBadgeCredential = {
-  "@context": [
-    "https://www.w3.org/2018/credentials/v1",
-    "https://w3id.org/badges/v3",
-  ],
+  "@context": OB3_CREDENTIAL_CONTEXT,
   id: "https://example.com/credentials/123",
   type: ["VerifiableCredential", "OpenBadgeCredential"],
   issuer: {
@@ -62,7 +63,7 @@ const testCredential: OpenBadgeCredential = {
 
 // Example OB2 assertion for testing
 const testOB2Assertion: OB2BadgeAssertion = {
-  "@context": "https://w3id.org/openbadges/v2",
+  "@context": OB2_CONTEXT_URL,
   type: "Assertion",
   id: "https://example.com/assertions/123",
   recipient: {

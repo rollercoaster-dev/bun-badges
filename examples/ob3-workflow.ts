@@ -23,6 +23,7 @@ import {
   isCredentialRevoked,
 } from "../src/utils/signing/status-list";
 import * as crypto from "crypto";
+import { OB3_CREDENTIAL_CONTEXT } from "../src/constants/context-urls";
 
 async function runOB3Workflow() {
   console.log("🏆 Open Badges 3.0 Workflow Example");
@@ -68,10 +69,7 @@ async function runOB3Workflow() {
 
   // Create the Open Badge 3.0 credential
   const badgeCredential = {
-    "@context": [
-      "https://www.w3.org/2018/credentials/v1",
-      "https://w3id.org/badges/v3",
-    ],
+    "@context": OB3_CREDENTIAL_CONTEXT,
     id: credentialId,
     type: ["VerifiableCredential", "OpenBadgeCredential"],
     issuer: issuerDidKey,

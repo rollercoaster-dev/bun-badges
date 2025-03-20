@@ -24,6 +24,10 @@ import {
   StatusList2021Entry,
 } from "@/models/credential.model";
 import { isValidUuid } from "@/utils/validation";
+import {
+  OB3_CREDENTIAL_CONTEXT,
+  OB3_ACHIEVEMENT_CONTEXT,
+} from "@/constants/context-urls";
 
 /**
  * Interface for a signable credential document without proof
@@ -85,10 +89,7 @@ export class CredentialService {
 
       // Create achievement definition
       return {
-        "@context": [
-          "https://www.w3.org/2018/credentials/v1",
-          "https://w3id.org/badges/v3",
-        ],
+        "@context": OB3_ACHIEVEMENT_CONTEXT,
         id: `${hostUrl}/badges/${badge.badgeId}`,
         type: ["AchievementCredential"],
         name: badge.name,
@@ -139,11 +140,7 @@ export class CredentialService {
 
       // Create the credential without proof
       const credential: SignableCredential = {
-        "@context": [
-          "https://www.w3.org/2018/credentials/v1",
-          "https://w3id.org/vc/status-list/2021/v1",
-          "https://w3id.org/badges/v3",
-        ],
+        "@context": OB3_CREDENTIAL_CONTEXT,
         id: `${hostUrl}/assertions/${assertion.assertionId}`,
         type: ["VerifiableCredential", "OpenBadgeCredential"],
         issuer: `${hostUrl}/issuers/${assertion.issuerId}`,

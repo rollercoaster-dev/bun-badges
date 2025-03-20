@@ -5,6 +5,7 @@ import {
   signCredential,
   verifyCredential,
 } from "../../../src/utils/signing/credential";
+import { OB3_CREDENTIAL_CONTEXT } from "../../../src/constants/context-urls";
 
 describe("Credential Signing and Verification", () => {
   let keyPair: { publicKey: string; privateKey: string };
@@ -12,10 +13,7 @@ describe("Credential Signing and Verification", () => {
 
   // Sample credential without proof
   const sampleCredential = {
-    "@context": [
-      "https://www.w3.org/2018/credentials/v1",
-      "https://w3id.org/badges/v3",
-    ],
+    "@context": OB3_CREDENTIAL_CONTEXT,
     id: "urn:uuid:" + crypto.randomUUID(),
     type: ["VerifiableCredential", "OpenBadgeCredential"],
     issuer: "", // Will be filled in beforeAll

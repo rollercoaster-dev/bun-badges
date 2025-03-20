@@ -110,7 +110,7 @@ GET /api/status/list/{issuerId}
   "@context": [
     "https://www.w3.org/2018/credentials/v1",
     "https://w3id.org/vc/status-list/2021/v1",
-    "https://w3id.org/badges/v3"
+    "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json"
   ],
   "id": "https://example.com/assertions/1234",
   "type": ["VerifiableCredential", "OpenBadgeCredential"],
@@ -265,5 +265,5 @@ The implementation uses:
 
 - [W3C Verifiable Credentials Data Model](https://www.w3.org/TR/vc-data-model/)
 - [W3C Status List 2021 Specification](https://w3c-ccg.github.io/vc-status-list-2021/)
-- [Open Badges 3.0 Specification](https://w3id.org/badges/v3)
+- [Open Badges 3.0 Specification](https://www.imsglobal.org/spec/ob/v3p0/)
 - [DID Core Specification](https://www.w3.org/TR/did-core/)
