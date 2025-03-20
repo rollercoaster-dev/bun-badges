@@ -17,9 +17,11 @@ console.log(
 let poolEnd: () => Promise<void>;
 
 // Determine if we're running integration tests that need DB
-const isIntegrationTest = process.argv.some(
-  (arg) => arg.includes("integration") || arg.includes("tests/integration"),
-);
+const isIntegrationTest =
+  process.env.INTEGRATION_TEST === "true" || // Check environment variable first
+  process.argv.some(
+    (arg) => arg.includes("integration") || arg.includes("tests/integration"),
+  );
 
 // Mock DB modules for unit tests
 if (!isIntegrationTest) {
