@@ -10,9 +10,7 @@ import { getSigningKey } from "@/utils/signing/keys";
 import * as ed from "@noble/ed25519";
 import { base64url } from "@scure/base";
 import { isValidUuid } from "@/utils/validation";
-import {
-  isCredentialRevoked,
-} from "@/utils/signing/status-list";
+import { isCredentialRevoked } from "@/utils/signing/status-list";
 import {
   OpenBadgeCredential,
   isOpenBadgeCredential,
@@ -297,7 +295,7 @@ export class VerificationService {
       const supportedProofTypes = [
         "Ed25519Signature2020",
         "JsonWebSignature2020",
-        "DataIntegrityProof"
+        "DataIntegrityProof",
       ];
       if (!supportedProofTypes.includes(proof.type)) {
         result.errors.push(
@@ -310,7 +308,9 @@ export class VerificationService {
       if (proof.type === "DataIntegrityProof") {
         const dataIntegrityProof = proof as DataIntegrityProof;
         if (!dataIntegrityProof.cryptosuite) {
-          result.errors.push("DataIntegrityProof missing required cryptosuite property");
+          result.errors.push(
+            "DataIntegrityProof missing required cryptosuite property",
+          );
           return result;
         }
 
@@ -321,7 +321,7 @@ export class VerificationService {
           );
           return result;
         }
-        
+
         result.details!.cryptosuite = dataIntegrityProof.cryptosuite;
       }
 
@@ -431,10 +431,15 @@ export class VerificationService {
 
         // Decode the proof value
         let signature: Uint8Array;
-        
-        if (proof.type === "DataIntegrityProof" || proof.type === "Ed25519Signature2020") {
+
+        if (
+          proof.type === "DataIntegrityProof" ||
+          proof.type === "Ed25519Signature2020"
+        ) {
           if (!proof.proofValue) {
-            result.errors.push("Missing proofValue in Ed25519/DataIntegrity proof");
+            result.errors.push(
+              "Missing proofValue in Ed25519/DataIntegrity proof",
+            );
             return result;
           }
           signature = base64url.decode(proof.proofValue);
@@ -451,7 +456,9 @@ export class VerificationService {
           }
           signature = base64url.decode(jwsParts[2]);
         } else {
-          result.errors.push(`Unsupported proof type for verification: ${proof.type}`);
+          result.errors.push(
+            `Unsupported proof type for verification: ${proof.type}`,
+          );
           return result;
         }
 

@@ -5,10 +5,7 @@ import {
   testDb,
   tableExists as checkTableExists,
 } from "@/utils/test/integration-setup";
-import { 
-  DataIntegrityProof, 
-  CredentialProof 
-} from "@/models/credential.model";
+import { DataIntegrityProof, CredentialProof } from "@/models/credential.model";
 import { seedTestData, clearTestData } from "@/utils/test/db-helpers";
 import { OB3_CREDENTIAL_CONTEXT } from "@/constants/context-urls";
 import { SignableCredential } from "@/services/credential.service";
@@ -94,8 +91,8 @@ describe("CredentialService Integration Tests", () => {
       issuanceDate: new Date().toISOString(),
       credentialSubject: {
         id: "test-recipient@example.com",
-        type: "EmailCredentialSubject"
-      }
+        type: "EmailCredentialSubject",
+      },
     };
 
     // Sign the credential
@@ -108,7 +105,9 @@ describe("CredentialService Integration Tests", () => {
     expect(result).toBeDefined();
     expect(result.proof).toBeDefined();
     expect(result.proof.type).toEqual("DataIntegrityProof");
-    expect((result.proof as DataIntegrityProof).cryptosuite).toEqual("eddsa-rdfc-2022");
+    expect((result.proof as DataIntegrityProof).cryptosuite).toEqual(
+      "eddsa-rdfc-2022",
+    );
     expect(result.proof.proofValue).toBeDefined();
 
     // Verify the signature is valid
@@ -132,8 +131,8 @@ describe("CredentialService Integration Tests", () => {
       issuanceDate: new Date().toISOString(),
       credentialSubject: {
         id: "test-recipient@example.com",
-        type: "EmailCredentialSubject"
-      }
+        type: "EmailCredentialSubject",
+      },
     };
 
     // Sign the credential
@@ -150,8 +149,7 @@ describe("CredentialService Integration Tests", () => {
     const tamperedCredential = JSON.parse(JSON.stringify(signedCredential));
     tamperedCredential.id = "tampered-credential";
 
-    const isTamperedValid =
-      await service.verifySignature(tamperedCredential);
+    const isTamperedValid = await service.verifySignature(tamperedCredential);
     expect(isTamperedValid).toBe(false);
   });
 
@@ -164,9 +162,9 @@ describe("CredentialService Integration Tests", () => {
       issuanceDate: new Date().toISOString(),
       credentialSubject: {
         id: "test-recipient@example.com",
-        type: "EmailCredentialSubject"
+        type: "EmailCredentialSubject",
       },
-      proof: undefined as unknown as CredentialProof
+      proof: undefined as unknown as CredentialProof,
     } as SignableCredential & { proof: CredentialProof };
 
     const result = await service.verifySignature(credential);
@@ -231,7 +229,9 @@ describe("CredentialService Integration Tests", () => {
     expect(result.credentialSubject.achievement).toBeDefined();
 
     // Verify the signature
-    const isValid = await service.verifySignature(result as unknown as SignableCredential & { proof: CredentialProof });
+    const isValid = await service.verifySignature(
+      result as unknown as SignableCredential & { proof: CredentialProof },
+    );
     expect(isValid).toBe(true);
   });
 

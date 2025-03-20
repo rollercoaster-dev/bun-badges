@@ -4,7 +4,10 @@ import { badgeClasses, badgeAssertions } from "@/db/schema";
 import { testDb, pool } from "@/utils/test/integration-setup";
 import { issuerProfiles } from "@/db/schema/issuers";
 import { eq } from "drizzle-orm";
-import { OpenBadgeCredential, DataIntegrityProof } from "@/models/credential.model";
+import {
+  OpenBadgeCredential,
+  DataIntegrityProof,
+} from "@/models/credential.model";
 
 describe("Credential Service Integration Tests", () => {
   // Create a service
@@ -151,25 +154,28 @@ describe("Credential Service Integration Tests", () => {
       expect(credential.proof).toBeDefined();
       if (credential.proof) {
         expect(credential.proof.type).toBe("DataIntegrityProof");
-        expect((credential.proof as DataIntegrityProof).cryptosuite).toBe("eddsa-rdfc-2022");
+        expect((credential.proof as DataIntegrityProof).cryptosuite).toBe(
+          "eddsa-rdfc-2022",
+        );
         expect(credential.proof.proofValue).toBeDefined();
       }
 
       // 5. Verify the signature is valid - we know the proof exists after checks above
       const isValid = await credentialService.verifySignature(
-        credential as any
+        credential as any,
       );
       expect(isValid).toBe(true);
 
       // 6. Test tampering detection - modify the credential and signature should fail
       const tamperedCredential = JSON.parse(
-        JSON.stringify(credential)
+        JSON.stringify(credential),
       ) as OpenBadgeCredential & { proof: any };
       tamperedCredential.credentialSubject.achievement.name =
         "Modified Badge Name";
 
-      const isTamperedValid =
-        await credentialService.verifySignature(tamperedCredential as any);
+      const isTamperedValid = await credentialService.verifySignature(
+        tamperedCredential as any,
+      );
       expect(isTamperedValid).toBe(false);
     } catch (error) {
       console.error("Test error:", error);
