@@ -16,6 +16,7 @@
         "canvas": "^3.1.0",
         "dotenv": "^16.4.7",
         "drizzle-orm": "^0.40.0",
+        "fast-bitset": "^1.3.2",
         "hono": "^4.0.5",
         "jose": "^5.2.2",
         "jsonld": "^8.3.2",
@@ -426,6 +427,8 @@
     "expand-template": ["expand-template@2.0.3", "", {}, "sha512-XYfuKMvj4O35f/pOXLObndIRvyQ+/+6AhODh+OKWj9S9498pHHn/IMszH+gt0fBCRWMNfk1ZSp5x3AifmnI2vg=="],
 
     "factory.ts": ["factory.ts@0.5.2", "", { "dependencies": { "clone-deep": "^4.0.1", "source-map-support": "^0.5.19" } }, "sha512-I4YDKuyMW+s2PocnWh/Ekv9wSStt/MNN1ZRb1qhy0Kv056ndlzbLHDsW9KEmTAqMpLI3BtjSqEdZ7ZfdnaXn9w=="],
+
+    "fast-bitset": ["fast-bitset@1.3.2", "", {}, "sha512-6cy85OYZdL0ieGxZYH9tZpC3vSpmj/WDLihzM7ZVe+RU31CD61Amlovvu8eiIBUV/JWReb1o/Uev6zE6/57EHQ=="],
 
     "fast-deep-equal": ["fast-deep-equal@3.1.3", "", {}, "sha512-f3qQ9oQy9j2AhBe/H9VC91wLmKBCCU/gDOnKNAYG5hswO7BLKj09Hc5HYNz9cGI++xlpDCIgDaitVs03ATR84Q=="],
 
