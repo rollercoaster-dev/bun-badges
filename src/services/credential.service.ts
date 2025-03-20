@@ -1,7 +1,18 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db/config";
-import { badgeAssertions, badgeClasses, issuerProfiles } from "@/db/schema";
+import {
+  badgeAssertions,
+  badgeClasses,
+  issuerProfiles,
+  statusLists,
+} from "@/db/schema";
 import { getSigningKey, generateSigningKey } from "@/utils/signing/keys";
+import {
+  createStatusListCredential,
+  updateCredentialStatus,
+  getIndexFromUuid,
+  isCredentialRevoked,
+} from "@/utils/signing/status-list";
 import * as ed from "@noble/ed25519";
 import { base64url } from "@scure/base";
 import {
@@ -9,6 +20,8 @@ import {
   OpenBadgeAchievement,
   CredentialProof,
   isOpenBadgeCredential,
+  StatusList2021Credential,
+  StatusList2021Entry,
 } from "@/models/credential.model";
 import { isValidUuid } from "@/utils/validation";
 
@@ -142,7 +155,13 @@ export class CredentialService {
           type:
             assertion.recipientType === "email"
               ? "EmailCredentialSubject"
-              : "IdentityObject",
+              : assertion.recipientType === "did"
+                ? "DidCredentialSubject"
+                : assertion.recipientType === "url"
+                  ? "UrlCredentialSubject"
+                  : assertion.recipientType === "phone"
+                    ? "PhoneCredentialSubject"
+                    : "IdentityObject",
           achievement,
         },
       };
@@ -157,15 +176,18 @@ export class CredentialService {
         ];
       }
 
-      // Add revocation status if the credential is revoked
-      if (assertion.revoked) {
-        credential.credentialStatus = {
-          id: `${hostUrl}/status/${assertion.assertionId}`,
-          type: "RevocationList2020Status",
-          statusListIndex: assertion.assertionId,
-          statusListCredential: `${hostUrl}/status/list`,
-        };
-      }
+      // Handle revocation and credential status
+      const statusListUrl = `${hostUrl}/status/list`;
+
+      // Always include credential status for OB3.0 credentials
+      // This allows for future revocation even if not currently revoked
+      credential.credentialStatus = {
+        id: `${statusListUrl}#${assertion.assertionId}`,
+        type: "StatusList2021Entry",
+        statusPurpose: "revocation",
+        statusListIndex: getIndexFromUuid(assertion.assertionId).toString(),
+        statusListCredential: statusListUrl,
+      };
 
       // Ensure issuer has keys
       await this.ensureIssuerKeyExists(assertion.issuerId);
@@ -270,6 +292,10 @@ export class CredentialService {
 
       // Extract signature from proof
       const proofValue = credential.proof.proofValue;
+      if (!proofValue) {
+        return false;
+      }
+
       const signature = base64url.decode(proofValue);
 
       // Create canonical form for verification without the proof
@@ -285,5 +311,193 @@ export class CredentialService {
       console.error("Signature verification error:", error);
       return false;
     }
+  }
+
+  /**
+   * Create or update a status list credential for revocation
+   */
+  async createOrUpdateStatusList(
+    hostUrl: string,
+    issuerId: string,
+  ): Promise<StatusList2021Credential> {
+    // Get the existing status list or create a new one
+    const [existingStatusList] = await db
+      .select()
+      .from(statusLists)
+      .where(eq(statusLists.issuerId, issuerId))
+      .limit(1);
+
+    const statusListUrl = `${hostUrl}/status/list/${issuerId}`;
+
+    if (existingStatusList) {
+      // Parse the existing status list credential
+      let statusListCredential: StatusList2021Credential;
+
+      if (typeof existingStatusList.statusListJson === "string") {
+        statusListCredential = JSON.parse(existingStatusList.statusListJson);
+      } else {
+        statusListCredential =
+          existingStatusList.statusListJson as StatusList2021Credential;
+      }
+
+      return statusListCredential;
+    } else {
+      // Create a new status list credential
+      const newStatusList = createStatusListCredential(
+        `${hostUrl}/issuers/${issuerId}`,
+        statusListUrl,
+        "revocation",
+      );
+
+      // Sign the status list credential
+      const signedStatusList = await this.signCredential(
+        issuerId,
+        newStatusList,
+      );
+
+      // Store in the database
+      await db.insert(statusLists).values({
+        statusListId: crypto.randomUUID(),
+        issuerId,
+        statusListJson: signedStatusList,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      return signedStatusList;
+    }
+  }
+
+  /**
+   * Update a credential's revocation status
+   */
+  async updateCredentialRevocationStatus(
+    hostUrl: string,
+    assertionId: string,
+    revoked: boolean,
+    reason?: string,
+  ): Promise<void> {
+    // Get the assertion
+    const [assertion] = await db
+      .select()
+      .from(badgeAssertions)
+      .where(eq(badgeAssertions.assertionId, assertionId));
+
+    if (!assertion) {
+      throw new Error("Assertion not found");
+    }
+
+    // Get the status list
+    const [statusList] = await db
+      .select()
+      .from(statusLists)
+      .where(eq(statusLists.issuerId, assertion.issuerId))
+      .limit(1);
+
+    let statusListCredential: StatusList2021Credential;
+
+    if (!statusList) {
+      // Create a new status list if none exists
+      statusListCredential = await this.createOrUpdateStatusList(
+        hostUrl,
+        assertion.issuerId,
+      );
+    } else {
+      // Parse the existing status list
+      if (typeof statusList.statusListJson === "string") {
+        statusListCredential = JSON.parse(statusList.statusListJson);
+      } else {
+        statusListCredential =
+          statusList.statusListJson as StatusList2021Credential;
+      }
+    }
+
+    // Get the encodedList and update it
+    const encodedList = statusListCredential.credentialSubject.encodedList;
+    const index = getIndexFromUuid(assertion.assertionId);
+
+    const updatedEncodedList = updateCredentialStatus(
+      encodedList,
+      index,
+      revoked,
+    );
+
+    // Update the status list
+    statusListCredential.credentialSubject.encodedList = updatedEncodedList;
+
+    // Re-sign the status list
+    const signedStatusList = await this.signCredential(
+      assertion.issuerId,
+      statusListCredential,
+    );
+
+    // Update in the database
+    await db
+      .update(statusLists)
+      .set({
+        statusListJson: signedStatusList,
+        updatedAt: new Date(),
+      })
+      .where(eq(statusLists.issuerId, assertion.issuerId));
+
+    // Update the assertion
+    await db
+      .update(badgeAssertions)
+      .set({
+        revoked,
+        revocationReason: reason || null,
+        updatedAt: new Date(),
+      })
+      .where(eq(badgeAssertions.assertionId, assertionId));
+  }
+
+  /**
+   * Check if a credential is revoked using the status list
+   */
+  async checkCredentialRevocationStatus(
+    credential: OpenBadgeCredential,
+  ): Promise<boolean> {
+    // Check if the credential has a status
+    if (!credential.credentialStatus) {
+      return false; // No status means not revoked
+    }
+
+    const status = credential.credentialStatus as StatusList2021Entry;
+
+    // Verify this is a status list entry
+    if (status.type !== "StatusList2021Entry") {
+      return false;
+    }
+
+    // Get the status list credential
+    const statusListUrl = status.statusListCredential;
+    const parts = statusListUrl.split("/");
+    const issuerId = parts[parts.length - 1];
+
+    const [statusList] = await db
+      .select()
+      .from(statusLists)
+      .where(eq(statusLists.issuerId, issuerId))
+      .limit(1);
+
+    if (!statusList) {
+      return false; // No status list means not revoked
+    }
+
+    // Parse the status list
+    let statusListCredential: StatusList2021Credential;
+
+    if (typeof statusList.statusListJson === "string") {
+      statusListCredential = JSON.parse(statusList.statusListJson);
+    } else {
+      statusListCredential =
+        statusList.statusListJson as StatusList2021Credential;
+    }
+
+    // Get the encoded list and check the status
+    const encodedList = statusListCredential.credentialSubject.encodedList;
+    const index = parseInt(status.statusListIndex);
+
+    return isCredentialRevoked(encodedList, index);
   }
 }

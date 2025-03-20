@@ -7,6 +7,7 @@ import badges from "@routes/badges.routes";
 import assertions from "@routes/assertions.routes";
 import issuers from "@routes/issuers.routes";
 import verification from "@routes/verification.routes";
+import status from "@routes/status.routes";
 import { createOAuthRouter } from "@routes/oauth.routes";
 import { OAuthController } from "@controllers/oauth.controller";
 import { errorHandler } from "@middleware/error-handler";
@@ -66,6 +67,7 @@ api.route("/badges", badges);
 api.route("/assertions", assertions);
 api.route("/issuers", issuers);
 api.route("/verify", verification);
+api.route("/status", status);
 app.route("/api", api);
 
 // Mount Swagger UI

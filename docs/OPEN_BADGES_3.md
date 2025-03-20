@@ -10,6 +10,7 @@ Open Badges 3.0 enhances the digital badge ecosystem with:
 - Decentralized identifiers (DIDs)
 - Self-contained verification (no hosted verification required)
 - Improved privacy features
+- Standardized revocation mechanisms
 
 This implementation supports both Open Badges 2.0 (for backward compatibility) and Open Badges 3.0 (for enhanced security and functionality).
 
@@ -38,7 +39,7 @@ Badges can be revoked using cryptographic status lists, providing secure and ver
 To issue a badge in Open Badges 3.0 format:
 
 ```
-POST /assertions
+POST /api/assertions
 ```
 
 With the following request body:
@@ -63,7 +64,7 @@ Setting `version` to `ob3` instructs the API to create an Open Badges 3.0 verifi
 To retrieve a badge in Open Badges 3.0 format:
 
 ```
-GET /assertions/{assertionId}?format=ob3
+GET /api/assertions/{assertionId}?format=ob3
 ```
 
 The response will include the full credential with cryptographic proof.
@@ -73,10 +74,32 @@ The response will include the full credential with cryptographic proof.
 To verify a badge:
 
 ```
-GET /verify/{assertionId}
+GET /api/verify/assertions/{assertionId}
+```
+
+For detailed verification results:
+
+```
+GET /api/verify/assertions/{assertionId}?format=detailed
 ```
 
 The response includes verification status with details about signature verification, revocation status, and structural validation.
+
+### Checking Credential Status
+
+To check a credential's revocation status:
+
+```
+GET /api/status/{assertionId}
+```
+
+### Retrieving Status Lists
+
+To get a status list for an issuer:
+
+```
+GET /api/status/list/{issuerId}
+```
 
 ## Data Model
 
@@ -123,6 +146,34 @@ The response includes verification status with details about signature verificat
 }
 ```
 
+### Status List 2021 Credential
+
+```json
+{
+  "@context": [
+    "https://www.w3.org/2018/credentials/v1",
+    "https://w3id.org/vc/status-list/2021/v1"
+  ],
+  "id": "https://example.com/status/list/issuer-id",
+  "type": ["VerifiableCredential", "StatusList2021Credential"],
+  "issuer": "https://example.com/issuers/issuer-id",
+  "issuanceDate": "2025-03-19T12:00:00Z",
+  "credentialSubject": {
+    "id": "https://example.com/status/list/issuer-id#list",
+    "type": "StatusList2021",
+    "statusPurpose": "revocation",
+    "encodedList": "H4sIAAAAAAAAA-3BMQEAAADCoPVPbQwfoAAAAAAAAAAAAAAAAAAAAIC3AYbSVKsAQAAA"
+  },
+  "proof": {
+    "type": "Ed25519Signature2020",
+    "created": "2025-03-19T12:05:00Z",
+    "verificationMethod": "did:key:z6MkrXSQTybtqyMasfSxeRBksrz6CjHhWBMz1EKT1STM7hV3#key-1",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "zQeVbY4oNQX6CbXs8EQ2zCus4Jt6FfgkU6cVZ6iNpSEsHsXvo5Aq12dbir57H2XfVP1QrFR5bqntoG5i1XB71Uw"
+  }
+}
+```
+
 ## Implementation Details
 
 ### Signing Keys
@@ -139,12 +190,12 @@ Badge verification involves:
 4. Checking revocation status
 5. Validating credential structure
 
-### Revocation
+### Revocation Mechanism
 
 Badges can be revoked through the API:
 
 ```
-POST /assertions/{assertionId}/revoke
+POST /api/assertions/{assertionId}/revoke
 ```
 
 ```json
@@ -153,11 +204,41 @@ POST /assertions/{assertionId}/revoke
 }
 ```
 
-Revoked OB3.0 badges contain a `credentialStatus` property that refers to a status list credential.
+Revoked OB3.0 badges use the Status List 2021 specification:
+
+1. A bitstring encodes the revocation status of many credentials
+2. Each credential is assigned an index in the bitstring
+3. A bit value of 1 indicates revocation, 0 indicates valid
+4. The status list is itself a verifiable credential with cryptographic proof
+5. Credentials reference their position in the status list via the `credentialStatus` property
+
+### DID Support
+
+Decentralized Identifiers (DIDs) are used for key management:
+
+1. Each issuer is assigned a did:key identifier
+2. The DID includes the public key in multibase format
+3. VerificationMethod references link signatures to specific keys
+4. The implementation focuses on the did:key method (other DID methods could be added)
+
+### Additional Supported Recipient Types
+
+Beyond email addresses, OB3.0 supports multiple recipient identifier types:
+
+1. `EmailCredentialSubject` - Email-based identity
+2. `DidCredentialSubject` - DID-based identity
+3. `UrlCredentialSubject` - URL-based identity
+4. `PhoneCredentialSubject` - Phone number-based identity
 
 ## Migration from OB2.0 to OB3.0
 
 Existing badges issued in OB2.0 format can continue to be verified through the platform. New badges can be issued in either format, with OB3.0 being recommended for enhanced security and features.
+
+To migrate from OB2.0 to OB3.0:
+
+1. Start issuing new badges with `version: "ob3"` parameter
+2. Existing OB2.0 badges remain valid and verifiable
+3. Use the format=ob3 parameter when retrieving badges to see them in OB3.0 format when possible
 
 ## Technical Implementation
 
@@ -165,14 +246,24 @@ The implementation uses:
 
 - Ed25519 cryptography for digital signatures
 - DIDs as persistent identifiers
+- StatusList2021 for revocation tracking
 - JSON-LD for semantic data representation
 - PostgreSQL for storing badge and key data
+- BitSet for efficient revocation status encoding
 - Bun and Hono for high-performance API delivery
 
 ## Future Enhancements
 
-- Support for additional proof formats
+- Support for additional proof formats (JsonWebSignature2020)
 - DID resolution with multiple DID methods
 - Integration with digital wallets
 - Support for selective disclosure
 - Expanded cryptographic algorithm options
+- Linked data proofs with advanced canonicalization
+
+## References
+
+- [W3C Verifiable Credentials Data Model](https://www.w3.org/TR/vc-data-model/)
+- [W3C Status List 2021 Specification](https://w3c-ccg.github.io/vc-status-list-2021/)
+- [Open Badges 3.0 Specification](https://w3id.org/badges/v3)
+- [DID Core Specification](https://www.w3.org/TR/did-core/)

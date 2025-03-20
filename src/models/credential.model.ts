@@ -36,6 +36,32 @@ export interface EmailCredentialSubject extends CredentialSubject {
 }
 
 /**
+ * DID credential subject
+ */
+export interface DidCredentialSubject extends CredentialSubject {
+  type: "DidCredentialSubject";
+  id: string; // A DID URI
+}
+
+/**
+ * URL credential subject
+ */
+export interface UrlCredentialSubject extends CredentialSubject {
+  type: "UrlCredentialSubject";
+  id: string; // A URL
+}
+
+/**
+ * Phone credential subject
+ */
+export interface PhoneCredentialSubject extends CredentialSubject {
+  type: "PhoneCredentialSubject";
+  phone: string;
+  hashed?: boolean;
+  salt?: string;
+}
+
+/**
  * Evidence for an achievement
  */
 export interface Evidence {
@@ -58,21 +84,39 @@ export interface CredentialStatus {
 }
 
 /**
- * Proof for verifiable credentials
+ * Status List 2021 status type
+ */
+export interface StatusList2021Entry extends CredentialStatus {
+  type: "StatusList2021Entry";
+  statusPurpose: "revocation" | "suspension";
+}
+
+/**
+ * Base Proof for verifiable credentials
  */
 export interface CredentialProof {
   type: string;
   created: string;
   verificationMethod: string;
   proofPurpose: string;
-  proofValue: string;
+  proofValue?: string;
+  jws?: string;
 }
 
 /**
  * Ed25519Signature2020 proof
  */
-export interface Ed25519Signature extends CredentialProof {
+export interface Ed25519Signature2020 extends CredentialProof {
   type: "Ed25519Signature2020";
+  proofValue: string;
+}
+
+/**
+ * JsonWebSignature2020 proof
+ */
+export interface JsonWebSignature2020 extends CredentialProof {
+  type: "JsonWebSignature2020";
+  jws: string;
 }
 
 /**
@@ -107,6 +151,7 @@ export interface PublicKey {
   type: string;
   controller: string;
   publicKeyJwk?: PublicKeyJwk;
+  publicKeyMultibase?: string;
 }
 
 /**
@@ -114,8 +159,11 @@ export interface PublicKey {
  */
 export interface PublicKeyJwk {
   kty: string;
-  crv: string;
-  x: string;
+  crv?: string;
+  x?: string;
+  y?: string;
+  n?: string;
+  e?: string;
   kid?: string;
   alg?: string;
   use?: string;
@@ -143,6 +191,29 @@ export interface Achievement {
   description?: string;
   criteria?: AchievementCriteria;
   image?: ImageObject;
+  creator?: IssuerProfile | string;
+}
+
+/**
+ * Achievement with specific types
+ */
+export interface AchievementCredential extends Achievement {
+  type: ["AchievementCredential"];
+  achievementType?: string;
+  tags?: string[];
+  alignment?: AlignmentObject[];
+}
+
+/**
+ * Alignment object for standards alignment
+ */
+export interface AlignmentObject {
+  type: "Alignment";
+  targetName: string;
+  targetUrl: string;
+  targetDescription?: string;
+  targetFramework?: string;
+  targetCode?: string;
 }
 
 /**
@@ -157,9 +228,21 @@ export interface OpenBadgeCredential {
   name?: string;
   description?: string;
   credentialSubject: OpenBadgeCredentialSubject;
-  evidence?: Evidence[];
+  evidence?: Evidence[] | Evidence;
   credentialStatus?: CredentialStatus;
   proof?: CredentialProof;
+  expirationDate?: string;
+  refreshService?: {
+    id: string;
+    type: string;
+  };
+  termsOfUse?: {
+    id?: string;
+    type: string;
+    obligation?: string;
+    prohibition?: string;
+    permission?: string;
+  }[];
 }
 
 /**
@@ -170,7 +253,6 @@ export interface OpenBadgeCredentialSubject extends CredentialSubject {
   identity?: string;
   hashed?: boolean;
   salt?: string;
-  email?: string;
 }
 
 /**
@@ -185,16 +267,21 @@ export interface OpenBadgeAchievement {
   image?: ImageObject;
   criteria?: AchievementCriteria;
   issuer: IssuerProfile | string;
+  alignment?: AlignmentObject[];
+  tags?: string[];
 }
 
 /**
- * Revocation status
+ * Status List 2021 Credential
  */
-export interface RevocationStatus {
-  id: string;
-  type: "RevocationList2020Status";
-  statusListIndex: string;
-  statusListCredential: string;
+export interface StatusList2021Credential extends OpenBadgeCredential {
+  type: ["VerifiableCredential", "StatusList2021Credential"];
+  credentialSubject: {
+    id: string;
+    type: "StatusList2021";
+    statusPurpose: "revocation" | "suspension";
+    encodedList: string; // Base64-encoded bitstring
+  };
 }
 
 /**
@@ -218,6 +305,32 @@ export function isOpenBadgeCredential(
       (typeof credential.issuer === "object" && credential.issuer !== null)) &&
     typeof credential.credentialSubject === "object" &&
     credential.credentialSubject !== null
+  );
+}
+
+/**
+ * Type guard to check if an object is a StatusList2021Credential
+ */
+export function isStatusList2021Credential(
+  obj: unknown,
+): obj is StatusList2021Credential {
+  if (!isOpenBadgeCredential(obj)) return false;
+
+  const credential = obj as Partial<StatusList2021Credential>;
+
+  if (!Array.isArray(credential.type)) return false;
+  if (!credential.type.includes("StatusList2021Credential")) return false;
+
+  const subject = credential.credentialSubject as Partial<
+    StatusList2021Credential["credentialSubject"]
+  >;
+
+  return (
+    typeof subject === "object" &&
+    subject !== null &&
+    subject.type === "StatusList2021" &&
+    typeof subject.statusPurpose === "string" &&
+    typeof subject.encodedList === "string"
   );
 }
 
