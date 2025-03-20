@@ -34,6 +34,10 @@ src/
 │   └── routes/            # Route tests
 │       ├── integration/   # Route integration tests
 │       └── ...            # Route unit tests
+├── services/
+│   └── __tests__/         # Service tests
+│       ├── integration/   # Service integration tests
+│       └── ...            # Regular service unit tests 
 └── utils/
     └── test/              # Test utilities
         ├── db-helpers.ts  # Database helpers for seeding and cleanup
@@ -46,17 +50,18 @@ src/
 - **Run All Tests**: `npm run test:all`
 - **Run Unit Tests Only**: `npm run test:unit`
 - **Run Integration Tests Only**: `npm run test:integration`
+- **Run Docker-based Integration Tests**: `npm run test:integration:full`
 
 ## Testing Infrastructure
 
-### Unit Testing Setup (`src/utils/test/setup.ts`)
+### Unit Testing Setup (`src/utils/test/unit-setup.ts`)
 
 The unit test setup provides mocks for:
 - Drizzle ORM operations (queries, filters, tables)
 - Database connections and services
 - Cryptographic operations for deterministic results
 
-### Integration Testing Setup
+### Integration Testing Setup (`src/utils/test/integration-setup.ts`)
 
 Integration tests use:
 - A real PostgreSQL database via Docker
@@ -125,10 +130,12 @@ import { seedTestData, clearTestData } from "@/utils/test/db-helpers";
 import { testDb } from "@/utils/test/integration-setup";
 
 describe("YourController Integration Tests", () => {
-  beforeEach(async () => {
-    await seedTestData();
-  });
+  let testData;
   
+  beforeEach(async () => {
+    testData = await seedTestData();
+  });
+
   afterEach(async () => {
     await clearTestData();
   });
@@ -138,6 +145,39 @@ describe("YourController Integration Tests", () => {
     // Test with real database interaction
   });
 });
+```
+
+## Converting Unit Tests to Integration Tests
+
+When you identify a unit test that should be an integration test (because it interacts with the database), follow these steps:
+
+1. **Create a new file** with the `.integration.test.ts` suffix or in an `integration/` subdirectory
+2. **Update imports** to use integration test setup instead of mocks
+3. **Add database setup/teardown** using `beforeEach`/`afterEach` hooks
+4. **Remove mock implementations** and replace with real database interactions
+5. **Update assertions** to verify actual database state
+
+Example pattern for conversion:
+
+```typescript
+// BEFORE (unit test with mocks):
+mock.module("@/db/config", () => ({
+  db: {
+    select: () => ({ from: () => ({ where: () => [mockData] }) })
+  }
+}));
+
+// AFTER (integration test with real DB):
+beforeEach(async () => {
+  testData = await seedTestData();
+});
+
+afterEach(async () => {
+  await clearTestData();
+});
+
+// Real DB query
+const results = await testDb.select().from(table).where(eq(table.id, id));
 ```
 
 ## Addressing Common Issues

@@ -113,7 +113,8 @@ src/
 ├── services/     # Business logic
 ├── models/       # Data models
 ├── middleware/   # Custom middleware
-└── utils/        # Helper functions
+├── utils/        # Helper functions
+└── __tests__/    # Test directories - see Testing section for details
 ```
 
 ## API Endpoints
@@ -184,7 +185,12 @@ REFRESH_TOKEN_EXPIRY=7d
 
 ## Testing
 
-This project uses Bun's built-in test runner.
+This project uses Bun's built-in test runner with a comprehensive dual-approach testing strategy:
+
+- **Unit Tests**: Fast tests using mocks for external dependencies
+- **Integration Tests**: Complete tests with real database connections
+
+For detailed information about testing strategy, see [TESTING.md](TESTING.md).
 
 ### Running Unit Tests (Recommended)
 
@@ -238,7 +244,30 @@ bun test:all
 ./test-all.sh
 ```
 
-Note: Integration tests may fail if the database is not properly set up.
+### Test Organization
+
+Tests are organized as follows:
+
+```
+src/
+├── __tests__/             # Top-level unit tests
+│   ├── controllers/       # Controller tests
+│   │   ├── integration/   # Controller integration tests
+│   │   └── ...            # Controller unit tests
+│   ├── middleware/        # Middleware tests
+│   └── routes/            # Route tests
+│       ├── integration/   # Route integration tests
+│       └── ...            # Route unit tests
+├── services/
+│   └── __tests__/         # Service tests
+│       ├── integration/   # Service integration tests
+│       └── ...            # Service unit tests
+└── utils/
+    └── test/              # Test utilities
+        ├── db-helpers.ts  # Database helpers for tests
+        ├── setup.ts       # Main test setup file
+        └── ...            # Other test utilities
+```
 
 ## Contributing
 
@@ -265,16 +294,3 @@ This provides an interactive interface to explore and test the API endpoints.
 ## Open Badges 3.0 Support
 
 For detailed information about the Open Badges 3.0 implementation, including the Verifiable Credentials data model, cryptographic verification, and example usage, see [Open Badges 3.0 Documentation](docs/OPEN_BADGES_3.md).
-
-## Project Structure
-
-```
-src/
-├── routes/       # API route definitions
-├── controllers/  # Request handlers
-├── services/     # Business logic
-├── models/       # Data models
-├── middleware/   # Custom middleware
-├── utils/        # Helper functions
-└── __tests__/    # Test files
-```

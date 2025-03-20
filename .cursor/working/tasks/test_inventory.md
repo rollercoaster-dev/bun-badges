@@ -9,7 +9,32 @@ These tests are already properly set up as integration tests:
 | File Path | Test Type | Status | Notes |
 |-----------|-----------|--------|-------|
 | `/src/__tests__/controllers/integration/issuer-verify.integration.test.ts` | Integration | ✅ Good | Uses proper setup/teardown with real DB |
+| `/src/__tests__/controllers/integration/auth.controller.integration.test.ts` | Integration | ✅ Good | Tests authentication with real DB |
+| `/src/__tests__/controllers/integration/issuer-create.integration.test.ts` | Integration | ✅ Good | Tests issuer creation with real DB |
+| `/src/__tests__/controllers/integration/issuer-delete.integration.test.ts` | Integration | ✅ Good | Tests issuer deletion with real DB |
+| `/src/__tests__/controllers/integration/issuer-get.integration.test.ts` | Integration | ✅ Good | Tests issuer retrieval with real DB |
+| `/src/__tests__/controllers/integration/issuer-update.integration.test.ts` | Integration | ✅ Good | Tests issuer updates with real DB |
+| `/src/__tests__/controllers/integration/oauth.controller.integration.test.ts` | Integration | ✅ Good | Tests OAuth flows with real DB |
+| `/src/__tests__/routes/integration/assertions.integration.test.ts` | Integration | ✅ Good | Tests assertion routes with real DB |
+| `/src/__tests__/routes/integration/badges.integration.test.ts` | Integration | ✅ Good | Tests badge routes with real DB |
 | `/src/services/__tests__/credential.integration.test.ts` | Integration | ✅ Good | Uses real DB with thorough test patterns |
+| `/src/services/__tests__/integration/credential.integration.test.ts` | Integration | ✅ Good | Tests credential service with real DB |
+| `/src/services/__tests__/integration/verification.edge.integration.test.ts` | Integration | ✅ Good | Tests edge cases with real DB |
+| `/src/services/__tests__/integration/verification.integration.test.ts` | Integration | ✅ Good | Tests verification with real DB |
+| `/tests/integration/database.test.ts` | Integration | ✅ Good | Basic database connection tests |
+| `/tests/integration/schema.test.ts` | Integration | ✅ Good | Tests database schema with real DB |
+| `/src/__tests__/controllers/integration/issuer-create.integration.test.ts` | Integration | ✅ Good | Tests issuer creation with real DB |
+| `/src/__tests__/controllers/integration/issuer-delete.integration.test.ts` | Integration | ✅ Good | Tests issuer deletion with real DB |
+| `/src/__tests__/controllers/integration/issuer-get.integration.test.ts` | Integration | ✅ Good | Tests issuer retrieval with real DB |
+| `/src/__tests__/controllers/integration/issuer-update.integration.test.ts` | Integration | ✅ Good | Tests issuer updates with real DB |
+| `/src/__tests__/controllers/integration/issuer.controller.integration.test.ts` | Integration | ✅ Good | Tests issuer controller with real DB |
+| `/src/__tests__/controllers/integration/oauth.controller.integration.test.ts` | Integration | ✅ Good | Tests OAuth flows with real DB |
+| `/src/__tests__/routes/integration/assertions.integration.test.ts` | Integration | ✅ Good | Tests assertion routes with real DB |
+| `/src/__tests__/routes/integration/badges.integration.test.ts` | Integration | ✅ Good | Tests badge routes with real DB |
+| `/src/services/__tests__/credential.integration.test.ts` | Integration | ✅ Good | Uses real DB with thorough test patterns |
+| `/src/services/__tests__/integration/credential.integration.test.ts` | Integration | ✅ Good | Tests credential service with real DB |
+| `/src/services/__tests__/integration/verification.edge.integration.test.ts` | Integration | ✅ Good | Tests edge cases with real DB |
+| `/src/services/__tests__/integration/verification.integration.test.ts` | Integration | ✅ Good | Tests verification with real DB |
 
 ## Unit Tests with DB Mocks
 
@@ -18,7 +43,24 @@ These unit tests use database mocks but might benefit from being converted to in
 | File Path | Current Test Type | Migration Status | DB Mock Usage | Notes |
 |-----------|-------------------|------------------|---------------|-------|
 | `/src/utils/signing/__tests__/signing.test.ts` | Unit | 🔍 Evaluate | Low | Has mock setup but skips when run in test suite |
-| *Add more tests here* | | | | |
+| `/src/__tests__/controllers/auth.controller.test.ts` | Unit | 🔍 Evaluate | Medium | Tests auth operations, could benefit from real DB |
+| `/src/__tests__/controllers/issuer.controller.test.ts` | Unit | 🔍 Evaluate | Medium | Tests issuer operations, real DB would be more thorough |
+| `/src/__tests__/controllers/oauth.controller.test.ts` | Unit | 🔍 Evaluate | Medium | Tests OAuth operations, real DB would validate flows better |
+| `/src/__tests__/middleware/auth.middleware.test.ts` | Unit | 🔍 Evaluate | Low | Tests auth middleware, may need real DB for token validation |
+| `/src/__tests__/routes/assertions.routes.test.ts` | Unit | 🔍 Evaluate | Medium | Tests assertion routes, should verify with real DB |
+| `/src/__tests__/routes/badges.routes.test.ts` | Unit | 🔍 Evaluate | Medium | Tests badge routes, should verify with real DB |
+| `/src/services/__tests__/credential.service.test.ts` | Unit | 🔍 Evaluate | High | Tests credential operations directly with DB mocks |
+| `/src/services/__tests__/verification.service.test.ts` | Unit | 🔍 Evaluate | High | Tests verification operations with DB mocks |
+| `/src/__tests__/controllers/auth.controller.test.ts` | Unit | 🔍 Evaluate | Medium | Tests auth operations, could benefit from real DB |
+| `/src/__tests__/controllers/issuer.controller.test.ts` | Unit | 🔍 Evaluate | Medium | Tests issuer operations, real DB would be more thorough |
+| `/src/__tests__/controllers/oauth.controller.test.ts` | Unit | 🔍 Evaluate | Medium | Tests OAuth operations, real DB would validate flows better |
+| `/src/__tests__/middleware/auth.middleware.test.ts` | Unit | 🔍 Evaluate | Low | Tests auth middleware, may need real DB for token validation |
+| `/src/__tests__/middleware/auth.test.ts` | Unit | 🔍 Evaluate | Low | Tests auth utility functions, may benefit from real DB |
+| `/src/__tests__/routes/assertions.routes.test.ts` | Unit | 🔍 Evaluate | Medium | Tests assertion routes, should verify with real DB |
+| `/src/__tests__/routes/badges.routes.test.ts` | Unit | 🔍 Evaluate | Medium | Tests badge routes, should verify with real DB |
+| `/src/__tests__/routes/issuers.test.ts` | Unit | 🔍 Evaluate | Medium | Tests issuer routes, should verify with real DB |
+| `/src/services/__tests__/credential.service.test.ts` | Unit | ✅ Migrated | High | Converted to integration test with real DB interactions |
+| `/src/services/__tests__/verification.service.test.ts` | Unit | 🔍 Evaluate | High | Tests verification operations with DB mocks |
 
 ## Test Utility Files
 
