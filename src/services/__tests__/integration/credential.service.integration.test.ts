@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { CredentialService } from "@/services/credential.service";
 import { badgeClasses, badgeAssertions } from "@/db/schema";
-import { testDb, pool } from "@/utils/test/integration-setup";
-// Remove unused imports
+import { testDb, globalPool } from "@/utils/test/integration-setup";
 import { OpenBadgeCredential } from "@/models/credential.model";
 import { seedTestData, clearTestData } from "@/utils/test/db-helpers";
 
@@ -16,7 +15,7 @@ describe("CredentialService Integration Tests", () => {
   // Helper to check if tables exist
   async function tableExists(tableName: string): Promise<boolean> {
     try {
-      const result = await pool.query(
+      const result = await globalPool.query(
         `
         SELECT EXISTS (
           SELECT FROM pg_tables
