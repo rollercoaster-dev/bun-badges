@@ -31,8 +31,9 @@
     "test:integration": "NODE_ENV=test INTEGRATION_TEST=true DATABASE_URL=postgres://postgres:postgres@localhost:5434/bun_badges_test bun test --preload ./tests/setup.ts tests/integration 'src/**/*.integration.test.ts' 'src/services/__tests__/integration/' 'src/routes/__tests__/integration/'",
     "test:integration:full": "bash ./integration-test.sh",
     "test:integration:file": "bash ./test-integration.sh",
-    "test:docker": "bash ./test-integration.sh",
-    "prepare": "husky install"
+    "test:docker": "bash ./test-docker.sh",
+    "prepare": "husky install",
+    "example:ob3": "bun run examples/run-ob3-example.js"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
