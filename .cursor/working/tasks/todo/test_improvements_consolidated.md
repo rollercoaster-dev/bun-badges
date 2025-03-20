@@ -1,76 +1,101 @@
-# Consolidated Test Improvements
+# Test Improvements Consolidated
 
 ## 1. Goal
-- **Objective:** Fix remaining test issues and improve test organization
+- **Objective:** Complete the remaining test improvements and integration test migrations
 - **Energy Level:** Medium 🔋
 - **Status:** 🟡 In Progress
 
-## 2. Background
-This task consolidates the remaining work from the following completed tasks:
-- ✅ Test Runner Improvements - Created better scripts for running tests
-- ✅ Test Integration Report - Fixed database connection management
-- ✅ Test Inventory - Cataloged all tests
-- ✅ Test Organization - Established directory structure and patterns
+## 2. Resources
+- **Key Files:**
+  - `/src/utils/test/integration-setup.ts` - Integration test setup
+  - `/src/utils/test/unit-setup.ts` - Unit test setup
+  - `/src/utils/test/db-helpers.ts` - Database test helpers
+  - `test-integration.sh` - Integration test runner
+  - `test-file.sh` - Smart test runner
+  - `test-all.sh` - Complete test suite runner
 
-## 3. Remaining Issues
+- **Testing Commands:**
+  - Run all tests: `bun test`
+  - Run unit tests only: `bun test:unit`
+  - Run integration tests (all): `./test-integration.sh`
+  - Run specific integration tests: `./test-integration.sh <file-path>`
+  - Run specific test (auto-detection): `bun test:file <file-path>`
 
-### 3.1 Fix credential.service.integration.test.ts 'pool' Import Issue
-- **Description:** The credential.service.integration.test.ts file fails with an import error regarding the 'pool' export from integration-setup.ts
-- **Solution:** Update exports in integration-setup.ts to properly expose the database pool
-- **Estimated time:** 30 minutes
+## 3. Completed Work
+- ✅ Fixed integration test setup with shared database connection
+- ✅ Created standardized test templates
+- ✅ Enhanced test scripts for better usability
+- ✅ Fixed schema exports issue (signingKeys)
+- ✅ Fixed verification service integration tests
+- ✅ Created test inventory and organization plan
+- ✅ Improved test data management with seedTestData and clearTestData
+- ✅ Migrated first tests from unit to integration (credential, auth)
+- ✅ Updated test runner to support individual file testing
 
-### 3.2 Fix UUID Validation in API Routes
-- **Description:** UUID validation in assertions and badges routes causes 500 errors instead of the expected 404 errors
-- **Solution:** Update route handlers to properly validate UUIDs and return 404 responses
-- **Estimated time:** 45 minutes
+## 4. Remaining Tasks
 
-### 3.3 Continue Test Migration
-- **Description:** Convert more unit tests that use database mocks to proper integration tests
-- **Priority order:**
-  1. Controller tests (oauth.controller.test.ts)
-  2. Route tests (badges.routes.test.ts, assertions.routes.test.ts)
-  3. Middleware tests (auth.middleware.test.ts)
-- **Estimated time:** 2-3 hours
+### 4.1. Fix Current Integration Test Failures
+- [ ] Fix credential.service.integration.test.ts 'pool' import issue (30 mins)
+  - Issue: Missing 'pool' export in integration-setup.ts
+  - Approach: Update exports or refactor to use globalPool
 
-## 4. Execution Plan
+- [ ] Fix UUID validation in assertions and badges routes (60 mins)
+  - Issue: UUID validation causes 500 instead of 404
+  - Approach: Update error handling to catch invalid UUIDs before database queries
 
-### Phase 1: Fix Critical Integration Test Issues
-1. Fix credential.service.integration.test.ts 'pool' import issue:
-   - Examine integration-setup.ts exports
-   - Update to ensure proper pool export
-   - Verify test runs successfully
+### 4.2. Migrate Remaining Unit Tests to Integration Tests
+Following the priority order:
 
-2. Fix UUID validation 500 errors:
-   - Identify validation middleware
-   - Update to catch invalid UUIDs and return 404
-   - Test assertions and badges endpoints with invalid UUIDs
+1. [ ] Migrate controller tests (90 mins)
+   - [ ] `src/controllers/oauth/oauth.controller.test.ts`
+   - Approach: Follow template from auth.controller.integration.test.ts
 
-### Phase 2: Continue Test Migration
-1. Start with controller tests:
-   - Convert oauth.controller.test.ts to integration test
-   - Move to appropriate directory structure
-   - Update to use real database connections
+2. [ ] Migrate route tests (120 mins)
+   - [ ] `src/routes/badges/badges.routes.test.ts` 
+   - [ ] `src/routes/assertions/assertions.routes.test.ts`
+   - Approach: Update to use real database connections instead of mocks
 
-2. Move to route tests:
-   - Convert badges.routes.test.ts and assertions.routes.test.ts
-   - Update test assertions to match actual system behavior
-   - Verify with real database interactions
+3. [ ] Migrate middleware tests (60 mins)
+   - [ ] `src/middleware/auth.middleware/auth.middleware.test.ts`
+   - Approach: Update to validate tokens against real database
 
-3. Finally, middleware tests:
-   - Convert auth.middleware.test.ts if needed
-   - Update test expectations for real token validation
+### 4.3. Optimize Test Performance
+- [ ] Improve database connection management (45 mins)
+  - [ ] Review connection pooling strategy
+  - [ ] Ensure proper cleanup between tests
+  - [ ] Optimize how connections are shared
 
-## 5. Success Criteria
-- All integration tests pass successfully
-- UUID validation returns proper 404 errors
-- Test structure follows established patterns
-- Database connection issues are resolved
-- No "Cannot use a pool after calling end on the pool" errors
+- [ ] Add selective test execution options (30 mins)
+  - [ ] Add ability to run tests by tag or group
+  - [ ] Improve parallel test execution where possible
+
+### 4.4. Update Documentation
+- [ ] Update TESTING.md with final patterns (30 mins)
+  - [ ] Add more examples of proper test setup
+  - [ ] Document test organization decisions
+  - [ ] Add troubleshooting section for common issues
+
+- [ ] Create test migration guide (20 mins)
+  - [ ] Step-by-step guide for converting unit tests to integration tests
+  - [ ] Best practices for test data management
+
+## 5. Migration Criteria
+Tests should be migrated to integration tests if they:
+
+1. Test DB-dependent functionality like controllers, services, or repositories
+2. Verify complex data patterns that are difficult to mock correctly
+3. Test DB-specific features or query patterns
+4. Validate data integrity across multiple tables
+5. Test operations that should verify actual database state
 
 ## 6. Next Actions
-- [ ] Fix credential.service.integration.test.ts 'pool' import issue
-- [ ] Fix UUID validation in assertions and badges routes
-- [ ] Convert oauth.controller.test.ts to integration test
-- [ ] Convert route tests to integration tests
-- [ ] Convert middleware tests to integration tests
-- [ ] Final verification of all tests passing
+- [ ] Fix credential.service.integration.test.ts 'pool' import issue (30 mins)
+- [ ] Update README.md with current test infrastructure details (15 mins)
+- [ ] Create PR template with testing checklist (15 mins)
+
+## 7. Success Criteria
+- All integration tests passing with real database connections
+- Clear separation between unit and integration tests
+- Standardized patterns for test setup and teardown
+- Comprehensive documentation for test infrastructure
+- Easy-to-use commands for running individual tests

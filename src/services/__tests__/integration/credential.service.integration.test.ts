@@ -1,7 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { CredentialService } from "@/services/credential.service";
 import { badgeClasses, badgeAssertions } from "@/db/schema";
-import { testDb, globalPool } from "@/utils/test/integration-setup";
+import {
+  testDb,
+  globalPool,
+  tableExists as checkTableExists,
+} from "@/utils/test/integration-setup";
 import { OpenBadgeCredential } from "@/models/credential.model";
 import { seedTestData, clearTestData } from "@/utils/test/db-helpers";
 
@@ -12,24 +16,9 @@ describe("CredentialService Integration Tests", () => {
   // Test data
   let testData: any;
 
-  // Helper to check if tables exist
+  // Helper to check if tables exist - using the exported function instead
   async function tableExists(tableName: string): Promise<boolean> {
-    try {
-      const result = await globalPool.query(
-        `
-        SELECT EXISTS (
-          SELECT FROM pg_tables
-          WHERE schemaname = 'public'
-          AND tablename = $1
-        );
-      `,
-        [tableName],
-      );
-      return result?.rows?.[0]?.exists === true;
-    } catch (error) {
-      console.error(`Error checking if table ${tableName} exists:`, error);
-      return false;
-    }
+    return checkTableExists(testDb, tableName);
   }
 
   // Setup before each test

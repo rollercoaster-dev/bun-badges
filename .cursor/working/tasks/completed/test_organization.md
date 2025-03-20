@@ -3,7 +3,7 @@
 ## 1. Goal
 - **Objective:** Reorganize tests to properly separate unit tests with DB mocks from integration tests
 - **Energy Level:** Medium 🔋
-- **Status:** ✅ Completed
+- **Status:** 🟡 In Progress
 
 ## 2. Resources
 - **Existing Tools/Files:**
@@ -75,7 +75,7 @@
      - Improve mock data quality in unit tests
      - Fix unused variable TypeScript errors
 
-  4. Perform Test Migrations: Convert identified tests to integration tests (120 mins) ✅
+  4. Perform Test Migrations: Convert identified tests to integration tests (120 mins) 🟡
      - Update imports to use integration-setup.ts instead of unit-setup.ts
      - Add proper beforeEach/afterEach hooks for DB seeding
      - Rename files to follow the *.integration.test.ts pattern
@@ -86,11 +86,11 @@
      - Verify test:integration includes all integration tests
      - Update test:all to run both types sequentially
 
-  6. Update Documentation: Revise testing docs to reflect new organization (30 mins) ✅
+  6. Update Documentation: Revise testing docs to reflect new organization (30 mins) 🟡
      - Update TESTING.md with clear guidelines
      - Document the migration process and decisions
 
-  7. Validate Test Suite: Run full test suite to verify all tests pass (30 mins) ✅
+  7. Validate Test Suite: Run full test suite to verify all tests pass (30 mins) 🟡
      - Run unit tests to verify they still pass
      - Run integration tests to verify DB interactions
      - Run full suite to ensure no conflicts
