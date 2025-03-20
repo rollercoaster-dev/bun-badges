@@ -31,20 +31,20 @@ mock.module("@noble/ed25519", () => {
       randomPrivateKey: (): Uint8Array => {
         return TEST_KEYS.privateKey.slice();
       },
-      sha512: async (data: Uint8Array) => {
+      sha512: async (_data: Uint8Array) => {
         // Return a consistent hash for testing
         const hash = new Uint8Array(64);
         hash.fill(9);
         return hash;
       },
     },
-    getPublicKey: async (privateKey: Uint8Array): Promise<Uint8Array> => {
+    getPublicKey: async (_privateKey: Uint8Array): Promise<Uint8Array> => {
       // Return consistent test public key
       return TEST_KEYS.publicKey.slice();
     },
     sign: async (
-      message: Uint8Array,
-      privateKey: Uint8Array,
+      _message: Uint8Array,
+      _privateKey: Uint8Array,
     ): Promise<Uint8Array> => {
       // Return consistent test signature
       return TEST_KEYS.signature.slice();
@@ -67,11 +67,11 @@ mock.module("@noble/ed25519", () => {
 mock.module("@scure/base", () => {
   return {
     base64url: {
-      decode: (str: string): Uint8Array => {
+      decode: (_str: string): Uint8Array => {
         // Return test signature for any base64 input
         return TEST_KEYS.signature.slice();
       },
-      encode: (bytes: Uint8Array): string => {
+      encode: (_bytes: Uint8Array): string => {
         // Return consistent base64 string
         return "TEST_BASE64_SIGNATURE";
       },
