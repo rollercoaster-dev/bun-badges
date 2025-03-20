@@ -93,7 +93,7 @@ export async function verifyToken(
       exp: payload.exp as number,
       iat: payload.iat as number,
     };
-  } catch (_error) {
+  } catch {
     throw new Error("Invalid token");
   }
 }

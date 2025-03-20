@@ -20,7 +20,7 @@ import { TEST_KEYS } from "./integration-setup";
 mock.module("@noble/ed25519", () => {
   return {
     etc: {
-      sha512Sync: (data: Uint8Array) => {
+      sha512Sync: (_data: Uint8Array) => {
         // Return a consistent hash for testing
         const hash = new Uint8Array(64);
         hash.fill(9);
@@ -31,7 +31,7 @@ mock.module("@noble/ed25519", () => {
       randomPrivateKey: (): Uint8Array => {
         return TEST_KEYS.privateKey.slice();
       },
-      sha512: async (_data: Uint8Array) => {
+      sha512: async () => {
         // Return a consistent hash for testing
         const hash = new Uint8Array(64);
         hash.fill(9);

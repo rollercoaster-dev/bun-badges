@@ -19,6 +19,7 @@ import {
   isStatusList2021Credential,
   DataIntegrityProof,
 } from "@/models/credential.model";
+import * as jose from "jose";
 
 export interface VerificationResult {
   valid: boolean;
@@ -129,7 +130,7 @@ export class VerificationService {
       if (typeof assertion.assertionJson === "string") {
         try {
           assertionJson = JSON.parse(assertion.assertionJson);
-        } catch (_error) {
+        } catch {
           result.errors.push("Invalid JSON format in credential");
           return result;
         }
@@ -173,10 +174,10 @@ export class VerificationService {
 
       // For OB2.0, hosted verification is considered valid if the badge exists and is not revoked
       result.valid = result.errors.length === 0;
-    } catch (_error) {
+    } catch (error) {
       result.errors.push(
         `Verification error: ${
-          _error instanceof Error ? _error.message : "Unknown error"
+          error instanceof Error ? error.message : "Unknown error"
         }`,
       );
     }
@@ -230,8 +231,12 @@ export class VerificationService {
       if (typeof assertion.assertionJson === "string") {
         try {
           assertionJson = JSON.parse(assertion.assertionJson);
-        } catch (_error) {
-          result.errors.push("Invalid JSON format in credential");
+        } catch (error) {
+          result.errors.push(
+            `Failed to parse credential: ${
+              error instanceof Error ? error.message : "Unknown error"
+            }`,
+          );
           return result;
         }
       } else {
@@ -365,7 +370,7 @@ export class VerificationService {
             if (typeof statusList.statusListJson === "string") {
               try {
                 statusListCredential = JSON.parse(statusList.statusListJson);
-              } catch (_error) {
+              } catch {
                 result.errors.push("Invalid status list JSON format");
                 result.checks.statusList = false;
                 return result;
@@ -473,10 +478,11 @@ export class VerificationService {
         if (!signatureValid) {
           result.errors.push("Invalid signature");
         }
-      } catch (_error) {
-        console.error("Signature verification error:", _error);
-        result.errors.push(`Signature verification error: ${_error}`);
+      } catch (error) {
+        console.error("Signature verification error:", error);
+        result.errors.push(`Signature verification error: ${error}`);
         result.checks.signature = false;
+        result.valid = false;
       }
 
       // Valid if all critical checks pass
@@ -490,10 +496,10 @@ export class VerificationService {
         result.checks.signature === true &&
         result.checks.revocation !== false &&
         result.checks.expiration !== false;
-    } catch (_error) {
+    } catch (error) {
       result.errors.push(
         `Verification error: ${
-          _error instanceof Error ? _error.message : "Unknown error"
+          error instanceof Error ? error.message : "Unknown error"
         }`,
       );
     }
@@ -541,7 +547,7 @@ export class VerificationService {
     if (typeof assertion.assertionJson === "string") {
       try {
         assertionJson = JSON.parse(assertion.assertionJson);
-      } catch (error) {
+      } catch {
         return {
           valid: false,
           checks: {
@@ -587,6 +593,59 @@ export class VerificationService {
 
       // Default to OB2 verification for legacy support
       return this.verifyOB2Assertion(assertionId);
+    }
+  }
+
+  async verifyTokenSignature(
+    token: string,
+    key: jose.KeyLike,
+  ): Promise<boolean> {
+    try {
+      // Verify token signature
+      await jose.jwtVerify(token, key);
+      return true;
+    } catch {
+      // If verification fails, return false
+      return false;
+    }
+  }
+
+  async verifyIssuerSignature(
+    token: string,
+    issuerPublicKey: jose.KeyLike,
+  ): Promise<boolean> {
+    try {
+      // Verify issuer's signature on the JWT credential
+      await jose.jwtVerify(token, issuerPublicKey);
+      return true;
+    } catch {
+      // If verification fails, return false
+      return false;
+    }
+  }
+
+  async verifyKey(
+    token: string,
+    key: jose.KeyLike,
+  ): Promise<{ key: jose.KeyLike; valid: boolean }> {
+    try {
+      // Try to verify with provided keys
+      await jose.jwtVerify(token, key);
+      return { key, valid: true };
+    } catch {
+      // Continue to next key
+      return { key, valid: false };
+    }
+  }
+
+  // TypeScript doesn't recognize the exact return type of jose.generateKeyPair
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async generateKeyPair(): Promise<any> {
+    try {
+      const keyPair = await jose.generateKeyPair("ES256K");
+      return keyPair;
+    } catch {
+      throw new Error("Error generating keypair");
     }
   }
 }

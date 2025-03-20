@@ -148,7 +148,7 @@ export async function verifyCredential<T extends Record<string, unknown>>(
     try {
       // Try to decode as base64url first
       publicKeyBytes = base64url.decode(publicKey);
-    } catch (_e) {
+    } catch {
       // If that fails, try multibase format
       if (publicKey.startsWith("z")) {
         publicKeyBytes = base64url.decode(publicKey.substring(1));

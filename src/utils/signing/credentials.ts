@@ -71,7 +71,7 @@ async function verifyJws(jws: string, publicKey: Uint8Array): Promise<boolean> {
     }
 
     return await ed.verify(signature, signingInput, publicKey);
-  } catch (_error) {
+  } catch {
     return false;
   }
 }

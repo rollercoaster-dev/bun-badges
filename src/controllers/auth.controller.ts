@@ -124,11 +124,11 @@ export class AuthController {
     await this.db.markCodeAsUsed(verificationCode.id);
 
     try {
-      const accessToken = await generateToken({
+      const accessToken = generateToken({
         sub: body.username,
         type: "access",
       });
-      const refreshToken = await generateToken({
+      const refreshToken = generateToken({
         sub: body.username,
         type: "refresh",
       });
@@ -143,7 +143,7 @@ export class AuthController {
         },
         200,
       );
-    } catch (_error) {
+    } catch {
       return c.json(
         {
           error: "Failed to generate tokens",
@@ -189,7 +189,7 @@ export class AuthController {
       const payload = await verifyToken(body.refreshToken);
 
       // Generate new access token
-      const accessToken = await generateToken({
+      const accessToken = generateToken({
         sub: payload.sub,
         type: "access",
       });
@@ -202,13 +202,8 @@ export class AuthController {
         },
         200,
       );
-    } catch (_error) {
-      return c.json(
-        {
-          error: "Invalid refresh token",
-        },
-        401,
-      );
+    } catch {
+      return c.json({ error: "Invalid refresh token" }, 401);
     }
   }
 

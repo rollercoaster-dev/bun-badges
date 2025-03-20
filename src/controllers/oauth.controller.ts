@@ -531,7 +531,7 @@ export class OAuthController {
             expires_in: 3600, // 1 hour
             scope: validScopes.join(" "),
           };
-        } catch (_error) {
+        } catch {
           throw new UnauthorizedError("Invalid refresh token");
         }
       } else {
@@ -600,8 +600,8 @@ export class OAuthController {
           sub: payload.sub,
           jti: payload.jti,
         });
-      } catch (_error) {
-        // If token verification fails, return inactive
+      } catch {
+        // Token is inactive
         return c.json({ active: false });
       }
     } catch (error) {
@@ -664,9 +664,9 @@ export class OAuthController {
         });
 
         return c.json({}, 200);
-      } catch (_error) {
-        // RFC 7009 requires 200 OK even if token is invalid
-        return c.json({}, 200);
+      } catch {
+        // Return success even for invalid tokens (per RFC 7009)
+        return c.json({});
       }
     } catch (error) {
       if (

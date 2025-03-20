@@ -119,7 +119,7 @@ mock.module("@noble/ed25519", () => {
           return false; // Detect the tampered credential
         }
         return true; // Valid for all other cases
-      } catch (_error) {
+      } catch {
         // In case of parsing errors, default to valid
         return true;
       }
