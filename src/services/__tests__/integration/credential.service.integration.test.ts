@@ -3,11 +3,15 @@ import { CredentialService } from "@/services/credential.service";
 import { badgeClasses, badgeAssertions } from "@/db/schema";
 import {
   testDb,
-  globalPool,
   tableExists as checkTableExists,
 } from "@/utils/test/integration-setup";
-import { OpenBadgeCredential } from "@/models/credential.model";
+import { 
+  DataIntegrityProof, 
+  CredentialProof 
+} from "@/models/credential.model";
 import { seedTestData, clearTestData } from "@/utils/test/db-helpers";
+import { OB3_CREDENTIAL_CONTEXT } from "@/constants/context-urls";
+import { SignableCredential } from "@/services/credential.service";
 
 describe("CredentialService Integration Tests", () => {
   let service: CredentialService;
@@ -86,6 +90,12 @@ describe("CredentialService Integration Tests", () => {
       id: "test-credential",
       type: ["VerifiableCredential"],
       issuer: `${hostUrl}/issuers/${testData.issuer.issuerId}`,
+      "@context": OB3_CREDENTIAL_CONTEXT,
+      issuanceDate: new Date().toISOString(),
+      credentialSubject: {
+        id: "test-recipient@example.com",
+        type: "EmailCredentialSubject"
+      }
     };
 
     // Sign the credential
@@ -97,7 +107,8 @@ describe("CredentialService Integration Tests", () => {
     // Verify results
     expect(result).toBeDefined();
     expect(result.proof).toBeDefined();
-    expect(result.proof.type).toEqual("Ed25519Signature2020");
+    expect(result.proof.type).toEqual("DataIntegrityProof");
+    expect((result.proof as DataIntegrityProof).cryptosuite).toEqual("eddsa-rdfc-2022");
     expect(result.proof.proofValue).toBeDefined();
 
     // Verify the signature is valid
@@ -117,6 +128,12 @@ describe("CredentialService Integration Tests", () => {
       id: "test-credential",
       type: ["VerifiableCredential"],
       issuer: `${hostUrl}/issuers/${testData.issuer.issuerId}`,
+      "@context": OB3_CREDENTIAL_CONTEXT,
+      issuanceDate: new Date().toISOString(),
+      credentialSubject: {
+        id: "test-recipient@example.com",
+        type: "EmailCredentialSubject"
+      }
     };
 
     // Sign the credential
@@ -133,8 +150,9 @@ describe("CredentialService Integration Tests", () => {
     const tamperedCredential = JSON.parse(JSON.stringify(signedCredential));
     tamperedCredential.id = "tampered-credential";
 
-    const tamperedResult = await service.verifySignature(tamperedCredential);
-    expect(tamperedResult).toBe(false);
+    const isTamperedValid =
+      await service.verifySignature(tamperedCredential);
+    expect(isTamperedValid).toBe(false);
   });
 
   it("should return false for missing proof", async () => {
@@ -142,8 +160,14 @@ describe("CredentialService Integration Tests", () => {
       id: "test-credential",
       type: ["VerifiableCredential"],
       issuer: `${hostUrl}/issuers/${testData?.issuer?.issuerId || "test-issuer-id"}`,
-      proof: undefined,
-    };
+      "@context": OB3_CREDENTIAL_CONTEXT,
+      issuanceDate: new Date().toISOString(),
+      credentialSubject: {
+        id: "test-recipient@example.com",
+        type: "EmailCredentialSubject"
+      },
+      proof: undefined as unknown as CredentialProof
+    } as SignableCredential & { proof: CredentialProof };
 
     const result = await service.verifySignature(credential);
     expect(result).toBe(false);
@@ -207,9 +231,7 @@ describe("CredentialService Integration Tests", () => {
     expect(result.credentialSubject.achievement).toBeDefined();
 
     // Verify the signature
-    const isValid = await service.verifySignature(
-      result as OpenBadgeCredential & { proof: any },
-    );
+    const isValid = await service.verifySignature(result as unknown as SignableCredential & { proof: CredentialProof });
     expect(isValid).toBe(true);
   });
 
