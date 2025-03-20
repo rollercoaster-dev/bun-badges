@@ -2,7 +2,7 @@ import { config } from "dotenv";
 import * as path from "path";
 import { beforeAll, afterAll, afterEach, mock, beforeEach } from "bun:test";
 import { runMigrations } from "@/db/migrate";
-import { clearTestData, seedTestData } from "./db-helpers";
+import { clearTestData } from "./db-helpers";
 import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool, QueryResult } from "pg";
@@ -119,7 +119,7 @@ mock.module("@noble/ed25519", () => {
           return false; // Detect the tampered credential
         }
         return true; // Valid for all other cases
-      } catch (error) {
+      } catch (_error) {
         // In case of parsing errors, default to valid
         return true;
       }
