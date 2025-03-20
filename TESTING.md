@@ -45,6 +45,15 @@ src/
         └── ...            # Other test utilities
 ```
 
+### Test Migration Status
+
+The following test files have been migrated from unit tests to integration tests:
+
+1. `src/services/__tests__/credential.service.test.ts` -> `src/services/__tests__/integration/credential.service.integration.test.ts`
+   - Status: ✅ Migration complete
+   - Original unit test file removed
+   - Integration tests now cover all functionality with real database interactions
+
 ## Running Tests
 
 - **Run All Tests**: `npm run test:all`
