@@ -1,5 +1,4 @@
 import { pgTable, uuid, varchar, text, timestamp } from "drizzle-orm/pg-core";
-import { signingKeys } from "./signing";
 
 // Users table for authentication and profile management
 export const users = pgTable("users", {
@@ -34,11 +33,12 @@ export const loginTokens = pgTable("login_tokens", {
   expiresAt: timestamp("expires_at").notNull(),
 });
 
+// Export the base modules that don't have circular dependencies
 export * from "./auth";
 export * from "./oauth";
 export * from "./badges";
 export * from "./issuers";
-export * from "./signing";
 
-// Explicit re-export of signingKeys to make absolutely sure it's available
+// Import and re-export signing last to avoid circular dependencies
+import { signingKeys } from "./signing";
 export { signingKeys };

@@ -7,13 +7,13 @@ import {
   boolean,
   jsonb,
 } from "drizzle-orm/pg-core";
-// Remove the circular import
-// import { issuerProfiles } from "./index";
 
 // Signing keys for digital signatures
 export const signingKeys = pgTable("signing_keys", {
   keyId: uuid("key_id").primaryKey().defaultRandom(),
-  issuerId: uuid("issuer_id").notNull(),
+  issuerId: uuid("issuer_id")
+    .references((): any => ({ table: "issuer_profiles", column: "issuer_id" }))
+    .notNull(),
   publicKeyMultibase: text("public_key_multibase").notNull(), // Base58-encoded public key
   privateKeyMultibase: text("private_key_multibase").notNull(), // Base58-encoded private key
   controller: text("controller").notNull(), // DID of the key controller

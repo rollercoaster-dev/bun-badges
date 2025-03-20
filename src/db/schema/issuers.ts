@@ -6,7 +6,6 @@ import {
   timestamp,
   jsonb,
 } from "drizzle-orm/pg-core";
-import { users } from "./index";
 
 // Issuer profiles for badge issuance
 export const issuerProfiles = pgTable("issuer_profiles", {
@@ -16,7 +15,8 @@ export const issuerProfiles = pgTable("issuer_profiles", {
   description: text("description"),
   email: varchar("email", { length: 255 }),
   ownerUserId: uuid("owner_user_id")
-    .references(() => users.userId)
+    // Use function reference with any type to avoid circular dependency
+    .references((): any => ({ table: "users", column: "user_id" }))
     .notNull(),
   issuerJson: jsonb("issuer_json").notNull(), // Full Open Badges issuer JSON
   publicKey: jsonb("public_key"),
