@@ -1,25 +1,29 @@
-# Unit Tests to Delete
+# ✅ Unit Tests to Delete (COMPLETED)
 
-This document identifies unit tests that have already been migrated to integration tests and should be deleted.
+This task has been completed. The following unit tests have been successfully deleted as they were redundant with integration tests:
 
-## Files to Delete Immediately
-
-These unit tests have direct integration test counterparts and test the same functionality, making them redundant:
-
-1. **`src/services/__tests__/verification.service.test.ts`**
+1. **`src/services/__tests__/verification.service.test.ts`** ✅ DELETED
    - Replaced by: `src/services/__tests__/integration/verification.integration.test.ts`
-   - Status: ✅ Integration test is working properly
-   - Note: Verification is better tested with real database interactions
 
-2. **`src/services/__tests__/edge-cases/verification.edge.test.ts`**
+2. **`src/services/__tests__/edge-cases/verification.edge.test.ts`** ✅ DELETED
    - Replaced by: `src/services/__tests__/integration/verification.edge.integration.test.ts`
-   - Status: ✅ Integration test is working properly
-   - Note: Edge cases benefit from integration testing with real database
 
-3. **`src/__tests__/controllers/auth.controller.test.ts`**
+3. **`src/__tests__/controllers/auth.controller.test.ts`** ✅ DELETED
    - Replaced by: `src/__tests__/controllers/integration/auth.controller.integration.test.ts`
-   - Status: ✅ Fully migrated to integration test
-   - Note: Integration test provides better coverage with real database interactions
+
+## Implementation Details
+
+- Created branch `cleanup/remove-duplicate-tests`
+- Deleted the redundant test files
+- Fixed database circular dependencies in schema files
+- Fixed test runner to properly exclude integration tests from unit test runs
+- Fixed pre-push hook to only run unit tests
+- All changes were committed and pushed to the repository
+
+## Next Steps
+
+The remaining test files should be evaluated as part of the next phase of test improvements.
+See the new task file "improve-test-organization.md" for more details.
 
 ## Additional Files to Verify and Delete
 

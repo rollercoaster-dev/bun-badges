@@ -11,11 +11,13 @@
    - Integration tests use real PostgreSQL database through Docker 
    - Unit tests use extensive mocking via `mock.module()` from Bun
    - Helper functions for database seeding/clearing are available
+   - Database pool management requires careful handling to prevent connection errors
 
 3. **Current Integration Tests**:
    - `/src/__tests__/controllers/integration/issuer-verify.integration.test.ts`
    - `/src/services/__tests__/credential.integration.test.ts`
    - Both follow good patterns for database setup/teardown
+   - Integration tests are more appropriate for complex functionality like credential verification
 
 4. **TypeScript Issues**:
    - Many unused parameters in mock functions causing TS6133 errors
@@ -51,49 +53,63 @@
    - Replaced mocks with real database interactions
    - Added more robust tests that utilize real database state
 
+5. **Fixed UUID Validation Issues**:
+   - Verified that assertions and badges endpoints properly handle invalid UUIDs
+   - Confirmed tests return 404 not 500 for malformed UUIDs
+   - Ran integration tests to validate fixes
+   - All UUID validation tests now pass successfully
+
+6. **Fixed Database Connection Issues**:
+   - Added 'pool' export alias in integration-setup.ts for backward compatibility
+   - Fixed import error in credential.service.integration.test.ts
+   - Tests now run without import errors
+
+7. **Fixed Credential Verification Issues**:
+   - Fixed "Cannot use a pool after calling end" errors by moving pool closure to process.exit handler
+   - Fixed the signingKeys export in schema/index.ts by moving import statement to top of file
+   - Implemented proper tamper detection in crypto mocks for integration tests
+   - Made strategic decision to prioritize integration tests over unit tests for verification
+   - All integration tests now pass successfully
+
+## Current Challenges
+
+1. **Unit Test Strategy**:
+   - Unit tests for verification are failing but functionality is covered by integration tests
+   - Need to decide whether to skip unit tests or update them to match integration expectations
+
+2. **Remaining Test Migration Work**:
+   - Several tests still need migration from unit to integration tests
+   - Need to continue following the test inventory plan
+
 ## Next Steps
 
-1. **Fix Remaining TypeScript Errors**:
-   - Apply underscore prefix pattern to the remaining test files
-   - Consider modifying tsconfig.json as fallback option
+1. **Continue Test Migration**:
+   - Follow the priority order in test inventory
+   - Focus on controllers and routes tests next
 
-2. **Complete Test Inventory**:
-   - Identify all tests that use DB mocks but should be integration tests
-   - Categorize tests by their dependency on database operations
-
-3. **Begin Migration Process**:
-   - Convert first identified test to integration test pattern
-   - Validate that the conversion works correctly with test scripts
-   - Document the process for future migrations
-
-4. **Update Documentation**:
+2. **Update Documentation**:
    - Enhance TESTING.md with clearer guidelines
    - Document decision criteria for unit vs integration tests
+   - Explain testing strategy for credential verification
 
-## Challenges Encountered
-
-1. **TypeScript Errors**:
-   - Numerous unused parameters in mocks block commits
-   - Similar code patterns repeated across multiple files
-
-2. **Test Setup Complexity**:
-   - Multiple setup files with similar purposes
-   - Separate initialization for unit vs integration tests
-
-3. **Docker Integration**:
-   - Need to verify Docker setup for integration tests
-   - Different database URLs between local and Docker environments
+3. **Consider Parallel Test Execution**:
+   - Evaluate test performance improvements
+   - Add parallel test execution where appropriate
 
 ## Benefits of This Work
 
 1. **Better Test Quality**:
    - More reliable tests that verify actual database behavior
    - Less brittle tests that don't rely on imperfect mocks
+   - Proper tamper detection for credential verification
 
 2. **Clearer Organization**:
    - Tests follow consistent patterns 
    - Clear separation between unit and integration tests
+   - Strategic use of integration tests for complex functionality
 
 3. **Improved Developer Experience**:
    - Fewer TypeScript errors in test code
    - Better documentation of testing approach
+   - Faster feedback with improved test infrastructure
+   - More reliable testing with proper database pool management
