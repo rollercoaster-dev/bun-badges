@@ -253,7 +253,8 @@ export class CredentialService {
     return {
       ...credential,
       proof: {
-        type: "Ed25519Signature2020",
+        type: "DataIntegrityProof",
+        cryptosuite: "eddsa-rdfc-2022",
         created: new Date().toISOString(),
         verificationMethod: signingKey.keyInfo.id,
         proofPurpose: "assertionMethod",

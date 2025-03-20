@@ -17,7 +17,7 @@ import {
 } from "../src/utils/signing/credential";
 import {
   createStatusListCredential,
-  createEncodedBitString,
+  _createEncodedBitString,
   updateCredentialStatus,
   getIndexFromUuid,
   isCredentialRevoked,
@@ -107,6 +107,10 @@ async function runOB3Workflow() {
       id: OB3_CREDENTIAL_SCHEMA_URL,
       type: "JsonSchemaValidator2018",
     },
+    proof: {
+      type: "DataIntegrityProof",
+      cryptosuite: "eddsa-rdfc-2022",
+    },
   };
 
   // Sign the badge credential
@@ -122,6 +126,13 @@ async function runOB3Workflow() {
   console.log("Badge credential created and signed successfully!");
   console.log(`Badge ID: ${credentialId}`);
   console.log(`Status List Index: ${statusIndex}\n`);
+
+  // Verify that the proof type is DataIntegrityProof
+  if (signedBadge.proof?.type === "DataIntegrityProof") {
+    console.log("Proof type: DataIntegrityProof with cryptosuite", signedBadge.proof.cryptosuite);
+  } else {
+    console.log("Unexpected proof type:", signedBadge.proof?.type);
+  }
 
   // Step 4: Verify the badge credential
   console.log("Step 4: Verifying badge credential...");

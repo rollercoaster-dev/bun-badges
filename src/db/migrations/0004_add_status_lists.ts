@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, uuid, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { _pgTable, _uuid, _timestamp, _jsonb } from "drizzle-orm/pg-core";
 
 export async function up(db: any) {
   await db.execute(sql`

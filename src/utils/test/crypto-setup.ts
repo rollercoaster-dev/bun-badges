@@ -13,7 +13,7 @@ export const TEST_SIGNATURE = new Uint8Array(64).fill(3);
 mock.module("@noble/ed25519", () => {
   return {
     etc: {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+       
       sha512Sync: (_data: Uint8Array) => {
         // Return a consistent hash for testing
         const hash = new Uint8Array(64);
@@ -25,7 +25,7 @@ mock.module("@noble/ed25519", () => {
       randomPrivateKey: (): Uint8Array => {
         return TEST_PRIVATE_KEY.slice();
       },
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+       
       sha512: async (_data: Uint8Array) => {
         // Return a consistent hash for testing
         const hash = new Uint8Array(64);
@@ -33,7 +33,7 @@ mock.module("@noble/ed25519", () => {
         return hash;
       },
     },
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+     
     getPublicKey: async (_privateKey: Uint8Array): Promise<Uint8Array> => {
       // Return consistent test public key
       return TEST_PUBLIC_KEY.slice();
@@ -65,24 +65,24 @@ mock.module("@noble/ed25519", () => {
 mock.module("@scure/base", () => {
   return {
     base64url: {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+       
       decode: (_str: string): Uint8Array => {
         // Return test signature for any base64 input
         return TEST_SIGNATURE.slice();
       },
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+       
       encode: (_bytes: Uint8Array): string => {
         // Return consistent base64 string
         return "TEST_BASE64_SIGNATURE";
       },
     },
     base58: {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+       
       decode: (_str: string): Uint8Array => {
         // Return test key for any base58 input
         return TEST_PUBLIC_KEY.slice();
       },
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+       
       encode: (_bytes: Uint8Array): string => {
         // Return consistent base58 string
         return "TEST_BASE58_KEY";

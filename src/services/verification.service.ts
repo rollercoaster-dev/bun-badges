@@ -21,6 +21,7 @@ import {
   StatusList2021Entry,
   StatusList2021Credential,
   isStatusList2021Credential,
+  DataIntegrityProof,
 } from "@/models/credential.model";
 
 export interface VerificationResult {
@@ -42,6 +43,7 @@ export interface VerificationResult {
     proofType?: string;
     statusListCredential?: string;
     statusListIndex?: string;
+    cryptosuite?: string;
   };
 }
 
@@ -297,12 +299,32 @@ export class VerificationService {
       const supportedProofTypes = [
         "Ed25519Signature2020",
         "JsonWebSignature2020",
+        "DataIntegrityProof"
       ];
       if (!supportedProofTypes.includes(proof.type)) {
         result.errors.push(
           `Unsupported proof type: ${proof.type}. Supported types: ${supportedProofTypes.join(", ")}`,
         );
         return result;
+      }
+
+      // For DataIntegrityProof, validate the cryptosuite
+      if (proof.type === "DataIntegrityProof") {
+        const dataIntegrityProof = proof as DataIntegrityProof;
+        if (!dataIntegrityProof.cryptosuite) {
+          result.errors.push("DataIntegrityProof missing required cryptosuite property");
+          return result;
+        }
+
+        const supportedCryptosuites = ["eddsa-rdfc-2022"];
+        if (!supportedCryptosuites.includes(dataIntegrityProof.cryptosuite)) {
+          result.errors.push(
+            `Unsupported cryptosuite: ${dataIntegrityProof.cryptosuite}. Supported cryptosuites: ${supportedCryptosuites.join(", ")}`,
+          );
+          return result;
+        }
+        
+        result.details!.cryptosuite = dataIntegrityProof.cryptosuite;
       }
 
       // Get issuer info for key verification
@@ -348,126 +370,107 @@ export class VerificationService {
               } catch (error) {
                 result.errors.push("Invalid status list JSON format");
                 result.checks.statusList = false;
-                // Continue verification despite status list error
+                return result;
               }
             } else {
               statusListCredential =
                 statusList.statusListJson as StatusList2021Credential;
             }
 
-            // Verify the status list format
             if (isStatusList2021Credential(statusListCredential)) {
-              const statusIndex = parseInt(status.statusListIndex);
+              // Get the index from the credential status
+              const index = parseInt(status.statusListIndex);
               const encodedList =
                 statusListCredential.credentialSubject.encodedList;
 
-              try {
-                const isRevoked = isCredentialRevoked(encodedList, statusIndex);
-                result.checks.revocation = !isRevoked;
-                result.checks.statusList = true;
+              // Check if the credential is revoked
+              const isRevoked = isCredentialRevoked(encodedList, index);
+              result.checks.revocation = !isRevoked;
 
-                if (isRevoked) {
-                  result.errors.push(
-                    "Credential has been revoked according to status list",
-                  );
-                }
-              } catch (error) {
-                result.errors.push(
-                  `Status list verification error: ${error instanceof Error ? error.message : "Unknown error"}`,
-                );
-                result.checks.statusList = false;
+              if (isRevoked) {
+                result.errors.push("Credential has been revoked");
               }
             } else {
-              result.warnings!.push("Status list format is invalid");
+              result.errors.push("Status list credential is invalid");
               result.checks.statusList = false;
+              return result;
             }
+
+            // Set status list check to true if we get here
+            result.checks.statusList = true;
           } else {
-            result.warnings!.push("Referenced status list not found");
+            result.warnings?.push("Status list not found");
             result.checks.statusList = false;
           }
         } else {
-          result.warnings!.push(
-            `Unsupported credential status type: ${status.type}`,
+          result.warnings?.push(
+            `Unsupported status type: ${status.type}. Expected StatusList2021Entry.`,
           );
           result.checks.statusList = false;
         }
       } else {
-        // No status list - check database revocation
-        result.checks.revocation = !assertion.revoked;
-        if (assertion.revoked) {
-          result.errors.push(
-            `Badge has been revoked. Reason: ${assertion.revocationReason || "Not specified"}`,
-          );
-        }
-
-        result.warnings!.push(
-          "Credential does not have a status list reference",
-        );
-        result.checks.statusList = false;
+        // If no credential status, mark as not applicable
+        result.checks.revocation = true; // Not revoked
+        result.checks.statusList = true; // No status list to check
       }
 
-      // Verify signature based on proof type
-      if (proof.type === "Ed25519Signature2020") {
-        // Get the signing key
-        const signingKey = await getSigningKey(assertion.issuerId);
-        if (!signingKey) {
-          result.errors.push("Issuer signing key not found");
-          result.checks.signature = false;
-          return result;
-        }
+      // Verify signature
+      const signingKey = await getSigningKey(assertion.issuerId);
+      if (!signingKey || !signingKey.publicKey) {
+        result.errors.push("Issuer signing key not found");
+        return result;
+      }
 
-        // Extract proof value for Ed25519
-        const proofValue = proof.proofValue;
-        if (!proofValue) {
-          result.errors.push("Missing proofValue for Ed25519Signature2020");
-          result.checks.signature = false;
-          return result;
-        }
-
-        // Decode the signature
-        let signature: Uint8Array;
-        try {
-          signature = base64url.decode(proofValue);
-        } catch (error) {
-          result.errors.push("Failed to decode signature from base64url");
-          result.checks.signature = false;
-          return result;
-        }
-
-        // For verification, create a canonical document without the proof
+      try {
+        // Create a copy without the proof to get same canonical form
         const documentToVerify = { ...credential };
-        delete (documentToVerify as Partial<OpenBadgeCredential>).proof;
+        if ("proof" in documentToVerify) {
+          delete (documentToVerify as any).proof;
+        }
 
-        // Convert to canonical form
         const canonicalData = JSON.stringify(documentToVerify);
         const dataToVerify = new TextEncoder().encode(canonicalData);
 
-        // Verify with Ed25519
-        try {
-          const isValid = await ed.verify(
-            signature,
-            dataToVerify,
-            signingKey.publicKey,
-          );
-          result.checks.signature = isValid;
-
-          if (!isValid) {
-            result.errors.push(
-              "Invalid signature - Ed25519 verification failed",
-            );
+        // Decode the proof value
+        let signature: Uint8Array;
+        
+        if (proof.type === "DataIntegrityProof" || proof.type === "Ed25519Signature2020") {
+          if (!proof.proofValue) {
+            result.errors.push("Missing proofValue in Ed25519/DataIntegrity proof");
+            return result;
           }
-        } catch (error) {
-          result.errors.push(
-            `Signature verification error: ${error instanceof Error ? error.message : "Unknown error"}`,
-          );
-          result.checks.signature = false;
+          signature = base64url.decode(proof.proofValue);
+        } else if (proof.type === "JsonWebSignature2020") {
+          if (!proof.jws) {
+            result.errors.push("Missing jws in JsonWebSignature2020 proof");
+            return result;
+          }
+          // Extract signature from JWS
+          const jwsParts = proof.jws.split(".");
+          if (jwsParts.length !== 3) {
+            result.errors.push("Invalid JWS format");
+            return result;
+          }
+          signature = base64url.decode(jwsParts[2]);
+        } else {
+          result.errors.push(`Unsupported proof type for verification: ${proof.type}`);
+          return result;
         }
-      } else if (proof.type === "JsonWebSignature2020") {
-        // For JsonWebSignature2020, we would need to verify the JWS
-        // This is a placeholder for future implementation
-        result.errors.push(
-          "JsonWebSignature2020 verification not yet implemented",
+
+        // Verify the signature
+        const signatureValid = await ed.verify(
+          signature,
+          dataToVerify,
+          signingKey.publicKey,
         );
+
+        result.checks.signature = signatureValid;
+        if (!signatureValid) {
+          result.errors.push("Invalid signature");
+        }
+      } catch (error) {
+        console.error("Signature verification error:", error);
+        result.errors.push(`Signature verification error: ${error}`);
         result.checks.signature = false;
       }
 

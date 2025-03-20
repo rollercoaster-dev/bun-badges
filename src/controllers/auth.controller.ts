@@ -143,7 +143,7 @@ export class AuthController {
         },
         200,
       );
-    } catch (error) {
+    } catch (_error) {
       return c.json(
         {
           error: "Failed to generate tokens",
@@ -202,7 +202,7 @@ export class AuthController {
         },
         200,
       );
-    } catch (error) {
+    } catch (_error) {
       return c.json(
         {
           error: "Invalid refresh token",

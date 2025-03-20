@@ -112,6 +112,15 @@ export interface Ed25519Signature2020 extends CredentialProof {
 }
 
 /**
+ * DataIntegrityProof with EdDSA cryptosuite
+ */
+export interface DataIntegrityProof extends CredentialProof {
+  type: "DataIntegrityProof";
+  cryptosuite: string;
+  proofValue: string;
+}
+
+/**
  * JsonWebSignature2020 proof
  */
 export interface JsonWebSignature2020 extends CredentialProof {

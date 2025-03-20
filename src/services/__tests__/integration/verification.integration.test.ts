@@ -51,7 +51,8 @@ describe("VerificationService Integration Tests", () => {
     // Update the assertion to add a proof property
     const assertionJson = testData.assertion.assertionJson as any;
     assertionJson.proof = {
-      type: "Ed25519Signature2020",
+      type: "DataIntegrityProof",
+      cryptosuite: "eddsa-rdfc-2022",
       created: new Date().toISOString(),
       verificationMethod: `did:key:${testData.signingKey.controller}#key-1`,
       proofPurpose: "assertionMethod",
@@ -104,7 +105,8 @@ describe("VerificationService Integration Tests", () => {
     // Update the assertion to add an invalid proof value
     const assertionJson = testData.assertion.assertionJson as any;
     assertionJson.proof = {
-      type: "Ed25519Signature2020",
+      type: "DataIntegrityProof",
+      cryptosuite: "eddsa-rdfc-2022",
       created: new Date().toISOString(),
       verificationMethod: `did:key:${testData.signingKey.controller}#key-1`,
       proofPurpose: "assertionMethod",
@@ -157,7 +159,8 @@ describe("VerificationService Integration Tests", () => {
     // Update the assertion to add a proof property
     const assertionJson = testData.assertion.assertionJson as any;
     assertionJson.proof = {
-      type: "Ed25519Signature2020",
+      type: "DataIntegrityProof",
+      cryptosuite: "eddsa-rdfc-2022",
       created: new Date().toISOString(),
       verificationMethod: `did:key:${testData.signingKey.controller}#key-1`,
       proofPurpose: "assertionMethod",

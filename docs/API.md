@@ -145,7 +145,8 @@ Content-Type: application/json
         "statusListCredential": "https://example.com/status/list/550e8400-e29b-41d4-a716-446655440001"
       },
       "proof": {
-        "type": "Ed25519Signature2020",
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-rdfc-2022",
         "created": "2023-03-16T12:35:00Z",
         "verificationMethod": "did:key:z6MkrXSQTybtqyMasfSxeRBksrz6CjHhWBMz1EKT1STM7hV3#key-1",
         "proofPurpose": "assertionMethod",
@@ -196,7 +197,8 @@ GET /api/verify/assertions/550e8400-e29b-41d4-a716-446655440010?format=detailed
     "details": {
       "credentialId": "550e8400-e29b-41d4-a716-446655440010",
       "issuerId": "550e8400-e29b-41d4-a716-446655440001",
-      "proofType": "Ed25519Signature2020",
+      "proofType": "DataIntegrityProof",
+      "cryptosuite": "eddsa-rdfc-2022",
       "verificationMethod": "did:key:z6MkrXSQTybtqyMasfSxeRBksrz6CjHhWBMz1EKT1STM7hV3#key-1",
       "statusListCredential": "https://example.com/status/list/550e8400-e29b-41d4-a716-446655440001",
       "statusListIndex": "123"

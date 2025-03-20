@@ -2,8 +2,10 @@
  * Credential signing and verification utilities for Open Badges 3.0
  * Based on the W3C Data Integrity EdDSA Cryptosuites v1.0 specification
  */
+import { CredentialProof } from "@/models/credential.model";
+import * as ed from "@noble/ed25519";
+import { base64url } from "@scure/base";
 import * as crypto from "crypto";
-import { decodeMultibase } from "./key-generation";
 
 /**
  * Options for signing a credential
@@ -30,125 +32,143 @@ export interface VerificationResult {
 const TEST_SIGNING_SECRET = "test-signing-secret-do-not-use-in-production";
 
 /**
- * Signs a credential with the provided key using DataIntegrityProof
- * with eddsa-rdfc-2022 cryptosuite
- *
+ * Sign a credential with a private key
+ * 
  * @param credential The credential to sign
- * @param privateKeyMultibase The private key in multibase format
- * @param options Signing options
+ * @param privateKey The private key as a string (base64url encoded)
+ * @param options Additional signing options
  * @returns The signed credential with proof
  */
-export async function signCredential(
-  credential: any,
-  privateKeyMultibase: string,
-  options: SigningOptions,
-): Promise<any> {
-  // Create a copy of the credential to avoid modifying the original
-  const credentialCopy = JSON.parse(JSON.stringify(credential));
+export async function signCredential<T extends Record<string, unknown>>(
+  credential: T,
+  privateKey: string | Uint8Array,
+  options: {
+    verificationMethod: string;
+    proofPurpose: string;
+  }
+): Promise<T & { proof: CredentialProof }> {
+  // Create a copy of the credential without proof
+  const documentToSign = { ...credential };
 
-  // Create a signature based on the credential
-  // For our test environment, we'll use a simplified approach
-  const signature = createTestSignature(credentialCopy);
+  // Prepare the key
+  let privateKeyBytes: Uint8Array;
+  if (typeof privateKey === "string") {
+    privateKeyBytes = base64url.decode(privateKey);
+  } else {
+    privateKeyBytes = privateKey;
+  }
 
-  // Return the credential with the OB3.0 compliant DataIntegrityProof
+  // Create a canonical form for signing
+  const canonicalData = JSON.stringify(documentToSign);
+  const dataToSign = new TextEncoder().encode(canonicalData);
+
+  // Sign the document
+  const signature = await ed.sign(dataToSign, privateKeyBytes);
+  const proofValue = base64url.encode(signature);
+
+  // Create the proof
   return {
-    ...credentialCopy,
+    ...credential,
     proof: {
       type: "DataIntegrityProof",
       cryptosuite: "eddsa-rdfc-2022",
-      created: options.created || new Date().toISOString(),
+      created: new Date().toISOString(),
       verificationMethod: options.verificationMethod,
       proofPurpose: options.proofPurpose,
-      proofValue: signature,
+      proofValue,
     },
   };
 }
 
 /**
- * Verifies a signed credential according to OB3.0 standards
- *
- * @param signedCredential The signed credential to verify
- * @param publicKeyMultibase The public key in multibase format
+ * Verify a signed credential
+ * 
+ * @param credential The signed credential with proof
+ * @param publicKey The public key as a string (base64url or multibase encoded)
  * @returns Verification result
  */
-export async function verifyCredential(
-  signedCredential: any,
-  publicKeyMultibase: string,
-): Promise<VerificationResult> {
-  // Check if credential has a proof
-  if (!signedCredential.proof) {
-    return {
-      verified: false,
-      error: "Credential does not contain a proof",
+export async function verifyCredential<T extends Record<string, unknown>>(
+  credential: T,
+  publicKey: string | Uint8Array
+): Promise<{ verified: boolean; results?: any; error?: string }> {
+  // Check if the credential has a proof
+  if (!credential.proof) {
+    return { verified: false, error: "No proof found in credential" };
+  }
+
+  // Extract the proof
+  const { proof } = credential as T & { proof: CredentialProof };
+
+  // Check proof type
+  if (proof.type !== "Ed25519Signature2020" && 
+      proof.type !== "DataIntegrityProof") {
+    return { 
+      verified: false, 
+      error: `Unsupported proof type: ${proof.type}. Support types are Ed25519Signature2020 and DataIntegrityProof` 
     };
   }
 
+  // For DataIntegrityProof, check cryptosuite
+  if (proof.type === "DataIntegrityProof") {
+    const dataIntegrityProof = proof as import("@/models/credential.model").DataIntegrityProof;
+    if (!dataIntegrityProof.cryptosuite) {
+      return {
+        verified: false,
+        error: `Unsupported cryptosuite: Missing cryptosuite. Supported cryptosuites are eddsa-rdfc-2022`
+      };
+    }
+
+    if (dataIntegrityProof.cryptosuite !== "eddsa-rdfc-2022") {
+      return {
+        verified: false,
+        error: `Unsupported cryptosuite: ${dataIntegrityProof.cryptosuite}. Supported cryptosuites are eddsa-rdfc-2022`
+      };
+    }
+  }
+
+  // Extract proof value
+  if (!proof.proofValue) {
+    return { verified: false, error: "No proofValue in credential proof" };
+  }
+
+  // Create a copy of the credential without the proof for verification
+  const documentToVerify = { ...credential };
+  delete (documentToVerify as any).proof;
+
+  // Create canonical form for verification
+  const canonicalData = JSON.stringify(documentToVerify);
+  const dataToVerify = new TextEncoder().encode(canonicalData);
+
+  // Prepare the public key
+  let publicKeyBytes: Uint8Array;
+  if (typeof publicKey === "string") {
+    try {
+      // Try to decode as base64url first
+      publicKeyBytes = base64url.decode(publicKey);
+    } catch (e) {
+      // If that fails, try multibase format
+      if (publicKey.startsWith("z")) {
+        publicKeyBytes = base64url.decode(publicKey.substring(1));
+      } else {
+        throw new Error("Unsupported public key format");
+      }
+    }
+  } else {
+    publicKeyBytes = publicKey;
+  }
+
   try {
-    // Support both new and legacy proof types
-    const proof = signedCredential.proof;
-    const isNewProofType = proof.type === "DataIntegrityProof";
-    const isLegacyProofType = proof.type === "Ed25519Signature2020";
+    // Decode the signature
+    const signature = base64url.decode(proof.proofValue);
 
-    if (!isNewProofType && !isLegacyProofType) {
-      return {
-        verified: false,
-        error: `Unsupported proof type: ${proof.type}`,
-      };
-    }
+    // Verify the signature
+    const verified = await ed.verify(signature, dataToVerify, publicKeyBytes);
 
-    // For DataIntegrityProof, verify the cryptosuite
-    if (isNewProofType && proof.cryptosuite !== "eddsa-rdfc-2022") {
-      return {
-        verified: false,
-        error: `Unsupported cryptosuite: ${proof.cryptosuite}`,
-      };
-    }
-
-    // Verify proof signature exists
-    if (!proof.proofValue) {
-      return {
-        verified: false,
-        error: "Proof does not contain a proofValue",
-      };
-    }
-
-    // Make a copy of the credential without the proof for verification
-    const credentialCopy = { ...signedCredential };
-    delete credentialCopy.proof;
-
-    // For the test case with a different public key, we need to check if
-    // the verification method and public key match
-    const keyMatchesMethod = checkKeyUsedInMethod(
-      publicKeyMultibase,
-      proof.verificationMethod,
-    );
-
-    if (!keyMatchesMethod) {
-      return {
-        verified: false,
-        error: "Public key does not match verification method",
-      };
-    }
-
-    // With the key check passed, verify the signature against our credential
-    // This tests for tampering with the credential data
-    if (proof.proofValue !== createTestSignature(credentialCopy)) {
-      return {
-        verified: false,
-        error: "Invalid signature or tampered credential",
-      };
-    }
-
-    // If we get here, verification was successful
-    return {
-      verified: true,
-      results: [{ proof }],
-    };
+    return { verified, results: { signatureVerification: verified } };
   } catch (error) {
-    return {
-      verified: false,
-      error:
-        error instanceof Error ? error.message : "Unknown verification error",
+    return { 
+      verified: false, 
+      error: `Verification error: ${error instanceof Error ? error.message : "Unknown error"}` 
     };
   }
 }

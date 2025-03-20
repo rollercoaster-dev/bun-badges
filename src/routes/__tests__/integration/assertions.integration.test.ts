@@ -208,7 +208,8 @@ describe("Assertions API Integration", () => {
     expect(credential.type).toContain("VerifiableCredential");
     expect(credential.type).toContain("OpenBadgeCredential");
     expect(credential.proof).toBeDefined();
-    expect(credential.proof.type).toBe("Ed25519Signature2020");
+    expect(credential.proof.type).toBe("DataIntegrityProof");
+    expect(credential.proof.cryptosuite).toBe("eddsa-rdfc-2022");
   });
 
   it("should retrieve the OB3.0 credential through the API", async () => {

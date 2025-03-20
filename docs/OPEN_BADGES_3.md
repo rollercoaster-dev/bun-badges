@@ -141,7 +141,8 @@ GET /api/status/list/{issuerId}
     "type": "JsonSchemaValidator2018"
   },
   "proof": {
-    "type": "Ed25519Signature2020",
+    "type": "DataIntegrityProof",
+    "cryptosuite": "eddsa-rdfc-2022",
     "created": "2025-03-19T12:05:00Z",
     "verificationMethod": "did:key:z6MkrXSQTybtqyMasfSxeRBksrz6CjHhWBMz1EKT1STM7hV3#key-1",
     "proofPurpose": "assertionMethod",
@@ -169,7 +170,8 @@ GET /api/status/list/{issuerId}
     "encodedList": "H4sIAAAAAAAAA-3BMQEAAADCoPVPbQwfoAAAAAAAAAAAAAAAAAAAAIC3AYbSVKsAQAAA"
   },
   "proof": {
-    "type": "Ed25519Signature2020",
+    "type": "DataIntegrityProof",
+    "cryptosuite": "eddsa-rdfc-2022",
     "created": "2025-03-19T12:05:00Z",
     "verificationMethod": "did:key:z6MkrXSQTybtqyMasfSxeRBksrz6CjHhWBMz1EKT1STM7hV3#key-1",
     "proofPurpose": "assertionMethod",

@@ -4,21 +4,15 @@
  */
 import {
   OpenBadgeCredential,
-  OpenBadgeAchievement,
   isOpenBadgeCredential,
-  isEvidence,
-  isAchievement,
+  DataIntegrityProof,
 } from "@/models/credential.model";
 
-import { BadgeAssertion, BadgeExtractionResult } from "@/utils/badge-baker";
-
 import {
-  VerificationResult,
   OB2BadgeAssertion,
   isOB2BadgeAssertion,
 } from "@/services/verification.service";
 
-import { SignableCredential } from "@/services/credential.service";
 import {
   OB3_CREDENTIAL_CONTEXT,
   OB2_CONTEXT_URL,
@@ -53,12 +47,13 @@ const testCredential: OpenBadgeCredential = {
     },
   },
   proof: {
-    type: "Ed25519Signature2020",
+    type: "DataIntegrityProof",
+    cryptosuite: "eddsa-rdfc-2022",
     created: "2025-01-01T00:00:01Z",
     verificationMethod: "https://example.com/issuers/456#keys-1",
     proofPurpose: "assertionMethod",
     proofValue: "z4oey5q6...",
-  },
+  } as DataIntegrityProof,
 };
 
 // Example OB2 assertion for testing
