@@ -25,13 +25,19 @@ if [ -d "src/utils/signing/__tests__" ]; then
   UNIT_TEST_FILES="$UNIT_TEST_FILES $SIGNING_TESTS"
 fi
 
+# Add ./ prefix to each file path
+FIXED_PATHS=""
+for file in $UNIT_TEST_FILES; do
+  FIXED_PATHS="$FIXED_PATHS ./$file"
+done
+
 # Print test files to be run
 echo "Running unit test files:"
-echo "$UNIT_TEST_FILES" | tr ' ' '\n' | grep -v "^$"
+echo "$FIXED_PATHS" | tr ' ' '\n' | grep -v "^$" | sort
 echo
 
 # Run the tests
 # The || true allows the script to continue even if tests fail
-bun --preload ./tests/setup.ts test $UNIT_TEST_FILES || true
+bun --preload ./tests/setup.ts test $FIXED_PATHS || true
 
 echo "Unit tests completed" 
