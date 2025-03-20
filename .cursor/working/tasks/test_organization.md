@@ -154,7 +154,7 @@
   - [x] Identify and list all remaining tests using DB mocks (30 mins)
   - [x] Fix export issues in schema files (30 mins)
   - [x] Fix verification integration tests to match actual behavior (60 mins)
-  - [ ] Fix assertions endpoint 404 handling for invalid IDs (45 mins)
+  - [x] Fix assertions endpoint 404 handling for invalid IDs (45 mins)
   - [ ] Fix credential.service.integration.test.ts 'pool' import issue (30 mins)
   - [ ] Create migration plan for remaining tests (30 mins)
   - [ ] Continue migrating tests according to inventory (ongoing)
@@ -224,7 +224,7 @@ Based on the analysis of tests run, the following unit tests still use database 
 ### Migration Priority Order:
 1. ✅ Fix infrastructure issues (exports, pool management) - DONE
 2. ✅ Fix verification service tests (most critical for functionality) - DONE
-3. Next: Fix assertions endpoint 404 handling for invalid UUIDs
+3. ✅ Fix assertions endpoint 404 handling for invalid UUIDs - DONE
 4. Next: Fix credential service import issue with 'pool'
 5. Next: Migrate controller tests (oauth)
 6. Next: Migrate route tests
