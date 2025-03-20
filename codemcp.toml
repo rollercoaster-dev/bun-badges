@@ -62,6 +62,50 @@ docker_test_up = { execute = "docker-compose -f docker-compose.test.yml up -d" }
 docker_test_down = { execute = "docker-compose -f docker-compose.test.yml down" }
 docker_test_restart = { execute = "docker-compose -f docker-compose.test.yml down && docker-compose -f docker-compose.test.yml up -d" }
 
+# Type Safety Commands
+type_check = { execute = "bun tsc --noEmit" }
+find_any = { execute = "grep -r \"any\" src/ --include=\"*.ts\" --exclude-dir=\"node_modules\"" }
+find_assertions = { execute = "grep -r \"as \\|<.*>\" src/ --include=\"*.ts\" --exclude-dir=\"node_modules\"" }
+
+# Database Commands
+db_check = { execute = "bun run src/db/scripts/check-schema.ts" }
+db_validate = { execute = "bun run src/db/scripts/validate-schema.ts" }
+db_migrate = { execute = "bun run src/db/scripts/migrate.ts" }
+
+# Documentation Commands
+docs_api = { execute = "bun run scripts/generate-api-docs.ts" }
+docs_schema = { execute = "bun run scripts/generate-schema-docs.ts" }
+docs_validate = { execute = "bun run scripts/validate-docs.ts" }
+
+# Security Commands
+security_audit = { execute = "bun run scripts/security-audit.ts" }
+key_rotate = { execute = "bun run scripts/rotate-keys.ts" }
+
+# Development Workflow
+dev = { execute = "bun run --watch src/index.ts" }
+dev_test = { execute = "bun test --watch" }
+lint = { execute = "bun run scripts/lint.ts" }
+format = { execute = "bun run scripts/format.ts" }
+
+# Build and Deploy
+build = { execute = "bun run scripts/build.ts" }
+build_docs = { execute = "bun run scripts/build-docs.ts" }
+deploy = { execute = "bun run scripts/deploy.ts" }
+
+# Quality Assurance
+qa_full = { execute = "bun run scripts/qa-check.ts" }
+coverage = { execute = "bun test --coverage" }
+perf_test = { execute = "bun run scripts/performance-test.ts" }
+
+# Image Processing
+image_optimize = { execute = "bun run scripts/optimize-images.ts" }
+image_validate = { execute = "bun run scripts/validate-images.ts" }
+
+# Utility Commands
+clean = { execute = "rm -rf dist coverage .nyc_output" }
+reset = { execute = "bun run clean && rm -rf node_modules && bun install" }
+update_deps = { execute = "bun run scripts/update-dependencies.ts" }
+
 [testing]
 framework = "bun:test"
 require_tests = true
