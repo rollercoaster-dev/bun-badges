@@ -23,8 +23,13 @@ export function createEncodedBitString(size: number = 16384): string {
  * @returns Base64 encoded bitstring
  */
 export function encodeBitString(bitSet: FastBitSet): string {
+  // FastBitSet.toString() returns a binary string representation
   const bitString = bitSet.toString();
-  const buffer = Buffer.from(bitString, "binary");
+
+  // Convert binary string to a buffer
+  const buffer = Buffer.from(bitString);
+
+  // Encode as Base64
   return buffer.toString("base64");
 }
 
@@ -34,9 +39,21 @@ export function encodeBitString(bitSet: FastBitSet): string {
  * @returns BitSet object
  */
 export function decodeBitString(encoded: string): FastBitSet {
+  // Decode Base64 to get the binary representation
   const buffer = Buffer.from(encoded, "base64");
-  const bitString = buffer.toString("binary");
-  return FastBitSet.fromString(bitString);
+  const bitString = buffer.toString();
+
+  // Create a new empty BitSet
+  const bitSet = new FastBitSet(bitString.length);
+
+  // Set bits based on the string
+  for (let i = 0; i < bitString.length; i++) {
+    if (bitString[i] === "1") {
+      bitSet.set(bitString.length - i - 1);
+    }
+  }
+
+  return bitSet;
 }
 
 /**
@@ -58,6 +75,7 @@ export function updateCredentialStatus(
   if (revoked) {
     bitSet.set(index);
   } else {
+    // Use unset() method instead of clear() since clear() removes all bits
     bitSet.unset(index);
   }
 
