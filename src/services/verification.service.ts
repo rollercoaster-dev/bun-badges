@@ -4,6 +4,7 @@ import { badgeAssertions, badgeClasses, issuerProfiles } from "@/db/schema";
 import { getSigningKey } from "@/utils/signing/keys";
 import * as ed from "@noble/ed25519";
 import { base64url } from "@scure/base";
+import { isValidUuid } from "@/utils/validation";
 
 export interface VerificationResult {
   valid: boolean;
@@ -36,6 +37,12 @@ export class VerificationService {
       },
       errors: [],
     };
+
+    // Validate UUID format before database queries
+    if (!isValidUuid(assertionId)) {
+      result.errors.push("Invalid assertion ID format");
+      return result;
+    }
 
     try {
       // Get the assertion
@@ -136,6 +143,12 @@ export class VerificationService {
       },
       errors: [],
     };
+
+    // Validate UUID format before database queries
+    if (!isValidUuid(assertionId)) {
+      result.errors.push("Invalid assertion ID format");
+      return result;
+    }
 
     try {
       // Get the assertion
@@ -315,6 +328,18 @@ export class VerificationService {
    * Auto-detect and verify an assertion as either OB2 or OB3
    */
   async verifyAssertion(assertionId: string): Promise<VerificationResult> {
+    // Validate UUID format before any database operations
+    if (!isValidUuid(assertionId)) {
+      return {
+        valid: false,
+        checks: {
+          signature: false,
+          revocation: false,
+          structure: false,
+        },
+        errors: ["Invalid assertion ID format"],
+      };
+    }
     // Get the assertion to determine format
     const [assertion] = await db
       .select()

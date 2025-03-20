@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { BADGE_ROUTES } from "./aliases";
 import { BadgeController } from "../controllers/badge.controller";
 import { bakeImage, extractImage } from "../utils/badge-baker";
+import { isValidUuid } from "@/utils/validation";
 
 const badges = new Hono();
 const controller = new BadgeController();
@@ -14,6 +15,16 @@ badges.get(BADGE_ROUTES.LIST, async (c) => {
   try {
     // Get badge classes (with optional filtering by issuer)
     const issuerId = c.req.query("issuerId");
+
+    // Validate UUID format if issuerId is provided
+    if (issuerId && !isValidUuid(issuerId)) {
+      return c.json({
+        status: "success",
+        data: {
+          badges: [],
+        },
+      });
+    }
 
     if (issuerId) {
       const results = await db
@@ -56,6 +67,20 @@ badges.get(BADGE_ROUTES.LIST, async (c) => {
 badges.get(BADGE_ROUTES.GET, async (c) => {
   try {
     const badgeId = c.req.param("id");
+
+    // Validate UUID format
+    if (!isValidUuid(badgeId)) {
+      return c.json(
+        {
+          status: "error",
+          error: {
+            code: "NOT_FOUND",
+            message: "Badge not found",
+          },
+        },
+        404,
+      );
+    }
 
     const badge = await db
       .select()
@@ -115,6 +140,20 @@ badges.post(BADGE_ROUTES.CREATE, async (c) => {
           },
         },
         400,
+      );
+    }
+
+    // Validate issuer UUID format
+    if (!isValidUuid(issuerId)) {
+      return c.json(
+        {
+          status: "error",
+          error: {
+            code: "NOT_FOUND",
+            message: "Issuer not found",
+          },
+        },
+        404,
       );
     }
 
@@ -215,6 +254,21 @@ badges.post(BADGE_ROUTES.CREATE, async (c) => {
 badges.put(BADGE_ROUTES.UPDATE, async (c) => {
   try {
     const badgeId = c.req.param("id");
+
+    // Validate UUID format
+    if (!isValidUuid(badgeId)) {
+      return c.json(
+        {
+          status: "error",
+          error: {
+            code: "NOT_FOUND",
+            message: "Badge not found",
+          },
+        },
+        404,
+      );
+    }
+
     const body = await c.req.json();
 
     // Get the existing badge
@@ -287,6 +341,20 @@ badges.put(BADGE_ROUTES.UPDATE, async (c) => {
 badges.delete(BADGE_ROUTES.DELETE, async (c) => {
   try {
     const badgeId = c.req.param("id");
+
+    // Validate UUID format
+    if (!isValidUuid(badgeId)) {
+      return c.json(
+        {
+          status: "error",
+          error: {
+            code: "NOT_FOUND",
+            message: "Badge not found",
+          },
+        },
+        404,
+      );
+    }
 
     // Check if badge exists
     const badge = await db
@@ -362,6 +430,33 @@ badges.get(BADGE_ROUTES.BAKE_BADGE, async (c) => {
           },
         },
         400,
+      );
+    }
+
+    // Validate UUID format for both IDs
+    if (!isValidUuid(badgeId)) {
+      return c.json(
+        {
+          status: "error",
+          error: {
+            code: "NOT_FOUND",
+            message: "Badge not found",
+          },
+        },
+        404,
+      );
+    }
+
+    if (!isValidUuid(assertionId)) {
+      return c.json(
+        {
+          status: "error",
+          error: {
+            code: "NOT_FOUND",
+            message: "Assertion not found",
+          },
+        },
+        404,
       );
     }
 

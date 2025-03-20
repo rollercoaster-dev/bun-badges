@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import crypto from "crypto";
 import { CredentialService } from "@/services/credential.service";
 import { VerificationService } from "@/services/verification.service";
+import { isValidUuid } from "@/utils/validation";
 
 const ASSERTION_ROUTES = {
   CREATE: "/assertions",
@@ -24,6 +25,25 @@ assertions.get(ASSERTION_ROUTES.LIST, async (c) => {
   try {
     const badgeId = c.req.query("badgeId");
     const issuerId = c.req.query("issuerId");
+
+    // Validate UUIDs if provided - Early validation helps prevent DB errors
+    if (badgeId && !isValidUuid(badgeId)) {
+      return c.json({
+        status: "success",
+        data: {
+          assertions: [],
+        },
+      });
+    }
+
+    if (issuerId && !isValidUuid(issuerId)) {
+      return c.json({
+        status: "success",
+        data: {
+          assertions: [],
+        },
+      });
+    }
 
     if (badgeId && issuerId) {
       const results = await db
@@ -111,9 +131,7 @@ assertions.get(ASSERTION_ROUTES.GET, async (c) => {
     }
 
     // Validate UUID format
-    const uuidRegex =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(assertionId)) {
+    if (!isValidUuid(assertionId)) {
       return c.json(
         {
           status: "error",
@@ -249,6 +267,20 @@ assertions.post(ASSERTION_ROUTES.CREATE, async (c) => {
           },
         },
         400,
+      );
+    }
+
+    // Validate badge ID format
+    if (!isValidUuid(badgeId)) {
+      return c.json(
+        {
+          status: "error",
+          error: {
+            code: "NOT_FOUND",
+            message: "Badge not found",
+          },
+        },
+        404,
       );
     }
 
@@ -519,9 +551,7 @@ assertions.post(ASSERTION_ROUTES.REVOKE, async (c) => {
     }
 
     // Validate UUID format
-    const uuidRegex =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(assertionId)) {
+    if (!isValidUuid(assertionId)) {
       return c.json(
         {
           status: "error",

@@ -8,6 +8,7 @@ import {
   OpenBadgeCredential,
   OpenBadgeAchievement,
 } from "@/models/credential.model";
+import { isValidUuid } from "@/utils/validation";
 
 export class CredentialService {
   /**
@@ -28,6 +29,11 @@ export class CredentialService {
     hostUrl: string,
     badgeId: string,
   ): Promise<OpenBadgeAchievement> {
+    // Validate UUID format
+    if (!isValidUuid(badgeId)) {
+      throw new Error("Invalid badge ID format");
+    }
+
     // Get the badge class
     const [badge] = await db
       .select()
@@ -38,35 +44,40 @@ export class CredentialService {
       throw new Error("Badge not found");
     }
 
-    // Get the issuer
-    const [issuer] = await db
-      .select()
-      .from(issuerProfiles)
-      .where(eq(issuerProfiles.issuerId, badge.issuerId));
+    try {
+      // Get the issuer
+      const [issuer] = await db
+        .select()
+        .from(issuerProfiles)
+        .where(eq(issuerProfiles.issuerId, badge.issuerId));
 
-    if (!issuer) {
-      throw new Error("Issuer not found");
+      if (!issuer) {
+        throw new Error("Issuer not found");
+      }
+
+      // Create achievement definition
+      return {
+        "@context": [
+          "https://www.w3.org/2018/credentials/v1",
+          "https://w3id.org/badges/v3",
+        ],
+        id: `${hostUrl}/badges/${badge.badgeId}`,
+        type: ["AchievementCredential"],
+        name: badge.name,
+        description: badge.description,
+        image: {
+          id: badge.imageUrl,
+          type: "Image",
+        },
+        criteria: {
+          narrative: badge.criteria,
+        },
+        issuer: `${hostUrl}/issuers/${badge.issuerId}`,
+      };
+    } catch (error) {
+      console.error("Error creating achievement:", error);
+      throw error;
     }
-
-    // Create achievement definition
-    return {
-      "@context": [
-        "https://www.w3.org/2018/credentials/v1",
-        "https://w3id.org/badges/v3",
-      ],
-      id: `${hostUrl}/badges/${badge.badgeId}`,
-      type: ["AchievementCredential"],
-      name: badge.name,
-      description: badge.description,
-      image: {
-        id: badge.imageUrl,
-        type: "Image",
-      },
-      criteria: {
-        narrative: badge.criteria,
-      },
-      issuer: `${hostUrl}/issuers/${badge.issuerId}`,
-    };
   }
 
   /**
@@ -76,6 +87,11 @@ export class CredentialService {
     hostUrl: string,
     assertionId: string,
   ): Promise<OpenBadgeCredential> {
+    // Validate UUID format
+    if (!isValidUuid(assertionId)) {
+      throw new Error("Invalid assertion ID format");
+    }
+
     // Get the assertion
     const [assertion] = await db
       .select()
@@ -86,46 +102,71 @@ export class CredentialService {
       throw new Error("Assertion not found");
     }
 
-    // Get the badge
-    const achievement = await this.createAchievement(
-      hostUrl,
-      assertion.badgeId,
-    );
+    try {
+      // Get the badge
+      const achievement = await this.createAchievement(
+        hostUrl,
+        assertion.badgeId,
+      );
 
-    // Create the credential without proof
-    const credential: Omit<OpenBadgeCredential, "proof"> = {
-      "@context": [
-        "https://www.w3.org/2018/credentials/v1",
-        "https://w3id.org/vc/status-list/2021/v1",
-        "https://w3id.org/badges/v3",
-      ],
-      id: `${hostUrl}/assertions/${assertion.assertionId}`,
-      type: ["VerifiableCredential", "OpenBadgeCredential"],
-      issuer: `${hostUrl}/issuers/${assertion.issuerId}`,
-      issuanceDate: assertion.issuedOn.toISOString(),
-      credentialSubject: {
-        id: assertion.recipientHashed ? undefined : assertion.recipientIdentity,
-        type:
-          assertion.recipientType === "email"
-            ? "EmailCredentialSubject"
-            : "IdentityObject",
-        achievement,
-      },
-      evidence: assertion.evidenceUrl
-        ? [
-            {
-              id: assertion.evidenceUrl,
-              type: "Evidence",
-            },
-          ]
-        : undefined,
-    };
+      // Create the credential without proof
+      const credential: Omit<OpenBadgeCredential, "proof"> = {
+        "@context": [
+          "https://www.w3.org/2018/credentials/v1",
+          "https://w3id.org/vc/status-list/2021/v1",
+          "https://w3id.org/badges/v3",
+        ],
+        id: `${hostUrl}/assertions/${assertion.assertionId}`,
+        type: ["VerifiableCredential", "OpenBadgeCredential"],
+        issuer: `${hostUrl}/issuers/${assertion.issuerId}`,
+        issuanceDate: assertion.issuedOn.toISOString(),
+        credentialSubject: {
+          id: assertion.recipientHashed
+            ? undefined
+            : assertion.recipientIdentity,
+          type:
+            assertion.recipientType === "email"
+              ? "EmailCredentialSubject"
+              : "IdentityObject",
+          achievement,
+        },
+        evidence: assertion.evidenceUrl
+          ? [
+              {
+                id: assertion.evidenceUrl,
+                type: "Evidence",
+              },
+            ]
+          : undefined,
+      };
 
-    // Ensure issuer has keys
-    await this.ensureIssuerKeyExists(assertion.issuerId);
+      // Add revocation status if the credential is revoked
+      if (assertion.revoked) {
+        credential["credentialStatus"] = {
+          id: `${hostUrl}/status/${assertion.assertionId}`,
+          type: "RevocationList2020Status",
+          revocationListIndex: assertion.assertionId,
+          revocationListCredential: `${hostUrl}/status/list`,
+        };
+      }
 
-    // Sign the credential
-    return this.signCredential(assertion.issuerId, credential);
+      // Ensure issuer has keys
+      await this.ensureIssuerKeyExists(assertion.issuerId);
+
+      // Sign the credential
+      return this.signCredential(assertion.issuerId, credential);
+    } catch (error) {
+      console.error("Error creating credential:", error);
+      if (error instanceof Error && error.message === "Badge not found") {
+        throw new Error("Badge not found - cannot create credential");
+      } else if (
+        error instanceof Error &&
+        error.message === "Issuer not found"
+      ) {
+        throw new Error("Issuer not found - cannot create credential");
+      }
+      throw error;
+    }
   }
 
   /**
