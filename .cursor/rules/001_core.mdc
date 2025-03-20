@@ -5,9 +5,6 @@ alwaysApply: true
 ---
 # Core Guidelines
 
-Rule Type: Manual
-This rule needs to be mentioned to be included
-
 - **Strict TypeScript:** Enforce strict mode (no implicit any) for type safety.
 - **Modular Code:** Organize code into clear, single-responsibility modules.
 - **Conciseness:** Provide concise responses and code changes (only changed lines plus two surrounding lines).
