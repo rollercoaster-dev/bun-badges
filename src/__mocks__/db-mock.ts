@@ -8,10 +8,15 @@ import { mock } from "bun:test";
 
 // Mock data storage
 const mockStorage: Record<string, any[]> = {
-  issuerProfiles: [],
-  badgeClasses: [],
-  badgeAssertions: [],
-  signingKeys: [],
+  users: [],
+  webauthn_credentials: [],
+  login_tokens: [],
+  issuer_profiles: [],
+  badge_classes: [],
+  badge_assertions: [],
+  signing_keys: [],
+  verification_codes: [],
+  revoked_tokens: [],
 };
 
 // Mock database operations
@@ -32,6 +37,14 @@ const mockDb = {
         };
       },
     };
+  },
+
+  execute: async (query: any) => {
+    // Mock the execute function to handle session_replication_role
+    if (query.toString().includes("session_replication_role")) {
+      return Promise.resolve();
+    }
+    return Promise.resolve([]);
   },
 
   select: () => {
@@ -79,8 +92,13 @@ export { mockDb, mockStorage };
 
 // Export tables with names for easier reference in tests
 export const tables = {
-  issuerProfiles: { name: "issuerProfiles" },
-  badgeClasses: { name: "badgeClasses" },
-  badgeAssertions: { name: "badgeAssertions" },
-  signingKeys: { name: "signingKeys" },
+  issuerProfiles: { name: "issuer_profiles" },
+  badgeClasses: { name: "badge_classes" },
+  badgeAssertions: { name: "badge_assertions" },
+  signingKeys: { name: "signing_keys" },
+  users: { name: "users" },
+  webauthnCredentials: { name: "webauthn_credentials" },
+  loginTokens: { name: "login_tokens" },
+  verificationCodes: { name: "verification_codes" },
+  revokedTokens: { name: "revoked_tokens" },
 };

@@ -1,18 +1,20 @@
 import { describe, it, expect, beforeAll, afterAll, mock } from "bun:test";
 import { Hono } from "hono";
-// Import our mock db and tables
-import { mockDb, tables } from "@/__mocks__/db-mock";
+import { db } from "@/db/config";
+import { issuerProfiles, badgeClasses } from "@/db/schema";
 import assertions from "@/routes/assertions.routes";
 import verification from "@/routes/verification.routes";
 import crypto from "crypto";
+import { seedTestData, clearTestData } from "@/utils/test/db-helpers";
+import { TEST_KEYS } from "@/utils/test/integration-setup";
 
 // Setup mocks for other dependencies
 mock.module("@noble/ed25519", () => ({
-  getPublicKey: () => Promise.resolve(new Uint8Array([1, 2, 3, 4])),
+  getPublicKey: () => Promise.resolve(TEST_KEYS.publicKey.slice()),
   utils: {
-    randomPrivateKey: () => new Uint8Array([5, 6, 7, 8]),
+    randomPrivateKey: () => TEST_KEYS.privateKey.slice(),
   },
-  sign: () => Promise.resolve(new Uint8Array([9, 10, 11, 12])),
+  sign: () => Promise.resolve(TEST_KEYS.signature.slice()),
   verify: () => Promise.resolve(true),
 }));
 
@@ -78,18 +80,17 @@ describe("Assertions API Integration", () => {
   let badgeId: string;
   let assertionId: string;
 
-  // Setup test environment with mocked database records
+  // Setup test environment with real database records
   beforeAll(async () => {
     // Create an issuer for testing
-    const [issuer] = await mockDb
-      .insert(tables.issuerProfiles)
+    const [issuer] = await db
+      .insert(issuerProfiles)
       .values({
         name: "Test API Issuer",
         url: "https://example.com/issuer",
         description: "A test issuer for API integration tests",
         email: "test-api@example.com",
         ownerUserId: crypto.randomUUID(),
-        issuerId: "test-issuer-id",
         issuerJson: {
           "@context": "https://w3id.org/openbadges/v2",
           type: "Issuer",
@@ -98,19 +99,17 @@ describe("Assertions API Integration", () => {
           url: "https://example.com/issuer",
           email: "test-api@example.com",
         },
-        createdAt: new Date(),
-        updatedAt: new Date(),
       })
       .returning();
 
     issuerId = issuer.issuerId;
 
-    // Mock the signing key generation
+    // Mock the signing key generation to use test keys
     mock.module("@/utils/signing/keys", () => ({
       getSigningKey: () =>
         Promise.resolve({
-          publicKey: new Uint8Array([1, 2, 3, 4]),
-          privateKey: new Uint8Array([5, 6, 7, 8]),
+          publicKey: TEST_KEYS.publicKey.slice(),
+          privateKey: TEST_KEYS.privateKey.slice(),
           controller: "did:key:test",
           type: "Ed25519VerificationKey2020",
           keyInfo: {
@@ -122,8 +121,8 @@ describe("Assertions API Integration", () => {
         }),
       generateSigningKey: () =>
         Promise.resolve({
-          publicKey: new Uint8Array([1, 2, 3, 4]),
-          privateKey: new Uint8Array([5, 6, 7, 8]),
+          publicKey: TEST_KEYS.publicKey.slice(),
+          privateKey: TEST_KEYS.privateKey.slice(),
           controller: "did:key:test",
           type: "Ed25519VerificationKey2020",
           keyInfo: {
@@ -136,11 +135,10 @@ describe("Assertions API Integration", () => {
     }));
 
     // Create a badge class for testing
-    const [badge] = await mockDb
-      .insert(tables.badgeClasses)
+    const [badge] = await db
+      .insert(badgeClasses)
       .values({
         issuerId,
-        badgeId: "test-badge-id",
         name: "Test API Badge",
         description: "A test badge for API integration tests",
         criteria: "Complete API integration tests",
@@ -157,17 +155,15 @@ describe("Assertions API Integration", () => {
           image: "https://example.com/badge.png",
           issuer: `${hostUrl}/issuers/${issuerId}`,
         },
-        createdAt: new Date(),
-        updatedAt: new Date(),
       })
       .returning();
 
     badgeId = badge.badgeId;
   });
 
-  // No need for cleanup with mocks
+  // Clean up after tests
   afterAll(async () => {
-    // Reset mocks
+    await clearTestData();
     mock.restore();
   });
 
