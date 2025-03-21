@@ -125,7 +125,7 @@ jsdoc_style = "minimal"
 
 [ci]
 required_checks = [
-  "typecheck",
+  "tsc",
   "lint",
   "test",
   "build"
