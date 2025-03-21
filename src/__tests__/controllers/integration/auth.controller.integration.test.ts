@@ -35,12 +35,14 @@ const createMockContext = (body: any, ip: string = "test-ip") => {
 };
 
 describe("Auth Controller Integration Tests", () => {
-  let _testData: TestData;
+  // We need this for setup, but don't reference it directly
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  let testData: TestData;
 
   // Set up before each test
   beforeEach(async () => {
     // Seed the database with test data
-    _testData = await seedTestData();
+    testData = await seedTestData();
   });
 
   // Clean up after each test

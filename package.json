@@ -16,6 +16,8 @@
     "gen:certs": "bash ./scripts/generate-certs.sh",
     "build": "bun build src/index.ts --outdir dist --target bun",
     "tsc": "tsc --noEmit",
+    "tsc:src": "tsc --project tsconfig.src.json --noEmit",
+    "tsc:test": "tsc --project tsconfig.test.json --noEmit",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "lint": "eslint \"src/**/*.{ts,tsx}\" --fix",
     "lint-fix": "eslint \"src/**/*.{ts,tsx}\" --fix",

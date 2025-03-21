@@ -3,7 +3,7 @@ import {
   generateCode,
   isCodeExpired,
   isValidCodeFormat,
-} from "../../../../utils/auth/codeGenerator";
+} from "../../auth/codeGenerator";
 
 describe("Code Generator", () => {
   test("generates numeric code with default options", () => {

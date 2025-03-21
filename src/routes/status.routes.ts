@@ -27,7 +27,7 @@ status.get(STATUS_ROUTES.GET_STATUS_LIST, async (c) => {
     const issuerId = c.req.param("issuerId");
 
     // Validate UUID format
-    if (!isValidUuid(issuerId)) {
+    if (!issuerId || !isValidUuid(issuerId)) {
       return c.json(
         {
           status: "error",
@@ -44,7 +44,7 @@ status.get(STATUS_ROUTES.GET_STATUS_LIST, async (c) => {
     const [statusList] = await db
       .select()
       .from(statusLists)
-      .where(eq(statusLists.issuerId, issuerId))
+      .where(eq(statusLists.issuerId, issuerId as string))
       .limit(1);
 
     if (!statusList) {
@@ -52,7 +52,7 @@ status.get(STATUS_ROUTES.GET_STATUS_LIST, async (c) => {
       const hostUrl = new URL(c.req.url).origin;
       const newStatusList = await credentialService.createOrUpdateStatusList(
         hostUrl,
-        issuerId,
+        issuerId as string,
       );
 
       // Validate the status list
@@ -103,7 +103,7 @@ status.get(STATUS_ROUTES.GET_STATUS, async (c) => {
     const assertionId = c.req.param("assertionId");
 
     // Validate UUID format
-    if (!isValidUuid(assertionId)) {
+    if (!assertionId || !isValidUuid(assertionId)) {
       return c.json(
         {
           status: "error",
@@ -120,7 +120,7 @@ status.get(STATUS_ROUTES.GET_STATUS, async (c) => {
     const [assertion] = await db
       .select()
       .from(badgeAssertions)
-      .where(eq(badgeAssertions.assertionId, assertionId))
+      .where(eq(badgeAssertions.assertionId, assertionId as string))
       .limit(1);
 
     if (!assertion) {
@@ -159,7 +159,7 @@ status.get(STATUS_ROUTES.GET_STATUS, async (c) => {
       }
 
       if (isStatusList2021Credential(statusListCredential)) {
-        const index = getIndexFromUuid(assertionId);
+        const index = getIndexFromUuid(assertionId as string);
         const encodedList = statusListCredential.credentialSubject.encodedList;
 
         try {

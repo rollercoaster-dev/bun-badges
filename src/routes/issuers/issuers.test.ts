@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, mock } from "bun:test";
 import { type Context } from "hono";
-import { Role } from "../../../middleware/auth";
+import { Role } from "../../middleware/auth";
 import {
   createMockContext,
   createNextFunction,

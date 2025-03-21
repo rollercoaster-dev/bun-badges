@@ -186,8 +186,11 @@ export async function verifyCredential<T extends Record<string, unknown>>(
  *
  * @param credential The credential to sign
  * @returns A test signature string
+ * @internal
  */
-function _createTestSignature(credential: Record<string, unknown>): string {
+export function createTestSignature(
+  credential: Record<string, unknown>,
+): string {
   // Create a deterministic string from the credential
   const credentialString = JSON.stringify(credential);
 
@@ -208,8 +211,9 @@ function _createTestSignature(credential: Record<string, unknown>): string {
  * @param publicKeyMultibase The public key in multibase format
  * @param verificationMethod The verification method from the proof
  * @returns True if the key is associated with the method
+ * @internal
  */
-function _checkKeyUsedInMethod(
+export function checkKeyUsedInMethod(
   publicKeyMultibase: string,
   verificationMethod: string,
 ): boolean {

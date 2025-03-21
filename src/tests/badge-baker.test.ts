@@ -10,6 +10,26 @@ import {
 import * as fs from "fs";
 import * as path from "path";
 
+// Define interfaces for badge assertion types
+interface BadgeAssertion {
+  "@context": string;
+  type: string;
+  id: string;
+  recipient: {
+    type: string;
+    identity: string;
+  };
+  [key: string]: any;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+interface BadgeExtractionResult {
+  "@context"?: string;
+  type?: string;
+  id?: string;
+  [key: string]: any;
+}
+
 describe("Badge Baker Utility", () => {
   const sampleAssertion = {
     "@context": "https://w3id.org/openbadges/v2",
@@ -56,7 +76,7 @@ describe("Badge Baker Utility", () => {
   });
 
   test("extractSvgBadge should extract assertion data from SVG", async () => {
-    const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:openbadges="http://openbadges.org" width="100" height="100">
+    const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:openbadges="http://openbadges.org">
       <openbadges:assertion verify="http://example.org/assertions/123">
         <![CDATA[
           ${JSON.stringify(sampleAssertion)}
@@ -64,7 +84,7 @@ describe("Badge Baker Utility", () => {
       </openbadges:assertion>
     </svg>`;
 
-    const extractedAssertion = extractSvgBadge(svgContent);
+    const extractedAssertion = extractSvgBadge(svgContent) as BadgeAssertion;
 
     expect(extractedAssertion).toBeDefined();
     expect(extractedAssertion["@context"]).toBe(
@@ -82,7 +102,7 @@ describe("Badge Baker Utility", () => {
     const bakedSvg = bakeSvgBadge(svgContent, sampleAssertion);
 
     // Extract the assertion from the baked SVG
-    const extractedAssertion = extractSvgBadge(bakedSvg);
+    const extractedAssertion = extractSvgBadge(bakedSvg) as BadgeAssertion;
 
     // Verify the extracted assertion matches the original
     expect(extractedAssertion).toEqual(sampleAssertion);

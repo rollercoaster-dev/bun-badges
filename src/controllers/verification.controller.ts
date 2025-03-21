@@ -35,7 +35,10 @@ export class VerificationController {
           valid: result.valid,
           checks: result.checks,
           errors: result.errors?.length > 0 ? result.errors : undefined,
-          warnings: result.warnings?.length > 0 ? result.warnings : undefined,
+          warnings:
+            result.warnings && result.warnings.length > 0
+              ? result.warnings
+              : undefined,
         },
       });
     } catch (error) {
@@ -119,7 +122,10 @@ export class VerificationController {
           valid: result.valid,
           checks: result.checks,
           errors: result.errors?.length > 0 ? result.errors : undefined,
-          warnings: result.warnings?.length > 0 ? result.warnings : undefined,
+          warnings:
+            result.warnings && result.warnings.length > 0
+              ? result.warnings
+              : undefined,
         },
       });
     } catch (error) {

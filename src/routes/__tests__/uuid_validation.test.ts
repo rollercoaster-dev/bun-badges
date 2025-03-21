@@ -3,7 +3,8 @@ import { Hono } from "hono";
 import assertions from "@/routes/assertions.routes";
 
 // Define the expected response structure
-interface _ApiErrorResponse {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+interface ApiErrorResponse {
   status: string;
   error: {
     code: string;

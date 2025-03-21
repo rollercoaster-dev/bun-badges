@@ -1,17 +1,17 @@
 import { mock, describe, expect, it, beforeEach } from "bun:test";
 import { type Context } from "hono";
-import { Role } from "../../../middleware/auth";
+import { Role } from "../../auth";
 import {
   createMockContext,
   createNextFunction,
-} from "../../../utils/test/route-test-utils";
+} from "../../utils/test/route-test-utils";
 import {
   requireAuth,
   requireRole,
   requireOwnership,
   combineMiddleware,
-} from "../../../middleware/auth";
-import { setupJwtMock } from "../../../utils/test/auth-test-utils";
+} from "../../auth";
+import { setupJwtMock } from "../../utils/test/auth-test-utils";
 
 describe("Auth Middleware", () => {
   beforeEach(() => {
