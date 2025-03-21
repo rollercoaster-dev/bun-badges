@@ -2,7 +2,6 @@ import { beforeAll, afterAll, describe, it, expect } from "vitest";
 import supertest from "supertest";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
-import { dbPool } from "@/db/config";
 
 describe("API Smoke Test", () => {
   let server: ReturnType<typeof serve>;
@@ -71,9 +70,10 @@ describe("API Smoke Test", () => {
     server.close();
     console.log("Test server stopped");
 
-    // Close database connection
-    await dbPool.end();
-    console.log("Database connection closed");
+    // Don't close database connection here - this will be handled in the global cleanup
+    // to prevent "Cannot use a pool after calling end on the pool" errors
+    // when running multiple test files
+    console.log("Database connection will be closed by global cleanup");
   });
 
   // Health check test

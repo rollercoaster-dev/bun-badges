@@ -31,10 +31,11 @@ services:
   test_runner:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     environment:
       - NODE_ENV=test
       - E2E_TEST=true
+      - INTEGRATION_TEST=true
       - DATABASE_URL=postgres://postgres:postgres@db_test:5432/bun_badges_test
       - JWT_SECRET=test-jwt-secret-for-e2e-tests
       - AUTH_TOKEN_EXPIRY=1d
@@ -49,7 +50,7 @@ services:
       - .:/app
       - node_modules:/app/node_modules
       - ./test-results:/app/test-results
-    command: ["sh", "-c", "echo 'Waiting for database...' && sleep 2 && bun run db:migrate && bun test:e2e:vitest"]
+    command: ["sh", "-c", "echo 'Waiting for database...' && sleep 2 && bun install && bun run db:migrate && bun test:e2e:vitest"]
     networks:
       - test_network
 

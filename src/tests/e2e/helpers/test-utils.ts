@@ -86,8 +86,9 @@ export async function cleanupTestResources(server: ReturnType<typeof serve>) {
   // Close server
   server.close();
 
-  // Close database connection
-  await dbPool.end();
+  // Don't close database connection here - this will be handled in the global cleanup
+  // to prevent "Cannot use a pool after calling end on the pool" errors
+  // when running multiple test files
 }
 
 /**

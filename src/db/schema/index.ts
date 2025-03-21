@@ -43,3 +43,8 @@ export * from "./status";
 // Import and re-export signing last to avoid circular dependencies
 import { signingKeys } from "./signing";
 export { signingKeys };
+
+// Explicitly re-export specific schemas to fix circular dependency issues
+import { revokedTokens } from "./auth";
+import { statusLists } from "./status";
+export { revokedTokens, statusLists };
