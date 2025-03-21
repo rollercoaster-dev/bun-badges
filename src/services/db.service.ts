@@ -2,14 +2,46 @@ import { and, eq, gt, lt } from "drizzle-orm";
 import { db, schema } from "@/db/config";
 import { nanoid } from "nanoid";
 
-const { verificationCodes, revokedTokens, oauthClients, authorizationCodes } =
-  schema;
+const {
+  verificationCodes,
+  revokedTokens,
+  oauthClients,
+  authorizationCodes,
+  users,
+} = schema;
 
 import type { NewRevokedToken } from "@/db/schema/auth";
+import type { InferInsertModel } from "drizzle-orm";
+
+type NewUser = Omit<InferInsertModel<typeof users>, "createdAt" | "updatedAt">;
 
 export class DatabaseService {
   // Re-export the db instance for direct access when needed
   static db = db;
+
+  // User Management Methods
+  async createUser(data: NewUser) {
+    const [user] = await db
+      .insert(users)
+      .values({
+        ...data,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+
+    return user;
+  }
+
+  async getUserByEmail(email: string) {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+
+    return user;
+  }
 
   // Verification Code Methods
   async createVerificationCode(

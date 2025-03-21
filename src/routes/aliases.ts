@@ -3,6 +3,8 @@ export const AUTH_ROUTES = {
   VERIFY_CODE: "/auth/code/verify",
   REFRESH_TOKEN: "/auth/token/refresh",
   REVOKE_TOKEN: "/auth/token/revoke",
+  REGISTER: "/auth/register",
+  LOGIN: "/auth/login",
 } as const;
 
 export const BADGE_ROUTES = {
