@@ -9,8 +9,6 @@ import {
 } from "@/db/schema";
 import { users } from "@/db/schema/index";
 import { sql } from "drizzle-orm";
-import { TEST_KEYS } from "./integration-setup";
-import { base58 } from "@scure/base";
 import { nanoid } from "nanoid";
 
 /**
@@ -123,22 +121,7 @@ export async function seedTestData(): Promise<TestData> {
 
     // Create test signing key
     console.log("Creating test signing key...");
-    const [signingKey] = await db
-      .insert(signingKeys)
-      .values({
-        issuerId: issuer.issuerId,
-        publicKeyMultibase: base58.encode(TEST_KEYS.publicKey),
-        privateKeyMultibase: base58.encode(TEST_KEYS.privateKey),
-        controller: "did:key:test",
-        keyInfo: {
-          "@context": ["https://w3id.org/security/v2"],
-          id: "did:key:test#key-1",
-          type: "Ed25519VerificationKey2020",
-          controller: "did:key:test",
-        },
-        revoked: false,
-      })
-      .returning();
+    const signingKey = await createTestSigningKey(issuer.issuerId);
 
     // Create test assertion
     console.log("Creating test assertion...");
@@ -307,4 +290,42 @@ export function createMockContext(options: any = {}) {
       });
     },
   } as any;
+}
+
+/**
+ * Creates a consistent test signing key for use across tests
+ * @param issuerId - The issuer ID to associate with the key
+ * @returns The created signing key
+ */
+export async function createTestSigningKey(issuerId: string) {
+  // Use predictable test keys for signing
+  const publicKeyMultibase = "z6MksSBa6fJgGBw4m3WxoLLHJ4mji9iodcYQXJmF7xT9wFQZ";
+  const privateKeyMultibase =
+    "z3u2en7t32RYgLVdTt7GHwcgmJn3nXFPS4SadJvNnXBihgxV2vGWTn9WuJmJfMK1o3UXe7m8TqdqeH7DuHNLmDBLm";
+
+  // Create consistent key ID with did:key format
+  const controller = `did:key:${publicKeyMultibase}`;
+
+  // Insert the test signing key
+  const [key] = await db
+    .insert(signingKeys)
+    .values({
+      keyId: crypto.randomUUID(),
+      issuerId: issuerId,
+      publicKeyMultibase: publicKeyMultibase,
+      privateKeyMultibase: privateKeyMultibase,
+      controller: controller, // Use consistent controller with did:key format
+      type: "Ed25519VerificationKey2020",
+      keyInfo: {
+        id: `${controller}#z6Mk`,
+        type: "Ed25519VerificationKey2020",
+        controller: controller,
+      },
+      revoked: false,
+      updatedAt: new Date(),
+    })
+    .returning();
+
+  console.log("Creating test signing key...");
+  return key;
 }
