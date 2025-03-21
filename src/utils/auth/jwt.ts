@@ -19,11 +19,16 @@ setInterval(() => {
 }, 3600000); // Clean up every hour
 
 export interface JWTPayload {
-  sub: string; // username
+  sub: string; // username or user ID
   iat?: number; // issued at
   exp?: number; // expires at
-  type?: "access" | "refresh"; // token type
+  type?: "access" | "refresh" | "registration" | "verification"; // token type
   jti?: string; // JWT ID
+  scope?: string; // permissions scope
+  // Additional claims for Open Badges 3.0 support
+  email?: string; // user email
+  name?: string; // user name
+  [key: string]: unknown; // Allow additional claims with unknown type
 }
 
 // Secret key for JWT signing
@@ -44,6 +49,9 @@ export async function generateToken(payload: {
   sub: string;
   type: keyof typeof TOKEN_EXPIRATION;
   scope?: string;
+  email?: string;
+  name?: string;
+  [key: string]: unknown;
 }): Promise<string> {
   const jwtId = nanoid();
   const expiration = TOKEN_EXPIRATION[payload.type];
@@ -64,14 +72,14 @@ export async function generateToken(payload: {
 export async function verifyToken(
   token: string,
   tokenType: "access" | "refresh" = "access",
-): Promise<{
-  sub: string;
-  type: string;
-  scope?: string;
-  jti: string;
-  exp: number;
-  iat: number;
-}> {
+): Promise<
+  JWTPayload & {
+    sub: string;
+    jti: string;
+    exp: number;
+    iat: number;
+  }
+> {
   try {
     const { payload } = await jwtVerify(token, SECRET, {
       issuer: "bun-badges",
@@ -87,11 +95,16 @@ export async function verifyToken(
 
     return {
       sub: payload.sub as string,
-      type: payload.type as string,
+      type: payload.type as
+        | "access"
+        | "refresh"
+        | "registration"
+        | "verification",
       scope: payload.scope as string | undefined,
       jti: payload.jti as string,
       exp: payload.exp as number,
       iat: payload.iat as number,
+      ...payload, // Include all other claims
     };
   } catch {
     throw new Error("Invalid token");

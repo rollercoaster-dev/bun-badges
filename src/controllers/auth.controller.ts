@@ -7,6 +7,7 @@ import {
   verifyToken,
 } from "@utils/auth/jwt";
 import { DatabaseService } from "@services/db.service";
+import * as bcrypt from "bcrypt";
 
 type CodeRequestBody = {
   username: string;
@@ -26,6 +27,17 @@ type RevokeTokenBody = {
   type: "access" | "refresh";
 };
 
+type RegisterBody = {
+  email: string;
+  password: string;
+  name?: string;
+};
+
+type LoginBody = {
+  email: string;
+  password: string;
+};
+
 export class AuthController {
   private rateLimiter: RateLimiter;
   private db: DatabaseService;
@@ -38,6 +50,125 @@ export class AuthController {
         windowMs: 3600000, // 1 hour
       });
     this.db = db || new DatabaseService();
+  }
+
+  async register(c: Context) {
+    const body = await c.req.json<RegisterBody>();
+
+    if (!body.email || !body.password) {
+      return c.json({ error: "Email and password are required" }, 400);
+    }
+
+    // Rate limiting to prevent registration abuse
+    const clientIp = c.req.header("x-forwarded-for") || "unknown";
+    const rateLimitKey = `register:${clientIp}`;
+
+    if (!this.rateLimiter.attempt(rateLimitKey)) {
+      const timeToReset = this.rateLimiter.getTimeToReset(rateLimitKey);
+      return c.json(
+        {
+          error: "Too many registration attempts",
+          retryAfter: Math.ceil(timeToReset / 1000),
+        },
+        429,
+      );
+    }
+
+    try {
+      // Check if user already exists
+      const existingUser = await this.db.getUserByEmail(body.email);
+      if (existingUser) {
+        return c.json({ error: "User already exists" }, 409);
+      }
+
+      // Hash the password
+      const salt = await bcrypt.genSalt(10);
+      const passwordHash = await bcrypt.hash(body.password, salt);
+
+      // Create the user
+      const user = await this.db.createUser({
+        email: body.email,
+        passwordHash,
+        name: body.name || null,
+      });
+
+      // Return a format that matches the test expectations
+      return c.json(
+        {
+          id: user.userId, // Use userId but return it as id for compatibility
+          email: user.email,
+        },
+        201,
+      );
+    } catch (error) {
+      console.error("Registration error:", error);
+      return c.json({ error: "Failed to register user" }, 500);
+    }
+  }
+
+  async login(c: Context) {
+    const body = await c.req.json<LoginBody>();
+
+    if (!body.email || !body.password) {
+      return c.json({ error: "Email and password are required" }, 400);
+    }
+
+    // Rate limiting to prevent brute force attacks
+    const clientIp = c.req.header("x-forwarded-for") || "unknown";
+    const rateLimitKey = `login:${clientIp}:${body.email}`;
+
+    if (!this.rateLimiter.attempt(rateLimitKey)) {
+      const timeToReset = this.rateLimiter.getTimeToReset(rateLimitKey);
+      return c.json(
+        {
+          error: "Too many login attempts",
+          retryAfter: Math.ceil(timeToReset / 1000),
+        },
+        429,
+      );
+    }
+
+    try {
+      // Get user from database
+      const user = await this.db.getUserByEmail(body.email);
+      if (!user || !user.passwordHash) {
+        return c.json({ error: "Invalid credentials" }, 401);
+      }
+
+      // Verify password
+      const passwordValid = await bcrypt.compare(
+        body.password,
+        user.passwordHash,
+      );
+      if (!passwordValid) {
+        return c.json({ error: "Invalid credentials" }, 401);
+      }
+
+      // Generate tokens
+      const accessToken = generateToken({
+        sub: user.userId,
+        type: "access",
+        // Include additional claims for Open Badges 3.0 compatibility
+        email: user.email,
+        name: user.name || undefined,
+      });
+
+      // Return a format that matches the test expectations and OB3 needs
+      return c.json(
+        {
+          token: accessToken,
+          user: {
+            id: user.userId,
+            email: user.email,
+            name: user.name || null,
+          },
+        },
+        200,
+      );
+    } catch (error) {
+      console.error("Login error:", error);
+      return c.json({ error: "Failed to log in" }, 500);
+    }
   }
 
   async requestCode(c: Context) {

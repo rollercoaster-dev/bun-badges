@@ -15,6 +15,7 @@ import { createAuthMiddleware } from "@middleware/auth.middleware";
 import { DatabaseService } from "@services/db.service";
 import { createSwaggerUI } from "./swagger";
 
+// Create the Hono app instance
 const app = new Hono();
 
 // Initialize services and controllers
@@ -76,10 +77,8 @@ app.route("/docs", createSwaggerUI());
 // Root route
 app.get("/", (c) => c.json({ message: "Bun Badges API" }));
 
-// Super simple health check endpoint with plain text
-app.get("/health", () => {
-  return new Response("OK", { status: 200 });
-});
+// Super simple health check endpoint with JSON
+app.get("/health", (c) => c.json({ status: "healthy" }));
 
 // Log server startup
 const port = parseInt(process.env.PORT || "7777", 10);
@@ -134,3 +133,6 @@ export default {
   fetch: app.fetch,
   ...tlsConfig,
 };
+
+// Export the app instance directly for testing purposes
+export { app as honoApp };

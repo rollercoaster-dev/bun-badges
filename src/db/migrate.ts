@@ -16,7 +16,7 @@ async function runMigrations() {
 }
 
 // Run migrations if this file is executed directly
-if (require.main === module) {
+if (import.meta.main) {
   runMigrations();
 }
 

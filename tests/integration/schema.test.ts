@@ -37,6 +37,9 @@ describe("Database Schema Integration", () => {
       ["test_name"],
     );
 
+    // Check if insertResult has rows and the expected data
+    expect(insertResult.rows).toBeDefined();
+    expect(insertResult.rows.length).toBeGreaterThan(0);
     expect(insertResult.rows[0].name).toBe("test_name");
     expect(insertResult.rows[0].id).toBeDefined();
 
@@ -46,6 +49,8 @@ describe("Database Schema Integration", () => {
       ["test_name"],
     );
 
+    // Check if selectResult has rows and the expected data
+    expect(selectResult.rows).toBeDefined();
     expect(selectResult.rows.length).toBe(1);
     expect(selectResult.rows[0].name).toBe("test_name");
   });
@@ -57,7 +62,11 @@ describe("Database Schema Integration", () => {
       ["update_test"],
     );
 
+    // Verify insert worked properly
+    expect(insertResult.rows).toBeDefined();
+    expect(insertResult.rows.length).toBeGreaterThan(0);
     const id = insertResult.rows[0].id;
+    expect(id).toBeDefined();
 
     // Update the record
     await dbPool.query("UPDATE test_table SET name = $1 WHERE id = $2", [
@@ -71,6 +80,9 @@ describe("Database Schema Integration", () => {
       [id],
     );
 
+    // Check if selectResult has rows and the expected data
+    expect(selectResult.rows).toBeDefined();
+    expect(selectResult.rows.length).toBeGreaterThan(0);
     expect(selectResult.rows[0].name).toBe("updated_name");
   });
 
@@ -81,7 +93,11 @@ describe("Database Schema Integration", () => {
       ["delete_test"],
     );
 
+    // Verify insert worked properly
+    expect(insertResult.rows).toBeDefined();
+    expect(insertResult.rows.length).toBeGreaterThan(0);
     const id = insertResult.rows[0].id;
+    expect(id).toBeDefined();
 
     // Delete the record
     await dbPool.query("DELETE FROM test_table WHERE id = $1", [id]);
@@ -92,6 +108,8 @@ describe("Database Schema Integration", () => {
       [id],
     );
 
+    // Check if selectResult has rows
+    expect(selectResult.rows).toBeDefined();
     expect(selectResult.rows.length).toBe(0);
   });
 });
