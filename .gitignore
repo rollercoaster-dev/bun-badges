@@ -37,4 +37,10 @@ temp/
 *.local
 
 # TypeScript
-*.tsbuildinfo 
+*.tsbuildinfo
+
+# SSL/TLS Certificates (except examples)
+certs/
+*.pem
+*.key
+*.crt 

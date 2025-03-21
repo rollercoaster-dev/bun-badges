@@ -244,3 +244,52 @@ This provides an interactive interface to explore and test the API endpoints.
 ## Open Badges 3.0 Support
 
 For detailed information about the Open Badges 3.0 implementation, including the Verifiable Credentials data model, cryptographic verification, and example usage, see [Open Badges 3.0 Documentation](docs/OPEN_BADGES_3.md).
+
+## HTTPS Configuration
+
+The application supports HTTPS for secure communication. Here's how to set it up:
+
+### Development HTTPS Setup
+
+1. Generate self-signed certificates for development:
+
+```bash
+bun run gen:certs
+```
+
+2. Update your `.env` file with the following settings:
+
+```
+USE_HTTPS=true
+TLS_CERT_FILE=./certs/cert.pem
+TLS_KEY_FILE=./certs/key.pem
+```
+
+3. Start the development server with HTTPS enabled:
+
+```bash
+bun run dev:https
+```
+
+### Production HTTPS Setup
+
+For production, you should use proper certificates from a trusted certificate authority:
+
+1. Obtain SSL/TLS certificates from a trusted Certificate Authority
+2. Place the certificates in the `./certs` directory or another location of your choice
+3. Set the environment variables in your `.env` file:
+
+```
+USE_HTTPS=true
+TLS_CERT_FILE=/path/to/your/cert.pem
+TLS_KEY_FILE=/path/to/your/key.pem
+TLS_PASSPHRASE=your-passphrase-if-needed
+```
+
+The Docker configuration is already set up to mount the `./certs` directory into the container.
+
+**Note:** Self-signed certificates are not suitable for production use and will trigger security warnings in browsers. Always use certificates from a trusted Certificate Authority for production environments.
+
+**Current limitations:**
+- Bun currently only supports HTTPS over HTTP/1.1
+- HTTP/2 is not yet supported

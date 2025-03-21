@@ -76,13 +76,9 @@ app.route("/docs", createSwaggerUI());
 // Root route
 app.get("/", (c) => c.json({ message: "Bun Badges API" }));
 
-// Health check endpoint
-app.get("/health", (c) => {
-  return c.json({
-    status: "healthy",
-    timestamp: new Date().toISOString(),
-    version: process.env.npm_package_version || "0.0.1",
-  });
+// Super simple health check endpoint with plain text
+app.get("/health", () => {
+  return new Response("OK", { status: 200 });
 });
 
 // Log server startup
@@ -105,6 +101,36 @@ if (isDevEnv && !process.env.DOCKER_CONTAINER) {
   );
 }
 
-// Export the app without manually calling serve()
-// Bun will automatically serve this when using 'bun run'
-export default app;
+// Configure TLS if HTTPS is enabled
+const useHttps = process.env.USE_HTTPS === "true";
+const tlsConfig = useHttps
+  ? {
+      tls: {
+        cert: process.env.TLS_CERT_FILE
+          ? Bun.file(process.env.TLS_CERT_FILE)
+          : undefined,
+        key: process.env.TLS_KEY_FILE
+          ? Bun.file(process.env.TLS_KEY_FILE)
+          : undefined,
+        passphrase: process.env.TLS_PASSPHRASE,
+      },
+    }
+  : {};
+
+// Log HTTPS status
+if (useHttps) {
+  console.log(`HTTPS enabled with certificate: ${process.env.TLS_CERT_FILE}`);
+  console.log(`Key file: ${process.env.TLS_KEY_FILE}`);
+  console.log(`Using port: ${port} for HTTPS server`);
+} else {
+  console.log("HTTPS is disabled. Running in HTTP mode.");
+  console.log(`Using port: ${port} for HTTP server`);
+}
+
+// Export the app with optional TLS configuration
+// When USE_HTTPS is not set, this behaves exactly like the original export
+export default {
+  port,
+  fetch: app.fetch,
+  ...tlsConfig,
+};

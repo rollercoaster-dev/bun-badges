@@ -11,11 +11,17 @@ services:
       - db
     env_file:
       - .env.docker
+    environment:
+      USE_HTTPS: ${USE_HTTPS:-false}
+      TLS_CERT_FILE: ${TLS_CERT_FILE:-/app/certs/cert.pem}
+      TLS_KEY_FILE: ${TLS_KEY_FILE:-/app/certs/key.pem}
+      TLS_PASSPHRASE: ${TLS_PASSPHRASE:-}
+      PORT: ${PORT:-7777}
     ports:
-      - "${PORT:-7777}:7777"
+      - "${PORT:-7777}:${PORT:-7777}"
     volumes:
-      - .:/app
-      - /app/node_modules
+      - .:/app:delegated
+      - ./certs:/app/certs:delegated
     command: >
       sh -c "bun install &&
              sleep 5 &&

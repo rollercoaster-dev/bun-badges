@@ -26,6 +26,9 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/drizzle ./drizzle
 COPY package.json .
 
+# Create certs directory for HTTPS
+RUN mkdir -p /app/certs && chmod 755 /app/certs
+
 # Set production environment
 ENV NODE_ENV=production
 ENV PORT=7777

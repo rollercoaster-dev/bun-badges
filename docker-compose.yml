@@ -16,6 +16,10 @@ services:
       JWT_SECRET: ${JWT_SECRET:-your-secret-key}
       JWT_EXPIRY: ${JWT_EXPIRY:-15m}
       REFRESH_TOKEN_EXPIRY: ${REFRESH_TOKEN_EXPIRY:-7d}
+      USE_HTTPS: ${USE_HTTPS:-false}
+      TLS_CERT_FILE: ${TLS_CERT_FILE:-/app/certs/cert.pem}
+      TLS_KEY_FILE: ${TLS_KEY_FILE:-/app/certs/key.pem}
+      TLS_PASSPHRASE: ${TLS_PASSPHRASE:-}
     ports:
       - "${PORT:-7777}:7777"
     healthcheck:
@@ -27,6 +31,7 @@ services:
     volumes:
       - ./dist:/app/dist
       - ./drizzle:/app/drizzle
+      - ./certs:/app/certs
     networks:
       - bun-badges-network
 
