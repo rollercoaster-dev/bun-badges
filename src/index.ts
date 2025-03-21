@@ -15,6 +15,10 @@ import { createAuthMiddleware } from "@middleware/auth.middleware";
 import { DatabaseService } from "@services/db.service";
 import { createSwaggerUI } from "./swagger";
 
+// Import tRPC components
+import { appRouter } from "./trpc";
+import { createTRPCHonoMiddleware } from "./trpc/hono-adapter";
+
 const app = new Hono();
 
 // Initialize services and controllers
@@ -70,6 +74,10 @@ api.route("/verify", verification);
 api.route("/status", status);
 app.route("/api", api);
 
+// Add tRPC middleware
+const trpcMiddleware = createTRPCHonoMiddleware(appRouter, db);
+app.use("/trpc/*", trpcMiddleware);
+
 // Mount Swagger UI
 app.route("/docs", createSwaggerUI());
 
@@ -98,6 +106,9 @@ if (isDevEnv && !process.env.DOCKER_CONTAINER) {
   );
   console.log(
     '• Try the Open Badges 3.0 example: "bun run examples/ob3-workflow.ts"\n',
+  );
+  console.log(
+    "• Access tRPC API at: http://localhost:" + port + "/trpc/badges.getAll\n",
   );
 }
 

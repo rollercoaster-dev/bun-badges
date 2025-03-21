@@ -52,6 +52,7 @@
     "@scure/base": "^1.2.4",
     "@transmute/did-key-ed25519": "^0.3.0-unstable.10",
     "@transmute/json-web-signature": "^0.7.0-unstable.60",
+    "@trpc/server": "^10.45.2",
     "base64url": "^3.0.1",
     "bnid": "^3.0.0",
     "canvas": "^3.1.0",
