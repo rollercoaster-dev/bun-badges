@@ -28,7 +28,7 @@ export interface JWTPayload {
   // Additional claims for Open Badges 3.0 support
   email?: string; // user email
   name?: string; // user name
-  [key: string]: any; // Allow any additional claims
+  [key: string]: unknown; // Allow additional claims with unknown type
 }
 
 // Secret key for JWT signing
@@ -51,7 +51,7 @@ export async function generateToken(payload: {
   scope?: string;
   email?: string;
   name?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }): Promise<string> {
   const jwtId = nanoid();
   const expiration = TOKEN_EXPIRATION[payload.type];
