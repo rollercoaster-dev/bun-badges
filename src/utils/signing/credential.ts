@@ -114,6 +114,7 @@ export async function verifyCredential<T extends Record<string, unknown>>(
   if (proof.type === "DataIntegrityProof") {
     const dataIntegrityProof =
       proof as import("@/models/credential.model").DataIntegrityProof;
+
     if (!dataIntegrityProof.cryptosuite) {
       return {
         verified: false,
@@ -146,15 +147,18 @@ export async function verifyCredential<T extends Record<string, unknown>>(
   let publicKeyBytes: Uint8Array;
   if (typeof publicKey === "string") {
     try {
-      // Try to decode as base64url first
-      publicKeyBytes = base64url.decode(publicKey);
-    } catch {
-      // If that fails, try multibase format
+      // If the key starts with 'z', it's multibase format
       if (publicKey.startsWith("z")) {
         publicKeyBytes = base64url.decode(publicKey.substring(1));
       } else {
-        throw new Error("Unsupported public key format");
+        // Otherwise, assume it's base64url
+        publicKeyBytes = base64url.decode(publicKey);
       }
+    } catch (error) {
+      return {
+        verified: false,
+        error: `Failed to decode public key: ${error instanceof Error ? error.message : "Unknown error"}`,
+      };
     }
   } else {
     publicKeyBytes = publicKey;
