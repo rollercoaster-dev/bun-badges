@@ -23,6 +23,8 @@ export function createTestServer(app: Hono) {
   // Create supertest client
   const request = supertest(`http://localhost:${port}`);
 
+  console.log(`Test server started on port ${port}`);
+
   return { server, request, port };
 }
 
@@ -44,14 +46,18 @@ export function createTestUserData(prefix = "e2e_user") {
  * Register and login a test user
  * @param request Supertest request object
  * @param userData User credentials (uses random user if not provided)
+ * @param authBasePath Base path for auth endpoints (defaults to '/auth')
  * @returns User data with auth token
  */
 export async function registerAndLoginUser(
   request: ReturnType<typeof supertest>,
   userData = createTestUserData(),
+  authBasePath = "/auth",
 ) {
   // Register user
-  const registerResponse = await request.post("/auth/register").send(userData);
+  const registerResponse = await request
+    .post(`${authBasePath}/register`)
+    .send(userData);
 
   if (registerResponse.status !== 201) {
     throw new Error(
@@ -60,7 +66,7 @@ export async function registerAndLoginUser(
   }
 
   // Login user
-  const loginResponse = await request.post("/auth/login").send({
+  const loginResponse = await request.post(`${authBasePath}/login`).send({
     email: userData.email,
     password: userData.password,
   });

@@ -15,6 +15,7 @@ import { createAuthMiddleware } from "@middleware/auth.middleware";
 import { DatabaseService } from "@services/db.service";
 import { createSwaggerUI } from "./swagger";
 
+// Create the Hono app instance
 const app = new Hono();
 
 // Initialize services and controllers
@@ -132,3 +133,6 @@ export default {
   fetch: app.fetch,
   ...tlsConfig,
 };
+
+// Export the app instance directly for testing purposes
+export { app as honoApp };
