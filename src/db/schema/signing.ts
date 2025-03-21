@@ -13,6 +13,7 @@ export const signingKeys = pgTable("signing_keys", {
   keyId: uuid("key_id").primaryKey().defaultRandom(),
   issuerId: uuid("issuer_id")
     // Using any is necessary due to circular dependency issues in Drizzle ORM
+    // This is documented in Drizzle issues: https://github.com/drizzle-team/drizzle-orm/issues/638
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .references((): any => ({ table: "issuer_profiles", column: "issuer_id" }))
     .notNull(),

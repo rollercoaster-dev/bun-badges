@@ -666,7 +666,7 @@ export class OAuthController {
         return c.json({}, 200);
       } catch {
         // Return success even for invalid tokens (per RFC 7009)
-        return c.json({});
+        return c.json({}, 200);
       }
     } catch (error) {
       if (

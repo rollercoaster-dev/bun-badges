@@ -16,6 +16,7 @@
     "tsc": "tsc --noEmit",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "lint": "eslint \"src/**/*.{ts,tsx}\" --fix",
+    "lint-fix": "eslint \"src/**/*.{ts,tsx}\" --fix",
     "db:generate": "drizzle-kit generate:pg",
     "db:migrate": "bun run src/db/migrate.ts",
     "db:migrate:status": "bun run run-migration.js",

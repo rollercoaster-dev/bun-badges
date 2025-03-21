@@ -601,11 +601,9 @@ export class VerificationService {
     key: jose.KeyLike,
   ): Promise<boolean> {
     try {
-      // Verify token signature
       await jose.jwtVerify(token, key);
       return true;
     } catch {
-      // If verification fails, return false
       return false;
     }
   }
@@ -615,11 +613,9 @@ export class VerificationService {
     issuerPublicKey: jose.KeyLike,
   ): Promise<boolean> {
     try {
-      // Verify issuer's signature on the JWT credential
       await jose.jwtVerify(token, issuerPublicKey);
       return true;
     } catch {
-      // If verification fails, return false
       return false;
     }
   }
@@ -629,18 +625,14 @@ export class VerificationService {
     key: jose.KeyLike,
   ): Promise<{ key: jose.KeyLike; valid: boolean }> {
     try {
-      // Try to verify with provided keys
       await jose.jwtVerify(token, key);
       return { key, valid: true };
     } catch {
-      // Continue to next key
       return { key, valid: false };
     }
   }
 
-  // TypeScript doesn't recognize the exact return type of jose.generateKeyPair
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async generateKeyPair(): Promise<any> {
+  async generateKeyPair(): Promise<jose.GenerateKeyPairResult<jose.KeyLike>> {
     try {
       const keyPair = await jose.generateKeyPair("ES256K");
       return keyPair;

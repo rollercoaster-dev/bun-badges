@@ -24,14 +24,29 @@ declare module "hono" {
 const controller = new IssuerController();
 const issuers = new Hono();
 
+// Interface for issuer response with ownerUserId
+interface IssuerResponse {
+  issuerId: string;
+  ownerUserId: string;
+  name: string;
+  url: string;
+  description?: string;
+  email?: string;
+  issuerJson: Record<string, unknown>;
+  publicKey?: Record<string, unknown>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 /**
  * Get the owner user ID for an issuer
  */
 async function getIssuerOwner(c: Context): Promise<string> {
   const id = c.req.param("id");
   if (!id) throw new Error("Issuer ID is required");
-  const issuer = await controller.getIssuer(c);
-  return (issuer as any).ownerUserId;
+  const response = await controller.getIssuer(c);
+  const data = (await response.json()) as IssuerResponse;
+  return data.ownerUserId;
 }
 
 // List issuers
@@ -60,7 +75,7 @@ issuers.get("/:id", requireRole(Role.ISSUER_VIEWER), async (c) => {
 issuers.post("/", requireAuth, requireRole(Role.ISSUER_ADMIN), async (c) => {
   try {
     const data = await c.req.json<CreateIssuerDto>();
-    const userId = (c.get("user") as any).id;
+    const userId = (c.get("user") as AuthUser).id;
     const hostUrl = new URL(c.req.url).origin;
 
     const result = await controller.createIssuer(userId, data, hostUrl);
@@ -118,8 +133,9 @@ issuers.delete(
 // Verify issuer
 issuers.get("/:id/verify", async (c) => {
   try {
-    const issuer = await controller.getIssuer(c);
-    return c.json((issuer as any).issuerJson);
+    const response = await controller.getIssuer(c);
+    const data = (await response.json()) as IssuerResponse;
+    return c.json(data.issuerJson);
   } catch (error) {
     throw new Error(
       `Failed to verify issuer: ${error instanceof Error ? error.message : String(error)}`,

@@ -3,12 +3,26 @@ import { db } from "../db/config";
 import { badgeClasses, issuerProfiles, badgeAssertions } from "../db/schema";
 import { eq } from "drizzle-orm";
 import { BADGE_ROUTES } from "./aliases";
-import { BadgeController } from "../controllers/badge.controller";
+import { BadgeController } from "@/controllers/badge.controller";
 import { bakeImage, extractImage } from "../utils/badge-baker";
 import { isValidUuid } from "@/utils/validation";
 
 const badges = new Hono();
 const controller = new BadgeController();
+
+// Interface for badge class JSON
+interface BadgeClassJson {
+  "@context": string;
+  type: string;
+  id: string;
+  name: string;
+  description: string;
+  image: string;
+  criteria: {
+    narrative: string;
+  };
+  issuer: string;
+}
 
 // List all badge classes
 badges.get(BADGE_ROUTES.LIST, async (c) => {
@@ -212,7 +226,7 @@ badges.post(BADGE_ROUTES.CREATE, async (c) => {
 
     // Update the badge JSON with the correct ID
     const insertedBadge = result[0];
-    const badgeJson = insertedBadge.badgeJson as any;
+    const badgeJson = insertedBadge.badgeJson as BadgeClassJson;
     badgeJson.id = `${hostUrl}/badges/${insertedBadge.badgeId}`;
 
     // Update the badge with the correct ID
@@ -293,7 +307,18 @@ badges.put(BADGE_ROUTES.UPDATE, async (c) => {
 
     // Extract fields to update
     const { name, description, criteria, imageUrl } = body;
-    const updates: any = { updatedAt: new Date() };
+
+    // Create a properly typed updates object
+    type BadgeUpdates = {
+      updatedAt: Date;
+      name?: string;
+      description?: string;
+      criteria?: string;
+      imageUrl?: string;
+      badgeJson?: Record<string, unknown>;
+    };
+
+    const updates: BadgeUpdates = { updatedAt: new Date() };
 
     if (name) updates.name = name;
     if (description) updates.description = description;
@@ -301,7 +326,9 @@ badges.put(BADGE_ROUTES.UPDATE, async (c) => {
     if (imageUrl) updates.imageUrl = imageUrl;
 
     // Update the badge JSON as well
-    const badgeJson = { ...(existingBadge[0].badgeJson as any) };
+    const badgeJson = {
+      ...(existingBadge[0].badgeJson as Record<string, unknown>),
+    };
     if (name) badgeJson.name = name;
     if (description) badgeJson.description = description;
     if (criteria) badgeJson.criteria = { narrative: criteria };
@@ -523,7 +550,7 @@ badges.get(BADGE_ROUTES.BAKE_BADGE, async (c) => {
     const imageBuffer = Buffer.from(imageArrayBuffer);
 
     // Bake the assertion into the image
-    const assertionJson = assertion[0].assertionJson;
+    const assertionJson = assertion[0].assertionJson as Record<string, unknown>;
     const bakedImage = await bakeImage(imageBuffer, assertionJson);
 
     // Set content type based on image type

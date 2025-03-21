@@ -39,11 +39,11 @@ export const OAUTH_ROUTES = {
 
 // Create OAuth router with dependency injection for the controller
 export const createOAuthRouter = (controller: {
-  registerClient: (c: Context) => Promise<any>;
-  authorize: (c: Context) => Promise<any>;
-  token: (c: Context) => Promise<any>;
-  introspect: (c: Context) => Promise<any>;
-  revoke: (c: Context) => Promise<any>;
+  registerClient: (c: Context) => Promise<Response>;
+  authorize: (c: Context) => Promise<Response>;
+  token: (c: Context) => Promise<Response>;
+  introspect: (c: Context) => Promise<Response>;
+  revoke: (c: Context) => Promise<Response>;
 }) => {
   const oauth = new Hono();
 
@@ -53,10 +53,14 @@ export const createOAuthRouter = (controller: {
   // Authorization endpoints
   oauth.get(OAUTH_ROUTES.AUTHORIZE, (c) => controller.authorize(c));
   oauth.post(OAUTH_ROUTES.AUTHORIZE, (c) => controller.authorize(c));
+
+  // Token endpoint
   oauth.post(OAUTH_ROUTES.TOKEN, (c) => controller.token(c));
 
-  // Token management endpoints
+  // Token introspection
   oauth.post(OAUTH_ROUTES.INTROSPECT, (c) => controller.introspect(c));
+
+  // Token revocation
   oauth.post(OAUTH_ROUTES.REVOKE, (c) => controller.revoke(c));
 
   return oauth;

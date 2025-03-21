@@ -136,7 +136,7 @@ export async function verifyCredential<T extends Record<string, unknown>>(
 
   // Create a copy of the credential without the proof for verification
   const documentToVerify = { ...credential };
-  delete (documentToVerify as any).proof;
+  delete (documentToVerify as Record<string, unknown>).proof;
 
   // Create canonical form for verification
   const canonicalData = JSON.stringify(documentToVerify);
@@ -169,6 +169,7 @@ export async function verifyCredential<T extends Record<string, unknown>>(
 
     return { verified, results: { signatureVerification: verified } };
   } catch (error) {
+    console.error("Verification error:", error);
     return {
       verified: false,
       error: `Verification error: ${error instanceof Error ? error.message : "Unknown error"}`,

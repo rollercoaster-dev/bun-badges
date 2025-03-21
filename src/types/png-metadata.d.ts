@@ -7,7 +7,9 @@ declare module "png-metadata" {
       y: number;
       units: number;
     };
-    [key: string]: any;
+    // PNG can have various chunk types, we need to allow for different properties
+    // but with more specific types than 'any'
+    [key: string]: unknown;
   }
 
   /**

@@ -310,7 +310,7 @@ export class CredentialService {
       // Create canonical form for verification without the proof
       const documentToVerify = { ...credential };
       if ("proof" in documentToVerify) {
-        delete (documentToVerify as any).proof;
+        delete (documentToVerify as Record<string, unknown>).proof;
       }
 
       const canonicalData = JSON.stringify(documentToVerify);

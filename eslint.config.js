@@ -5,7 +5,50 @@ import unusedImports from 'eslint-plugin-unused-imports';
 
 export default [
   {
-    ignores: ['dist/**', 'node_modules/**'],
+    ignores: ['dist/**', 'node_modules/**', '**/*.test.ts', '**/*.integration.test.ts'],
+  },
+  {
+    // Ignore test files - these often need more flexibility with types and console logs
+    files: [
+      '**/*.test.ts', 
+      '**/*.integration.test.ts'
+    ],
+    languageOptions: {
+      parser: tsparser,
+      parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'module',
+      },
+    },
+    plugins: {
+      '@typescript-eslint': tseslint,
+      'unused-imports': unusedImports,
+    },
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      'no-console': 'off',
+      'unused-imports/no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+    },
+  },
+  {
+    // Turn off no-console warning for test utility files
+    files: ['**/src/utils/test/**/*.ts'],
+    languageOptions: {
+      parser: tsparser,
+      parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'module',
+      },
+    },
+    plugins: {
+      '@typescript-eslint': tseslint,
+      'unused-imports': unusedImports,
+    },
+    rules: {
+      'no-console': 'off',
+      '@typescript-eslint/no-explicit-any': 'off', // Test utilities often need flexibility with types
+    },
   },
   {
     // Only apply strict no-any rule to our modified files

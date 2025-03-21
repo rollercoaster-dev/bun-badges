@@ -6,6 +6,7 @@ import crypto from "crypto";
 import { CredentialService } from "@/services/credential.service";
 import { VerificationService } from "@/services/verification.service";
 import { isValidUuid } from "@/utils/validation";
+import { OB2BadgeAssertion } from "@/services/verification.service";
 
 const ASSERTION_ROUTES = {
   CREATE: "/assertions",
@@ -474,7 +475,8 @@ assertions.post(ASSERTION_ROUTES.CREATE, async (c) => {
     // For OB2.0 or as fallback
 
     // Update the assertion JSON with the correct ID
-    const updatedAssertionJson = insertedAssertion.assertionJson as any;
+    const updatedAssertionJson =
+      insertedAssertion.assertionJson as OB2BadgeAssertion;
     updatedAssertionJson.id = `${hostUrl}/assertions/${insertedAssertion.assertionId}`;
 
     // Update the assertion with the correct ID
@@ -596,7 +598,7 @@ assertions.post(ASSERTION_ROUTES.REVOKE, async (c) => {
       });
     }
 
-    const assertionJson = assertion[0].assertionJson as any;
+    const assertionJson = assertion[0].assertionJson as OB2BadgeAssertion;
     const isOB3 = !!assertionJson.proof;
     const hostUrl = new URL(c.req.url).origin;
 

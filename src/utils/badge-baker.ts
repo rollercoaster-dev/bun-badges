@@ -19,6 +19,7 @@ export interface BadgeExtractionResult {
   format: "OB3.0" | "OB2.0" | "unknown";
   valid: boolean;
   error?: string;
+  _note?: string; // Note about extraction limitations
 }
 
 /**
