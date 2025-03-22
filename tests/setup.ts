@@ -356,3 +356,74 @@ if (needsDatabase) {
     process.exit(1);
   }
 }
+
+// Create a function that returns a chainable mock
+const createChainableMock = () => {
+  const handler = {
+    get: (target: object, prop: string | symbol) => {
+      if (prop === "array") {
+        return () => new Proxy({}, handler);
+      }
+      return () => new Proxy({}, handler);
+    },
+  };
+  return new Proxy({}, handler);
+};
+
+// Mock drizzle-orm/pg-core
+mock.module("drizzle-orm/pg-core", () => {
+  return {
+    pgTable: () => createChainableMock(),
+    serial: () => createChainableMock(),
+    text: () => createChainableMock(),
+    timestamp: () => createChainableMock(),
+    boolean: () => createChainableMock(),
+    json: () => createChainableMock(),
+    uuid: () => createChainableMock(),
+    integer: () => createChainableMock(),
+    varchar: () => createChainableMock(),
+    primaryKey: () => createChainableMock(),
+    foreignKey: () => createChainableMock(),
+    unique: () => createChainableMock(),
+    index: () => createChainableMock(),
+  };
+});
+
+// Mock the DatabaseService for tests that need database access
+mock.module("@/services/db.service", () => {
+  const dbMock = {
+    insert: () => ({ values: () => Promise.resolve([]) }),
+    select: () => ({
+      from: () => ({ where: () => ({ limit: () => Promise.resolve([]) }) }),
+    }),
+  };
+
+  return {
+    DatabaseService: class {
+      constructor() {
+        // No initialization needed for mock
+      }
+      // Add any required methods that controllers might call
+      db = dbMock;
+    },
+  };
+});
+
+// Set up test database if needed
+try {
+  // Check if we need to set up the test database
+  const needsSetup = process.env.SETUP_TEST_DB === "true";
+  if (needsSetup) {
+    console.log("🔄 Setting up test database...");
+
+    // Run database setup scripts
+    execSync("bun run db:setup:test", { stdio: "inherit" });
+
+    console.log("✅ Test database setup complete");
+  }
+} catch (error) {
+  console.error("❌ Failed to setup test environment:", error);
+  process.exit(1);
+}
+
+console.log("✅ Test setup complete");

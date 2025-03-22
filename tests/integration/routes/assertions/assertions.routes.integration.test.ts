@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import assertionsRoutes from "@/routes/assertions.routes";
 import verificationRoutes from "@/routes/verification.routes";
 import { db } from "@/db/config";
-import { issuerProfiles, badgeClasses } from "@/db/schema";
+import { issuerProfiles, badgeClasses, signingKeys, users } from "@/db/schema";
 import crypto from "crypto";
 import {
   TestData,
@@ -172,8 +172,10 @@ describe("Assertions Routes Integration", () => {
 
   afterEach(async () => {
     // Clear test data from the database
-    await db.delete(badgeClasses).execute();
-    await db.delete(issuerProfiles).execute();
+    await db.delete(badgeClasses);
+    await db.delete(signingKeys);
+    await db.delete(issuerProfiles);
+    await db.delete(users);
   });
 
   describe("GET /api/assertions/:id", () => {

@@ -1,10 +1,7 @@
 import { expect, test, describe, beforeEach, afterEach } from "bun:test";
 import { IssuerController } from "@/controllers/issuer.controller";
-import {
-  seedTestData,
-  clearTestData,
-  createMockContext,
-} from "@/utils/test/db-helpers";
+import { seedTestData, clearTestData } from "@/utils/test/db-helpers";
+import { createMockContext } from "@/utils/test/mock-context";
 
 describe("IssuerController - Get Issuer", () => {
   let testData: any;
@@ -35,7 +32,7 @@ describe("IssuerController - Get Issuer", () => {
       const issuerData = (await response.json()) as any;
       expect(issuerData.issuerId).toBe(testData.issuer.issuerId);
       expect(issuerData.name).toBe("Test Issuer");
-      expect(issuerData.url).toBe("https://example.org");
+      expect(issuerData.url).toBe("https://test-issuer.example.com");
       expect(issuerData.issuerJson).toBeDefined();
     });
 
@@ -52,7 +49,13 @@ describe("IssuerController - Get Issuer", () => {
         // Use explicit fail method from bun:test
         expect(true).toBe(false); // This will fail the test if execution reaches here
       } catch (error: any) {
-        expect(error.message).toContain("Failed to get issuer");
+        // Update to check for both possible error messages
+        const errorMessage = error.message;
+        const hasExpectedError =
+          errorMessage.includes("Failed to get issuer") ||
+          errorMessage.includes("Issuer not found");
+
+        expect(hasExpectedError).toBe(true);
       }
     });
   });

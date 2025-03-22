@@ -13,7 +13,7 @@ import {
   getIndexFromUuid,
   isCredentialRevoked,
 } from "@/utils/signing/status-list";
-import * as ed from "@noble/ed25519";
+import ed from "@/utils/signing/noble-polyfill";
 import { base64url } from "@scure/base";
 import {
   OpenBadgeCredential,

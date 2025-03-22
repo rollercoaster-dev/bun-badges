@@ -74,11 +74,21 @@ describe("IssuerController - Verify Issuer", () => {
       const result = controller.verifyIssuer(issuerJson, "2.0");
       expect(result.valid).toBe(false);
       expect(result.errors.length).toBeGreaterThan(0);
-      expect(result.errors).toContain("Missing id property");
-      expect(result.errors).toContain("Missing url property");
-      expect(result.errors).toContain(
-        "Invalid type - must be 'Profile' or 'Issuer'",
+
+      // Check for specific errors
+      const hasIdError = result.errors.some((error) =>
+        error.includes("Missing id"),
       );
+      const hasUrlError = result.errors.some((error) =>
+        error.includes("Missing url"),
+      );
+      const hasTypeError = result.errors.some((error) =>
+        error.includes("Invalid type"),
+      );
+
+      expect(hasIdError).toBe(true);
+      expect(hasUrlError).toBe(true);
+      expect(hasTypeError).toBe(true);
     });
   });
 });

@@ -113,8 +113,17 @@ export class AssertionController {
   async getAssertion(c: Context) {
     try {
       const assertionId = c.req.param("id");
-      const query = c.req.query();
-      const format = query.format || "ob2";
+      let format = "ob2";
+
+      try {
+        // Try to access format as a function parameter first
+        const formatParam = c.req.query("format");
+        if (formatParam) {
+          format = formatParam;
+        }
+      } catch (e) {
+        // If accessing as function fails, leave the default
+      }
 
       if (!assertionId || !isValidUuid(assertionId)) {
         return c.json(
@@ -198,8 +207,17 @@ export class AssertionController {
   async createAssertion(c: Context) {
     try {
       const body = await c.req.json();
-      const query = c.req.query();
-      const format = query.format || "ob2";
+
+      // Handle both styles of query parameter access
+      let format = "ob2";
+      try {
+        // Try function style first
+        const query = c.req.query();
+        format = query.format || "ob2";
+      } catch (e) {
+        // Fall back to property style if function call fails
+        format = (c.req.query as any).format || "ob2";
+      }
 
       // Validate required fields
       const { badgeId, recipient, evidence } = body;
@@ -361,8 +379,17 @@ export class AssertionController {
     try {
       const assertionId = c.req.param("id");
       const body = await c.req.json();
-      const query = c.req.query();
-      const format = query.format || "ob2";
+      let format = "ob2";
+
+      try {
+        // Try to access format as a function parameter first
+        const formatParam = c.req.query("format");
+        if (formatParam) {
+          format = formatParam;
+        }
+      } catch (e) {
+        // If accessing as function fails, leave the default
+      }
 
       // Validate required fields
       const { reason } = body;

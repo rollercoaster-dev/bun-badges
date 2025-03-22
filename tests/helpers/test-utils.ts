@@ -16,6 +16,10 @@ import {
   OpenBadgeCredential,
   DataIntegrityProof,
 } from "@/models/credential.model";
+import { createMockContext } from "@/utils/test/mock-context";
+
+// Re-export the mock context
+export { createMockContext };
 
 /**
  * Create a test server with the provided Hono app
@@ -152,60 +156,6 @@ export function updateOB3CredentialJson(
 ): OpenBadgeCredential {
   const base = getOB3CredentialJson(assertionId);
   return { ...base, ...updates };
-}
-
-/**
- * Create a mock context for testing
- */
-export function createMockContext(
-  options: {
-    headers?: Record<string, string>;
-    params?: Record<string, string>;
-    query?: Record<string, string>;
-    user?: any;
-    body?: any;
-    url?: string;
-  } = {},
-): Context {
-  const c = {
-    req: {
-      header: (name: string) => {
-        if (name === "Authorization") return options.headers?.Authorization;
-        return options.headers?.[name] ?? null;
-      },
-      param: (name: string) => options.params?.[name] ?? null,
-      query: () => options.query ?? {},
-      json: () => Promise.resolve(options.body || {}),
-      url: options.url || "https://example.com/assertions",
-    },
-    set: (key: string, value: any) => {
-      (c as any)[key] = value;
-    },
-    get: (key: string) => (c as any)[key],
-    status: (code: number) => {
-      (c as any).statusCode = code;
-      return c;
-    },
-    json: (data: any, status?: number) => {
-      (c as any).body = data;
-      if (status) (c as any).statusCode = status;
-      (c as any).finalized = true;
-      return {
-        json: () => Promise.resolve(data),
-        text: () => Promise.resolve(JSON.stringify(data)),
-      };
-    },
-    text: (data: string, status?: number) => {
-      (c as any).body = data;
-      if (status) (c as any).statusCode = status;
-      (c as any).finalized = true;
-      return c;
-    },
-    finalized: false,
-    statusCode: 200,
-  } as unknown as Context;
-
-  return c;
 }
 
 /**

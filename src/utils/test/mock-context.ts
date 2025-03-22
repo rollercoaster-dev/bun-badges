@@ -8,6 +8,8 @@ export type MockResponse = {
   body?: string | object;
   headers?: Record<string, string>;
   redirect?: string;
+  json?: () => Promise<any>;
+  text?: () => Promise<string>;
 };
 
 export type QueryParamValue = string | string[] | undefined;
@@ -49,6 +51,7 @@ export function createMockContext({
     JWT_SECRET: "test-secret",
     JWT_EXPIRY: "15m",
   },
+  user = null,
 }: {
   params?: Record<string, string>;
   query?: QueryParams;
@@ -57,6 +60,7 @@ export function createMockContext({
   url?: string;
   method?: string;
   env?: Record<string, any>;
+  user?: any;
 } = {}): HonoContext {
   // Create a proxy for query that supports both function call and property access
   const queryProxy = new Proxy(query, {
@@ -70,7 +74,7 @@ export function createMockContext({
     // Handle function calls (e.g., query('page'))
     apply: (target, _, args) => {
       if (args.length === 0) {
-        return target;
+        return target; // Return the entire query object when called with no arguments
       }
       const key = args[0];
       return target[key];
@@ -92,13 +96,22 @@ export function createMockContext({
       parseBody: () => Promise.resolve(body),
       header: (name: string) => headers[name] || headers[name.toLowerCase()],
       path: url.split("?")[0],
+      raw: {
+        url: new URL(url),
+        headers: new Headers(headers),
+      },
     },
     // Helper for creating correct JSON response format
-    json: (data: any, status: StatusCode = 200) => ({
-      status,
-      data,
-      headers: { "Content-Type": "application/json" },
-    }),
+    json: (data: any, status: StatusCode = 200) => {
+      const response = {
+        status,
+        data,
+        headers: { "Content-Type": "application/json" },
+        json: () => Promise.resolve(data),
+        text: () => Promise.resolve(JSON.stringify(data)),
+      };
+      return response;
+    },
     // Helper for creating correct HTML response format
     html: (content: string, status: StatusCode = 200) => ({
       status,
@@ -112,6 +125,8 @@ export function createMockContext({
         status: code,
         data,
         headers: { "Content-Type": "application/json" },
+        json: () => Promise.resolve(data),
+        text: () => Promise.resolve(JSON.stringify(data)),
       }),
       html: (content: string) => ({
         status: code,
@@ -149,6 +164,20 @@ export function createMockContext({
       body: `Rendered ${view} with params: ${JSON.stringify(params)}`,
       headers: { "Content-Type": "text/html" },
     }),
+    // Support for user context
+    get: (key: string) => {
+      if (key === "user") return user;
+      return undefined;
+    },
+    set: (key: string, value: any) => {
+      if (key === "user") {
+        (context as any).user = value;
+      }
+    },
+    // Support for finalized flag (used in some tests)
+    finalized: false,
+    // Support for statusCode (used in some tests)
+    statusCode: 200,
   };
 
   return context as unknown as HonoContext;

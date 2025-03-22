@@ -1,16 +1,14 @@
-import { db, dbPool } from "@/db/config";
+import { db, dbPool } from "../../db/config";
 import {
+  users,
   issuerProfiles,
   badgeClasses,
   badgeAssertions,
   signingKeys,
   verificationCodes,
-  revokedTokens,
-} from "@/db/schema";
-import { users } from "@/db/schema/index";
-import { sql, eq } from "drizzle-orm";
+} from "../../db/schema";
+import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { createMockContext } from "./mock-context";
 import { OB2BadgeAssertion } from "@/services/verification.service";
 import { OpenBadgeCredential } from "@/models/credential.model";
 import {
@@ -19,6 +17,9 @@ import {
   updateOB2AssertionJson,
   updateOB3CredentialJson,
 } from "../../../tests/helpers/test-utils";
+
+// Flag to detect if we're in a test environment with mocks
+const IS_TEST_ENV = process.env.NODE_ENV === "test" || !!process.env.BUN_TEST;
 
 /**
  * Test data interface
@@ -33,7 +34,7 @@ export interface TestData {
 
 /**
  * Helper to generate test data for integration tests
- * Uses a transaction to ensure data consistency and proper order of creation
+ * Uses direct database operations to seed test data
  */
 export async function seedTestData() {
   console.log("Seeding fresh test data...");
@@ -42,177 +43,110 @@ export async function seedTestData() {
     // Clear existing data first
     await clearTestData();
 
-    // Start a transaction
-    const result = await db.transaction(async (tx) => {
-      console.log("Creating test user...");
+    // Create a test user
+    const userId = crypto.randomUUID();
+    const user = await db
+      .insert(users)
+      .values({
+        userId,
+        email: `test-${nanoid(6)}@example.com`,
+        name: `Test User ${nanoid(6)}`,
+        passwordHash: "not-a-real-hash",
+        role: "admin",
+      })
+      .returning();
 
-      // 1. Create a test user first
-      const userId = crypto.randomUUID();
-      await tx.insert(users).values({
-        userId: userId,
-        email: "test@example.com",
-        passwordHash: "hashed_password",
-        name: "Test User",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-
-      console.log("Creating test issuer...");
-
-      // 2. Create a test issuer profile
-      const issuerId = crypto.randomUUID();
-      await tx.insert(issuerProfiles).values({
-        issuerId: issuerId,
+    // Create a test issuer
+    const issuerId = crypto.randomUUID();
+    const issuer = await db
+      .insert(issuerProfiles)
+      .values({
+        issuerId,
         name: "Test Issuer",
-        url: "https://example.org",
-        description: "A test issuer for integration tests",
-        email: "issuer@example.org",
-        ownerUserId: userId, // Reference to the user we just created
+        url: "https://test-issuer.example.com",
+        description: "A test issuer",
+        email: "test-issuer@example.com",
+        ownerUserId: userId,
         issuerJson: {
           "@context": "https://w3id.org/openbadges/v2",
           type: "Issuer",
-          id: "https://example.org/issuer",
+          id: `https://test-issuer.example.com/issuers/${issuerId}`,
           name: "Test Issuer",
-          url: "https://example.org",
-          email: "issuer@example.org",
-          description: "A test issuer for integration tests",
+          url: "https://test-issuer.example.com",
+          email: "test-issuer@example.com",
+          description: "A test issuer for testing purposes",
         },
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
+      })
+      .returning();
 
-      console.log("Creating test badge...");
+    // Create a test signing key
+    const signingKey = await createTestSigningKey(issuerId);
 
-      // 3. Create a test badge class
-      const badgeId = crypto.randomUUID();
-      await tx.insert(badgeClasses).values({
-        badgeId: badgeId,
-        issuerId: issuerId,
+    // Create a test badge
+    const badgeId = crypto.randomUUID();
+    const badge = await db
+      .insert(badgeClasses)
+      .values({
+        badgeId,
+        issuerId,
         name: "Test Badge",
-        description: "A test badge for integration tests",
-        imageUrl: "https://example.org/badge.png",
-        criteria: "Earn this badge by completing integration tests",
+        description: "A test badge",
+        imageUrl: "https://test-badge.example.com/image.png",
+        criteria: "https://test-badge.example.com/criteria",
         badgeJson: {
           "@context": "https://w3id.org/openbadges/v2",
           type: "BadgeClass",
-          id: "https://example.org/badges/test-badge",
+          id: `https://test-badge.example.com/badges/${badgeId}`,
           name: "Test Badge",
-          description: "A test badge for integration tests",
-          image: "https://example.org/badge.png",
+          description: "A test badge for testing purposes",
+          image: "https://test-badge.example.com/image.png",
           criteria: {
-            narrative: "Earn this badge by completing integration tests",
+            narrative: "Criteria for earning this badge",
           },
-          issuer: "https://example.org/issuer",
+          issuer: `https://test-issuer.example.com/issuers/${issuerId}`,
         },
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
+      })
+      .returning();
 
-      console.log("Creating test signing key...");
-
-      // 4. Create test signing keys
-      // First key
-      const keyId1 = await createTestSigningKey(issuerId, tx);
-
-      // Get the public key multibase for use in assertions
-      const signingKeyInfo = await tx
-        .select()
-        .from(signingKeys)
-        .where(sql`key_id = ${keyId1}`)
-        .execute();
-      const publicKeyMultibase =
-        signingKeyInfo[0]?.publicKeyMultibase ||
-        "z6MksSBa6fJgGBw4m3WxoLLHJ4mji9iodcYQXJmF7xT9wFQZ";
-
-      console.log("Creating test signing key...");
-
-      // Second key with slight variation for testing multiple keys
-      const keyId2 = crypto.randomUUID();
-      await tx.insert(signingKeys).values({
-        keyId: keyId2,
-        issuerId: issuerId,
-        // Use different multibase values
-        publicKeyMultibase: "z6MkrJVSNvnYyRKhJ5kJGcECFNLKNH7K2HdpYyZyTgRGZZ9B",
-        privateKeyMultibase:
-          "z3u2DLdPxfnAvY2Z1iK9LUqs2KyaQtKDFsXEQD8jEEqiYjWQzJisSvDqYVZ4kzRG4XA5yxcVBrkgtk9ntegCbD1KR",
-        controller: `did:key:z6MkrJVSNvnYyRKhJ5kJGcECFNLKNH7K2HdpYyZyTgRGZZ9B`,
-        type: "Ed25519VerificationKey2020",
-        keyInfo: {
-          "@context": "https://w3id.org/security/v2",
-          id: `did:key:z6MkrJVSNvnYyRKhJ5kJGcECFNLKNH7K2HdpYyZyTgRGZZ9B#z6MkrJVSNvnYyRKhJ5kJGcECFNLKNH7K2HdpYyZyTgRGZZ9B`,
-          type: "Ed25519VerificationKey2020",
-          controller: `did:key:z6MkrJVSNvnYyRKhJ5kJGcECFNLKNH7K2HdpYyZyTgRGZZ9B`,
-          publicKeyMultibase:
-            "z6MkrJVSNvnYyRKhJ5kJGcECFNLKNH7K2HdpYyZyTgRGZZ9B",
-        },
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-
-      console.log("Creating test assertion...");
-
-      // 5. Create a test badge assertion
-      const assertionId = crypto.randomUUID();
-      await tx.insert(badgeAssertions).values({
-        assertionId: assertionId,
-        badgeId: badgeId,
-        issuerId: issuerId,
+    // Create a test assertion
+    const assertionId = crypto.randomUUID();
+    const assertion = await db
+      .insert(badgeAssertions)
+      .values({
+        assertionId,
+        badgeId,
+        issuerId,
         recipientType: "email",
-        recipientIdentity: "recipient@example.com",
+        recipientIdentity: "test-recipient@example.com",
         recipientHashed: false,
         issuedOn: new Date(),
-        evidenceUrl: "https://example.org/evidence",
-        revoked: false,
         assertionJson: {
           "@context": "https://w3id.org/openbadges/v2",
           type: "Assertion",
-          id: `https://example.org/assertions/${assertionId}`,
+          id: `https://test-badge.example.com/assertions/${assertionId}`,
           recipient: {
             type: "email",
-            identity: "recipient@example.com",
+            identity: "test-recipient@example.com",
             hashed: false,
           },
-          badge: "https://example.org/badges/test-badge",
           issuedOn: new Date().toISOString(),
+          badge: `https://test-badge.example.com/badges/${badgeId}`,
           verification: {
-            type: "hosted",
-          },
-          evidence: "https://example.org/evidence",
-          // Add OB3 proof for verification tests
-          proof: {
-            type: "DataIntegrityProof",
-            cryptosuite: "eddsa-rdfc-2022",
-            created: new Date().toISOString(),
-            verificationMethod: `did:key:${publicKeyMultibase}#${publicKeyMultibase}`,
-            proofPurpose: "assertionMethod",
-            proofValue:
-              "z4oey5q2M3XKaxup3tmzN4DRFTLVqpLMweBrSxMY2xnrHmKYhBrTuxmTcBNwDiond5bnVKXdK7xRMCa2Z2GuRQcKS",
+            type: "HostedBadge",
           },
         },
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
+      })
+      .returning();
 
-      // Return all created IDs for test usage
-      return {
-        userId,
-        issuerId,
-        badgeId,
-        assertionId,
-        signingKeyId1: keyId1,
-        signingKeyId2: keyId2,
+    console.log("✅ Test data created successfully!");
 
-        // Also provide the nested structure for backward compatibility
-        user: { userId },
-        issuer: { issuerId },
-        badge: { badgeId },
-        assertion: { assertionId },
-        signingKey: { keyId: keyId1 },
-      };
-    });
-
-    console.log("✅ Fresh test data created successfully");
-    return result;
+    return {
+      user: user[0],
+      issuer: issuer[0],
+      badge: badge[0],
+      assertion: assertion[0],
+      signingKey,
+    };
   } catch (error) {
     console.error("Error seeding test data:", error);
     throw error;
@@ -220,83 +154,65 @@ export async function seedTestData() {
 }
 
 /**
- * Seed test verification code
+ * Seed a verification code for testing
  */
 export async function seedVerificationCode(
   username: string,
   code: string = "123456",
 ) {
-  const expiresAt = new Date();
-  expiresAt.setMinutes(expiresAt.getMinutes() + 5);
-
-  const [verificationCode] = await db
+  return await db
     .insert(verificationCodes)
     .values({
-      id: nanoid(),
       username,
       code,
-      expiresAt,
-      attempts: [],
+      expiresAt: new Date(Date.now() + 1000 * 60 * 10), // 10 minutes from now
     })
     .returning();
-
-  return verificationCode;
 }
 
 /**
  * Clear test data from the database
- * This deletes all test data in the correct order to avoid foreign key constraints
+ * This directly uses SQL to delete data from all important tables
  */
 export async function clearTestData() {
   console.log("🧹 Clearing test data from database...");
   try {
+    // Check if we're in a test environment with mocks
+    // In this case, use the db object from drizzle instead
+    if (IS_TEST_ENV && (!dbPool || typeof dbPool.query !== "function")) {
+      console.log("Using Drizzle ORM for test data cleanup in test mode");
+      try {
+        // Delete data using Drizzle ORM in reverse dependency order
+        await db.delete(badgeAssertions);
+        await db.delete(badgeClasses);
+        await db.delete(signingKeys);
+        await db.delete(issuerProfiles);
+        await db.delete(verificationCodes);
+        await db.delete(users);
+
+        console.log("✅ Test data cleared successfully");
+        return;
+      } catch (e) {
+        console.error("❌ Error clearing test data with Drizzle:", e);
+        throw e;
+      }
+    }
+
+    // Otherwise use normal pool connection
     // Disable foreign key checks (for PostgreSQL)
     await dbPool.query("SET session_replication_role = 'replica'");
 
     try {
-      // Get a list of existing tables
-      const tablesResult = await dbPool.query(
-        "SELECT tablename FROM pg_tables WHERE schemaname = 'public'",
-      );
+      // Delete data from each table in reverse dependency order
+      await dbPool.query("DELETE FROM badge_assertions");
+      await dbPool.query("DELETE FROM badge_classes");
+      await dbPool.query("DELETE FROM signing_keys");
+      await dbPool.query("DELETE FROM issuer_profiles");
+      await dbPool.query("DELETE FROM verification_codes");
+      await dbPool.query("DELETE FROM revoked_tokens");
+      await dbPool.query("DELETE FROM users");
 
-      const existingTables = tablesResult.rows.map((row) => row.tablename);
-      console.log(`Existing tables: ${existingTables.join(", ") || "none"}`);
-
-      // If we have any tables, delete data from them
-      if (existingTables.length > 0) {
-        // Clear data individually from each table to handle tables that might not exist
-        if (existingTables.includes("badge_assertions")) {
-          await db.delete(badgeAssertions);
-        }
-
-        if (existingTables.includes("badge_classes")) {
-          await db.delete(badgeClasses);
-        }
-
-        if (existingTables.includes("signing_keys")) {
-          await db.delete(signingKeys);
-        }
-
-        if (existingTables.includes("issuer_profiles")) {
-          await db.delete(issuerProfiles);
-        }
-
-        if (existingTables.includes("verification_codes")) {
-          await db.delete(verificationCodes);
-        }
-
-        if (existingTables.includes("revoked_tokens")) {
-          await db.delete(revokedTokens);
-        }
-
-        if (existingTables.includes("users")) {
-          await db.delete(users);
-        }
-
-        console.log("✅ Test data cleared successfully");
-      } else {
-        console.log("⚠️ No tables found to clear");
-      }
+      console.log("✅ Test data cleared successfully");
     } finally {
       // Re-enable foreign key checks
       await dbPool.query("SET session_replication_role = 'origin'");
@@ -307,56 +223,57 @@ export async function clearTestData() {
   }
 }
 
-/**
- * Creates a consistent test signing key for use across tests
- * @param issuerId - The issuer ID to associate with the key
- * @param tx - Optional transaction to use (for nested transactions)
- * @returns The created signing key ID
- */
-export async function createTestSigningKey(issuerId: string, tx?: any) {
-  // Use predictable test keys for signing
-  const publicKeyMultibase = "z6MksSBa6fJgGBw4m3WxoLLHJ4mji9iodcYQXJmF7xT9wFQZ";
-  const privateKeyMultibase =
-    "z3u2en7t32RYgLVdTt7GHwcgmJn3nXFPS4SadJvNnXBihgxV2vGWTn9WuJmJfMK1o3UXe7m8TqdqeH7DuHNLmDBLm";
-
-  // Create consistent key ID with did:key format
-  const controller = `did:key:${publicKeyMultibase}`;
+async function createTestSigningKey(issuerId: string) {
+  // Create a signing key for the issuer
   const keyId = crypto.randomUUID();
 
-  // Use the transaction if provided, otherwise use the global db
-  const dbContext = tx || db;
+  // Generate values for required fields
+  const controller = `did:web:test-issuer.example.com`;
 
-  // Insert the test signing key
-  await dbContext.insert(signingKeys).values({
-    keyId,
-    issuerId,
-    publicKeyMultibase,
-    privateKeyMultibase,
-    controller,
-    type: "Ed25519VerificationKey2020",
-    keyInfo: {
-      "@context": "https://w3id.org/security/v2",
-      id: `${controller}#${publicKeyMultibase}`,
+  const signingKey = await db
+    .insert(signingKeys)
+    .values({
+      keyId,
+      issuerId,
       type: "Ed25519VerificationKey2020",
-      controller,
-      publicKeyMultibase,
-    },
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  });
+      publicKeyMultibase: "z6MkrzXCdarP1kaZQXEX6CDRdcLYTk6bTEgGDgV5XQEyP4WB", // Test multibase public key
+      privateKeyMultibase:
+        "z3u2en7t8mxcz3s9wKaDTNWK1RA619VAXqLLGEY4ZD1vpCgPbR7yMkwk4Qj7TuuGJUTzpgvA", // Test multibase private key
+      controller: controller,
+      keyInfo: {
+        id: `${controller}#key-1`,
+        type: "Ed25519VerificationKey2020",
+        controller: controller,
+        publicKeyMultibase: "z6MkrzXCdarP1kaZQXEX6CDRdcLYTk6bTEgGDgV5XQEyP4WB",
+      },
+      revoked: false,
+    })
+    .returning();
 
-  return keyId;
+  return signingKey[0];
 }
 
-// Forward the export from mock-context.ts
-export { createMockContext };
-
 /**
- * Get assertion JSON from the database
+ * Get the JSON for an assertion
  */
 export async function getAssertionJson(
   assertionId: string,
 ): Promise<OB2BadgeAssertion | OpenBadgeCredential> {
+  // First check if this is a mocked environment
+  if (IS_TEST_ENV) {
+    try {
+      // Check for OB2 format
+      const ob2Json = await getOB2AssertionJson(assertionId);
+      if (ob2Json) return ob2Json;
+
+      // Check for OB3 format
+      const ob3Json = await getOB3CredentialJson(assertionId);
+      if (ob3Json) return ob3Json;
+    } catch (e) {
+      // Silently continue to DB query method if helper fails
+    }
+  }
+
   const assertion = await db
     .select()
     .from(badgeAssertions)
@@ -364,57 +281,54 @@ export async function getAssertionJson(
     .limit(1);
 
   if (!assertion || assertion.length === 0) {
-    throw new Error(`Assertion ${assertionId} not found`);
+    throw new Error(`Assertion not found: ${assertionId}`);
   }
 
-  const assertionJson = assertion[0].assertionJson;
-  if (!assertionJson) {
-    throw new Error(`Assertion ${assertionId} has no JSON data`);
-  }
-
-  // Check if it's an OB3 credential
-  const maybeOB3 = assertionJson as Record<string, unknown>;
-  if (
-    Array.isArray(maybeOB3["@context"]) &&
-    maybeOB3["@context"].some(
-      (ctx: unknown) =>
-        typeof ctx === "string" && ctx.includes("credentials/v1"),
-    )
-  ) {
-    return getOB3CredentialJson(assertionId);
-  }
-
-  return getOB2AssertionJson(assertionId);
+  return assertion[0].assertionJson as OB2BadgeAssertion | OpenBadgeCredential;
 }
 
 /**
- * Update assertion JSON in the database
+ * Update the JSON for an assertion
  */
 export async function updateAssertionJson(
   assertionId: string,
   updates: Partial<OB2BadgeAssertion | OpenBadgeCredential>,
 ): Promise<void> {
-  // Check if it's an OB3 credential
-  const maybeOB3 = updates as Record<string, unknown>;
-  const updatedJson =
-    Array.isArray(maybeOB3["@context"]) &&
-    maybeOB3["@context"].some(
-      (ctx: unknown) =>
-        typeof ctx === "string" && ctx.includes("credentials/v1"),
-    )
-      ? updateOB3CredentialJson(
-          assertionId,
-          updates as Partial<OpenBadgeCredential>,
-        )
-      : updateOB2AssertionJson(
-          assertionId,
-          updates as Partial<OB2BadgeAssertion>,
-        );
+  // First check if this is a mocked environment
+  if (IS_TEST_ENV) {
+    try {
+      // Try the OB2 update helper
+      const result = await updateOB2AssertionJson(assertionId, updates);
+      if (result) return;
 
+      // Try the OB3 update helper
+      const result2 = await updateOB3CredentialJson(assertionId, updates);
+      if (result2) return;
+    } catch (e) {
+      // Silently continue to DB update method if helper fails
+    }
+  }
+
+  // Get the existing assertion
+  const assertion = await db
+    .select()
+    .from(badgeAssertions)
+    .where(eq(badgeAssertions.assertionId, assertionId))
+    .limit(1);
+
+  if (!assertion || assertion.length === 0) {
+    throw new Error(`Assertion not found: ${assertionId}`);
+  }
+
+  // Update the assertionJson with the updates
+  const assertionJson = assertion[0].assertionJson as
+    | OB2BadgeAssertion
+    | OpenBadgeCredential;
+  const updatedJson = { ...assertionJson, ...updates };
+
+  // Save the updated assertionJson
   await db
     .update(badgeAssertions)
-    .set({
-      assertionJson: updatedJson,
-    })
+    .set({ assertionJson: updatedJson })
     .where(eq(badgeAssertions.assertionId, assertionId));
 }

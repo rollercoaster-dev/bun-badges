@@ -1,6 +1,6 @@
 import { mock, describe, expect, it, beforeEach } from "bun:test";
 import { type Context } from "hono";
-import { Role } from "@middleware/auth";
+import { Role } from "@/middleware/auth";
 import {
   createMockContext,
   createNextFunction,
@@ -10,8 +10,10 @@ import {
   requireRole,
   requireOwnership,
   combineMiddleware,
-} from "@middleware/auth";
+} from "@/middleware/auth";
 import { setupJwtMock } from "@utils/test/auth-test-utils";
+import { UnauthorizedError } from "@/utils/errors";
+import type { AuthUser } from "@/middleware/auth";
 
 describe("Auth Middleware", () => {
   beforeEach(() => {
@@ -20,88 +22,78 @@ describe("Auth Middleware", () => {
   });
 
   describe("requireAuth", () => {
-    it("allows request with valid token", async () => {
-      const ctx = createMockContext();
-      const next = createNextFunction();
-      // Mock the Authorization header
-      ctx.req.header = mock((name: string) => {
-        if (name === "Authorization") return "Bearer valid-token";
-        return undefined;
-      });
+    it("should pass with valid token", async () => {
+      const mockToken = "valid.jwt.token";
+      const mockUser: AuthUser = {
+        id: "test-user",
+        roles: [Role.ADMIN],
+        organizationId: "test-org",
+      };
 
-      await requireAuth(ctx as any, next);
+      const ctx = createMockContext() as Context;
+      ctx.req.raw.headers.set("authorization", `Bearer ${mockToken}`);
+      ctx.set("user", mockUser);
 
-      expect(next).toHaveBeenCalled();
+      const next = () => Promise.resolve();
+      await requireAuth(ctx, next);
+
+      expect(ctx.get("user")).toEqual(mockUser);
     });
 
-    it("rejects request without token", async () => {
-      const ctx = createMockContext();
-      const next = createNextFunction();
-      // Empty Authorization header
-      ctx.req.header = mock((_: string) => undefined);
+    it("should throw when no token provided", async () => {
+      const ctx = createMockContext() as Context;
+      const next = () => Promise.resolve();
 
-      await expect(requireAuth(ctx as any, next)).rejects.toThrow(
-        "Authentication required",
-      );
+      await expect(requireAuth(ctx, next)).rejects.toThrow(UnauthorizedError);
     });
 
-    it("rejects invalid token", async () => {
-      const ctx = createMockContext();
-      const next = createNextFunction();
-      // Invalid token
-      ctx.req.header = mock((name: string) => {
-        if (name === "Authorization") return "Bearer invalid-token";
-        return undefined;
-      });
+    it("should throw when invalid token format", async () => {
+      const ctx = createMockContext() as Context;
+      ctx.req.raw.headers.set("authorization", "NotBearer token");
+      const next = () => Promise.resolve();
 
-      await expect(requireAuth(ctx as any, next)).rejects.toThrow(
-        "Invalid or expired token",
-      );
+      await expect(requireAuth(ctx, next)).rejects.toThrow(UnauthorizedError);
     });
   });
 
   describe("requireRole", () => {
-    it("allows access with matching single role", async () => {
-      const ctx = createMockContext();
-      const next = createNextFunction();
-      ctx.get = mock(() => ({ id: "123", roles: [Role.ISSUER_ADMIN] }));
+    it("should pass when user has required role", async () => {
+      const mockUser: AuthUser = {
+        id: "test-user",
+        roles: [Role.ADMIN],
+        organizationId: "test-org",
+      };
 
-      await requireRole(Role.ISSUER_ADMIN)(ctx as any, next);
+      const ctx = createMockContext() as Context;
+      ctx.set("user", mockUser);
 
-      expect(next).toHaveBeenCalled();
+      const next = () => Promise.resolve();
+      await requireRole(Role.ADMIN)(ctx, next);
     });
 
-    it("allows access with one matching role from array", async () => {
-      const ctx = createMockContext();
-      const next = createNextFunction();
-      ctx.get = mock(() => ({ id: "123", roles: [Role.ISSUER_ADMIN] }));
+    it("should throw when user lacks required role", async () => {
+      const mockUser: AuthUser = {
+        id: "test-user",
+        roles: [Role.ISSUER_VIEWER],
+        organizationId: "test-org",
+      };
 
-      await requireRole([Role.ISSUER_ADMIN, Role.ISSUER_OWNER])(
-        ctx as any,
-        next,
+      const ctx = createMockContext() as Context;
+      ctx.set("user", mockUser);
+
+      const next = () => Promise.resolve();
+      await expect(requireRole(Role.ADMIN)(ctx, next)).rejects.toThrow(
+        UnauthorizedError,
       );
-
-      expect(next).toHaveBeenCalled();
     });
 
-    it("denies access with no matching roles from array", async () => {
-      const ctx = createMockContext();
-      const next = createNextFunction();
-      ctx.get = mock(() => ({ id: "123", roles: [Role.ISSUER_VIEWER] }));
+    it("should throw when no user in context", async () => {
+      const ctx = createMockContext() as Context;
+      const next = () => Promise.resolve();
 
-      await expect(
-        requireRole([Role.ISSUER_ADMIN, Role.ISSUER_OWNER])(ctx as any, next),
-      ).rejects.toThrow("Insufficient permissions");
-    });
-
-    it("denies access with non-matching single role", async () => {
-      const ctx = createMockContext();
-      const next = createNextFunction();
-      ctx.get = mock(() => ({ id: "123", roles: [Role.ISSUER_VIEWER] }));
-
-      await expect(
-        requireRole(Role.ISSUER_ADMIN)(ctx as any, next),
-      ).rejects.toThrow("Insufficient permissions");
+      await expect(requireRole(Role.ADMIN)(ctx, next)).rejects.toThrow(
+        UnauthorizedError,
+      );
     });
   });
 

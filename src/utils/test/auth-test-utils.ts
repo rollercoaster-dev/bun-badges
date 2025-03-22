@@ -2,6 +2,7 @@ import { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { Role } from "../../middleware/auth";
 import { mock, expect } from "bun:test";
+import { createMockContext } from "./mock-context";
 
 /**
  * Creates a mock context for testing auth middleware
@@ -14,115 +15,106 @@ export function createAuthTestContext(
     user?: any;
     body?: any;
   } = {},
-) {
-  const c = {
-    req: {
-      header: (name: string) => {
-        if (name === "Authorization") return options.headers?.Authorization;
-        return options.headers?.[name] ?? null;
-      },
-      param: (name: string) => options.params?.[name] ?? null,
-      query: (name: string) => options.query?.[name] ?? null,
-      json: () => Promise.resolve(options.body || {}),
-    },
-    set: (key: string, value: any) => {
-      (c as any)[key] = value;
-    },
-    get: (key: string) => (c as any)[key],
-    status: (code: number) => {
-      (c as any).statusCode = code;
-      return c;
-    },
-    json: (data: any, status?: number) => {
-      (c as any).body = data;
-      if (status) (c as any).statusCode = status;
-      (c as any).finalized = true;
-      return c;
-    },
-    text: (data: string, status?: number) => {
-      (c as any).body = data;
-      if (status) (c as any).statusCode = status;
-      (c as any).finalized = true;
-      return c;
-    },
-    finalized: false,
-    statusCode: 200,
-  } as unknown as Context;
-
-  if (options.user) {
-    c.set("user", options.user);
-  }
-
-  return c;
+): Context {
+  return createMockContext(options) as Context;
 }
 
 /**
- * Creates standard user objects for testing
+ * Creates test users for auth testing
  */
-export function createTestUsers() {
+function createTestUsers() {
   return {
-    viewer: {
-      id: "user123",
-      roles: [Role.ISSUER_VIEWER],
-      organizationId: "org123",
-    },
     admin: {
-      id: "admin123",
-      roles: [Role.ISSUER_ADMIN],
-      organizationId: "org123",
-    },
-    owner: {
-      id: "owner123",
-      roles: [Role.ISSUER_OWNER],
-      organizationId: "org123",
-    },
-    superAdmin: {
-      id: "super123",
+      userId: "admin-user",
+      email: "admin@example.com",
+      name: "Admin User",
       roles: [Role.ADMIN],
-      organizationId: "org123",
+    },
+    issuerAdmin: {
+      userId: "issuer-user",
+      email: "issuer@example.com",
+      name: "Issuer User",
+      roles: [Role.ISSUER_ADMIN],
+    },
+    issuerViewer: {
+      userId: "regular-user",
+      email: "user@example.com",
+      name: "Regular User",
+      roles: [Role.ISSUER_VIEWER],
     },
   };
 }
 
 /**
- * Standard mock JWT implementation for auth tests
+ * Creates a mock JWT module for auth testing
  */
-export function mockJwtModule() {
+function mockJwtModule() {
   const users = createTestUsers();
 
   return {
-    verify: async (token: string) => {
-      if (token === "valid-token") {
+    verify: mock((token: string, secret: string) => {
+      if (token === "invalid-token") {
+        throw new Error("Invalid token");
+      }
+      if (token === "admin-token") {
         return {
-          sub: users.viewer.id,
-          roles: users.viewer.roles,
-          organizationId: users.viewer.organizationId,
-          exp: Date.now() / 1000 + 3600,
-        };
-      } else if (token === "admin-token") {
-        return {
-          sub: users.admin.id,
+          sub: users.admin.userId,
           roles: users.admin.roles,
-          organizationId: users.admin.organizationId,
-          exp: Date.now() / 1000 + 3600,
+          exp: Math.floor(Date.now() / 1000) + 3600,
         };
-      } else if (token === "owner-token") {
+      }
+      if (token === "issuer-admin-token") {
         return {
-          sub: users.owner.id,
-          roles: users.owner.roles,
-          organizationId: users.owner.organizationId,
-          exp: Date.now() / 1000 + 3600,
+          sub: users.issuerAdmin.userId,
+          roles: users.issuerAdmin.roles,
+          exp: Math.floor(Date.now() / 1000) + 3600,
         };
-      } else if (token === "super-token") {
+      }
+      if (token === "issuer-viewer-token") {
         return {
-          sub: users.superAdmin.id,
-          roles: users.superAdmin.roles,
-          organizationId: users.superAdmin.organizationId,
-          exp: Date.now() / 1000 + 3600,
+          sub: users.issuerViewer.userId,
+          roles: users.issuerViewer.roles,
+          exp: Math.floor(Date.now() / 1000) + 3600,
         };
       }
       throw new Error("Invalid token");
-    },
+    }),
+    decode: mock((token: string) => {
+      if (token === "invalid-token") {
+        throw new Error("Invalid token");
+      }
+      if (token === "admin-token") {
+        return {
+          payload: {
+            sub: users.admin.userId,
+            roles: users.admin.roles,
+            exp: Math.floor(Date.now() / 1000) + 3600,
+          },
+        };
+      }
+      if (token === "issuer-admin-token") {
+        return {
+          payload: {
+            sub: users.issuerAdmin.userId,
+            roles: users.issuerAdmin.roles,
+            exp: Math.floor(Date.now() / 1000) + 3600,
+          },
+        };
+      }
+      if (token === "issuer-viewer-token") {
+        return {
+          payload: {
+            sub: users.issuerViewer.userId,
+            roles: users.issuerViewer.roles,
+            exp: Math.floor(Date.now() / 1000) + 3600,
+          },
+        };
+      }
+      throw new Error("Invalid token");
+    }),
+    sign: mock((payload: any, secret: string) => {
+      return "test-token";
+    }),
   };
 }
 
@@ -177,3 +169,6 @@ export async function runMiddlewareChain(
 
   return c;
 }
+
+// Re-export the mock context
+export { createMockContext };

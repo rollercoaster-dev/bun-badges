@@ -3,11 +3,33 @@ import type { DatabaseService as RealDatabaseService } from "@services/db.servic
 
 // In-memory token revocation store for testing
 const revokedTokens = new Map<string, boolean>();
+// In-memory user store for testing
+const users = new Map<string, any>();
 
 // Create a mock database service for testing
 export class MockDatabaseService implements RealDatabaseService {
   // Static db property
   static db = {} as Record<string, unknown>;
+
+  // User Methods
+  async createUser(data: any) {
+    const user = {
+      userId: `user-${Date.now()}`,
+      email: data.email,
+      passwordHash: data.passwordHash,
+      name: data.name || null,
+      oauthProvider: data.oauthProvider || null,
+      oauthSubject: data.oauthSubject || null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    users.set(data.email, user);
+    return user;
+  }
+
+  async getUserByEmail(email: string) {
+    return users.get(email) || null;
+  }
 
   // Verification Code Methods
   async createVerificationCode(
