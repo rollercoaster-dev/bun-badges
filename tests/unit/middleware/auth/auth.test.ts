@@ -2,42 +2,87 @@ import { mock, describe, expect, it, beforeEach } from "bun:test";
 import { type Context } from "hono";
 import { Role } from "@/middleware/auth";
 import {
-  createMockContext,
-  createNextFunction,
-} from "@utils/test/route-test-utils";
-import {
   requireAuth,
   requireRole,
   requireOwnership,
   combineMiddleware,
 } from "@/middleware/auth";
-import { setupJwtMock } from "@utils/test/auth-test-utils";
 import { UnauthorizedError } from "@/utils/errors";
 import type { AuthUser } from "@/middleware/auth";
+
+// Create a mock context directly in the test file to avoid import errors
+function createMockContext(options = {}) {
+  return {
+    req: {
+      raw: {
+        headers: new Headers(),
+      },
+      header: (name) => options?.headers?.[name],
+    },
+    json: (data, status = 200) => ({ status, data }),
+    get: mock((key) => options?.user || null),
+    set: mock((key, value) => {}),
+  } as unknown as Context;
+}
+
+// Create a mock next function
+function createNextFunction() {
+  return mock(() => Promise.resolve());
+}
+
+// Setup JWT mock directly in the test file
+function setupJwtMock() {
+  mock.module("hono/jwt", () => ({
+    verify: mock(async (token, secret) => {
+      if (token === "admin-token") {
+        return {
+          sub: "test-user",
+          roles: [Role.ADMIN],
+          exp: Math.floor(Date.now() / 1000) + 3600,
+        };
+      }
+      throw new Error("Invalid token");
+    }),
+  }));
+}
 
 describe("Auth Middleware", () => {
   beforeEach(() => {
     // Set up JWT mock before each test
     setupJwtMock();
+    // Setup JWT secret for tests
+    process.env.JWT_SECRET = "test-secret";
   });
 
   describe("requireAuth", () => {
     it("should pass with valid token", async () => {
-      const mockToken = "valid.jwt.token";
-      const mockUser: AuthUser = {
-        id: "test-user",
-        roles: [Role.ADMIN],
-        organizationId: "test-org",
-      };
+      // Create a mock token with valid data
+      const mockToken = "admin-token";
 
+      // Set up the context with the token
       const ctx = createMockContext() as Context;
-      ctx.req.raw.headers.set("authorization", `Bearer ${mockToken}`);
-      ctx.set("user", mockUser);
 
-      const next = () => Promise.resolve();
+      // Mock the header method
+      ctx.req.header = mock((name) => {
+        if (name.toLowerCase() === "authorization") {
+          return `Bearer ${mockToken}`;
+        }
+        return null;
+      });
+
+      // Setup the headers correctly
+      const headers = new Headers();
+      headers.set("authorization", `Bearer ${mockToken}`);
+      ctx.req.raw.headers = headers;
+
+      // Create a tracked next function
+      const next = createNextFunction();
+
+      // Call the middleware
       await requireAuth(ctx, next);
 
-      expect(ctx.get("user")).toEqual(mockUser);
+      // Verify that next was called
+      expect(next).toHaveBeenCalled();
     });
 
     it("should throw when no token provided", async () => {
@@ -62,20 +107,36 @@ describe("Auth Middleware", () => {
 
   describe("requireRole", () => {
     it("should pass when user has required role", async () => {
+      // Create a mock user with admin role
       const mockUser: AuthUser = {
         id: "test-user",
         roles: [Role.ADMIN],
         organizationId: "test-org",
       };
 
+      // Set up the context with the user
       const ctx = createMockContext() as Context;
-      ctx.set("user", mockUser);
 
-      const next = () => Promise.resolve();
+      // Mock the get method to return our user
+      ctx.get = mock((key) => {
+        if (key === "user") {
+          return mockUser;
+        }
+        return null;
+      });
+
+      // Create a tracked next function
+      const next = createNextFunction();
+
+      // Call the middleware
       await requireRole(Role.ADMIN)(ctx, next);
+
+      // Verify that next was called
+      expect(next).toHaveBeenCalled();
     });
 
     it("should throw when user lacks required role", async () => {
+      // Create a user with a viewer role only (not admin)
       const mockUser: AuthUser = {
         id: "test-user",
         roles: [Role.ISSUER_VIEWER],
@@ -83,9 +144,17 @@ describe("Auth Middleware", () => {
       };
 
       const ctx = createMockContext() as Context;
-      ctx.set("user", mockUser);
+      // Mock the get method to return our user
+      ctx.get = mock((key) => {
+        if (key === "user") {
+          return mockUser;
+        }
+        return null;
+      });
 
-      const next = () => Promise.resolve();
+      const next = createNextFunction();
+
+      // Test that it will throw
       await expect(requireRole(Role.ADMIN)(ctx, next)).rejects.toThrow(
         "Insufficient permissions",
       );
@@ -93,10 +162,17 @@ describe("Auth Middleware", () => {
 
     it("should throw when no user in context", async () => {
       const ctx = createMockContext() as Context;
-      // Set an empty user to prevent null error
-      ctx.set("user", { id: "test-user", roles: [] });
-      const next = () => Promise.resolve();
+      // Mock to return a user with empty roles
+      ctx.get = mock((key) => {
+        if (key === "user") {
+          return { id: "test-user", roles: [] };
+        }
+        return null;
+      });
 
+      const next = createNextFunction();
+
+      // Test that it will throw
       await expect(requireRole(Role.ADMIN)(ctx, next)).rejects.toThrow(
         "Insufficient permissions",
       );

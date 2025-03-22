@@ -130,11 +130,11 @@ export class AssertionController {
           {
             status: "error",
             error: {
-              code: "VALIDATION",
-              message: "Invalid assertion ID",
+              code: "NOT_FOUND",
+              message: "Assertion not found",
             },
           },
-          400,
+          404,
         );
       }
 
@@ -412,11 +412,11 @@ export class AssertionController {
           {
             status: "error",
             error: {
-              code: "VALIDATION",
-              message: "Invalid assertion ID",
+              code: "NOT_FOUND",
+              message: "Assertion not found",
             },
           },
-          400,
+          404,
         );
       }
 
