@@ -1,4 +1,4 @@
-import { db, dbPool } from "./src/db/config.js";
+import { db, dbPool } from "../../src/db/config.js";
 import { sql } from "drizzle-orm";
 
 // Migration content from 0004_add_status_lists.ts

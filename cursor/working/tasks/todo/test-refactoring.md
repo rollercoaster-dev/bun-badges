@@ -1,7 +1,6 @@
 ## Test Refactoring Task Status
 
-### Verify tests pass
-
+### Completed
 - [x] Check that unit tests pass
   - [x] migrate tests from src/ to tests/unit/ - 117 tests passing out of 125
   - [x] Fix mocking issues in oauth.controller.test.ts and auth.controller.test.ts
@@ -13,23 +12,37 @@
   - [x] Fixed request body JSON parsing in `createMockContext` function
   - [x] Fixed authorization header format in the tests
 
-- [ ] Check that other integration tests pass
-  - [ ] The test data structure has changed - tests are looking for `testData.user.userId` and `testData.issuer.issuerId` but these are now directly `testData.userId` and `testData.issuerId`
-  - [ ] Need to update all integration tests to use the new test data structure
+- [x] Clean up test scripts
+  - [x] Remove old shell scripts
+  - [x] Document remaining scripts
+  - [x] Update package.json to use Bun's test runner
 
-### Remaining Issues
+- [x] Reorganize E2E tests
+  - [x] Create flows directory structure
+  - [x] Move tests into appropriate categories
+  - [x] Add documentation for test organization
+  - [x] Create testing guidelines rule (008_testing.mdc)
 
-1. Most integration tests are failing due to the change in test data structure:
-   - The seedTestData function appears to return a different structure than expected in many tests
-   - Tests are looking for nested properties like `testData.user.userId` and `testData.issuer.issuerId`, but the actual data structure is flatter
+### Next Steps
 
-2. Some tests need to be updated to account for the new database schema:
-   - OAuth-related tests are now fixed and working properly
-   - Additional tests still need fixes for their data structure
+1. Fix TypeScript errors in tests
+   - [ ] Run `tsc:tests` to identify all type errors
+   - [ ] Fix import paths in E2E tests
+   - [ ] Fix type definitions for test utilities
+   - [ ] Ensure proper typing for mock objects
 
-3. Next steps:
-   - Update the seed test data function to match the expected structure in tests
-   - OR update all the tests to use the new flatter structure
-   - Run tests on smaller batches to isolate and fix remaining issues
+2. Fix remaining failing tests
+   - [ ] Fix assertion API tests (0/12 passing)
+   - [ ] Fix verification tests (4/6 passing)
+   - [ ] Fix OAuth controller unit tests (9 failing)
+   - [ ] Fix E2E test import issues
+   - [ ] Update test data fixtures as needed
 
-The OAuth controller integration tests are now 100% passing (8/8 tests) after our fixes! 
+### Current Test Status
+- OAuth controller integration tests: 8/8 passing 🟢
+- Issuer controller integration tests: 14/16 passing 🟡
+- Verification integration tests: 2/6 passing 🟠
+- Other integration tests: 0/12 passing 🔴
+- E2E tests: 5/8 passing (3 failing due to imports) 🟡
+
+Total progress: 29/50 tests passing (58%) 

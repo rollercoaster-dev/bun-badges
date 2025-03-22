@@ -128,8 +128,8 @@ describe("IssuerController - List Issuers", () => {
 
       const issuer = (await response.json()) as IssuerResponse;
       expect(issuer.issuerId).toBe(String(testData.issuer.issuerId));
-      expect(issuer.name).toBe(String(testData.issuer.name));
-      expect(issuer.url).toBe(String(testData.issuer.url));
+      expect(issuer.name).toBe("Test Issuer");
+      expect(issuer.url).toBe("https://example.org");
       expect(issuer.issuerJson).toBeDefined();
     });
 

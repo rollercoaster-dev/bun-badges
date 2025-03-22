@@ -1,55 +1,69 @@
 # E2E Testing Framework
 
-This directory contains the end-to-end (E2E) testing framework for the Bun Badges API. It uses Vitest and Supertest to provide a robust and developer-friendly testing experience.
+This directory contains the end-to-end (E2E) testing framework for the Bun Badges API. It uses Bun's test runner with Vitest and Supertest to provide a robust and developer-friendly testing experience.
 
-## Overview
+## Directory Structure
 
-End-to-end tests validate that the entire application works correctly from the user's perspective. These tests interact with the API just like a real client would, making HTTP requests and verifying responses.
+```
+tests/e2e/
+├── flows/           # Test flows organized by feature
+│   ├── auth/        # Authentication flows
+│   ├── badges/      # Badge-related flows
+│   ├── core/        # Core system flows
+│   └── verification/# Verification flows
+├── helpers/         # Test helper functions
+├── setup/          # Test environment setup
+├── utils/          # Additional utilities
+├── fixtures/       # Test data
+└── README.md       # This file
+```
 
 ## Getting Started
 
 ### Running E2E Tests
 
 To run all E2E tests:
-
 ```bash
-# Using npm script
-npm run test:e2e
+bun test:e2e
+```
 
-# Or directly
-./test-e2e.sh vitest
+To run tests for a specific feature area:
+```bash
+# Auth tests
+bun test tests/e2e/flows/auth/**/*.test.ts
+
+# Badge tests
+bun test tests/e2e/flows/badges/**/*.test.ts
+
+# Verification tests
+bun test tests/e2e/flows/verification/**/*.test.ts
+
+# Core tests
+bun test tests/e2e/flows/core/**/*.test.ts
 ```
 
 To run a specific test file:
-
 ```bash
-# Using npm script
-npm run test:e2e:file path/to/test.spec.ts
-
-# Or directly
-./test-e2e.sh vitest path/to/test.spec.ts
-```
-
-To run just the smoke test:
-
-```bash
-npm run test:e2e:smoke
+bun test path/to/test.test.ts
 ```
 
 ### Test Structure
 
 The framework consists of:
-
-- **Test Helpers**: Utility functions to simplify common testing tasks
-- **Fixtures**: Sample data for tests
-- **Test Files**: The actual test cases (`.spec.ts` files)
+- **Test Flows**: Feature-specific test flows in `flows/`
+- **Test Helpers**: Utility functions in `helpers/`
+- **Test Setup**: Environment setup in `setup/`
+- **Fixtures**: Sample data in `fixtures/`
 
 ## Creating a New E2E Test
 
-Here's a simple example of creating a new E2E test:
+1. Identify the appropriate feature area in `flows/`
+2. Create a new test file with the `.test.ts` extension
+3. Use the helper functions from `helpers/test-utils.ts`
+4. Follow the patterns in existing tests
 
+Example:
 ```typescript
-// src/tests/e2e/examples/simple.spec.ts
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Hono } from 'hono';
 import {
@@ -60,113 +74,55 @@ import {
 } from '../helpers/test-utils';
 
 describe('Example E2E Test', () => {
-  // Create a test app and server
-  const app = new Hono();
-  
-  // Add your test endpoints
-  app.get('/example', (c) => c.json({ message: 'Hello World' }));
-  
-  // Set up the test server
   const { server, request } = createTestServer(app);
   
-  // Clean up after tests
   afterAll(async () => {
     await cleanupTestResources(server);
   });
   
-  it('should respond with 200 status code', async () => {
+  it('should test something', async () => {
     const response = await request.get('/example');
     expect(response.status).toBe(200);
-    expect(response.body.message).toBe('Hello World');
   });
-});
-```
-
-## Using the Actual Application
-
-For testing the real application, you can import and use the actual app:
-
-```typescript
-import { describe, it, beforeAll, afterAll } from 'vitest';
-import appConfig from '../../../index'; // Import your main app 
-import { Hono } from 'hono';
-import { createTestServer, cleanupTestResources } from '../helpers/test-utils';
-
-describe('Real App E2E Test', () => {
-  // Create a Hono app for testing with the real app's fetch handler
-  const app = new Hono();
-  app.all('*', async (c) => {
-    // Pass all requests to the real app
-    return appConfig.fetch(c.req.raw);
-  });
-  
-  const { server, request } = createTestServer(app);
-  
-  afterAll(async () => {
-    await cleanupTestResources(server);
-  });
-  
-  it('should respond to health check', async () => {
-    const response = await request.get('/health');
-    expect(response.status).toBe(200);
-  });
-});
-```
-
-## Testing with Authentication
-
-To test endpoints that require authentication:
-
-```typescript
-it('should access protected endpoints', async () => {
-  // Register and login a test user
-  const user = await registerAndLoginUser(request);
-  
-  // Make an authenticated request
-  const response = await authenticatedRequest(
-    request,
-    'get',
-    '/protected-endpoint',
-    user.token
-  );
-  
-  expect(response.status).toBe(200);
-});
-```
-
-## Testing Database Operations
-
-To test features that interact with the database:
-
-```typescript
-import { resetDatabase } from '../helpers/test-utils';
-
-beforeEach(async () => {
-  // Reset the database before each test
-  await resetDatabase();
-});
-
-it('should create a new badge', async () => {
-  // ... test code
 });
 ```
 
 ## Best Practices
 
-1. **Isolation**: Each test should be independent and not rely on state from other tests.
-2. **Clean Up**: Always clean up resources after tests (server, database connections).
-3. **Meaningful Names**: Use descriptive test names that explain the behavior being tested.
-4. **Simple Tests**: Keep tests focused on a single behavior or flow.
-5. **Realistic Data**: Use realistic test data that represents actual use cases.
+1. **Organization**:
+   - Place tests in the appropriate feature directory
+   - Use descriptive file names
+   - Group related tests together
+
+2. **Test Structure**:
+   - Each test file should focus on one feature or flow
+   - Use clear test descriptions
+   - Follow the AAA pattern (Arrange, Act, Assert)
+
+3. **Data Management**:
+   - Use fixtures for test data
+   - Clean up after tests
+   - Don't rely on test order
+
+4. **Authentication**:
+   - Use `registerAndLoginUser` for auth flows
+   - Use `authenticatedRequest` for protected endpoints
+   - Test both positive and negative auth cases
+
+5. **Database**:
+   - Use `resetDatabase` before tests that need a clean state
+   - Clean up created data after tests
+   - Use transactions when appropriate
 
 ## Troubleshooting
 
-- **Database Connection Issues**: Ensure your test database is running (`./test-e2e.sh` handles this automatically).
-- **Port Conflicts**: If you see port binding errors, ensure no other tests are running or specify a different port.
-- **Failed Tests**: Check the console output for detailed error messages and stack traces.
+- **Database Connection Issues**: Ensure your test database is running
+- **Port Conflicts**: Tests use random ports to avoid conflicts
+- **Failed Tests**: Check the console output for detailed error messages
 
 ## Additional Resources
 
+- [Bun Test Documentation](https://bun.sh/docs/cli/test)
 - [Vitest Documentation](https://vitest.dev/)
 - [Supertest Documentation](https://github.com/ladjs/supertest)
 - [Hono Documentation](https://hono.dev/) 

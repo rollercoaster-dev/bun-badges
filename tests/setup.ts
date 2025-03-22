@@ -1,8 +1,66 @@
 import { resolve } from "path";
 import { config } from "dotenv";
 import { mock, type Mock } from "bun:test";
+import { execSync } from "child_process";
 
 console.log("Setting up test environment...");
+
+// Setup path aliases for test files
+const rootDir = process.cwd();
+
+// This is the resolver function for module paths
+// It will check for all @/ style imports and resolve them to the correct paths
+// This fixes the "Cannot find module '@/...'" errors in the test files
+Bun.plugin({
+  name: "path-alias-resolver",
+  setup(build) {
+    // Create a map of all our path aliases from tsconfig
+    const pathMappings = {
+      "@/": [
+        resolve(rootDir, "src/"),
+        resolve(rootDir, "tests/"), // Also check in tests directory
+      ],
+      "@routes/": resolve(rootDir, "src/routes/"),
+      "@controllers/": resolve(rootDir, "src/controllers/"),
+      "@utils/": resolve(rootDir, "src/utils/"),
+      "@models/": resolve(rootDir, "src/models/"),
+      "@services/": resolve(rootDir, "src/services/"),
+      "@middleware/": resolve(rootDir, "src/middleware/"),
+      "@tests/": resolve(rootDir, "tests/"),
+    };
+
+    // Register a resolver for each path prefix
+    Object.entries(pathMappings).forEach(([prefix, targetPath]) => {
+      build.onResolve({ filter: new RegExp(`^${prefix}.*`) }, (args) => {
+        const importPath = args.path;
+
+        // If we have an array of potential paths, try each one
+        if (Array.isArray(targetPath)) {
+          for (const path of targetPath) {
+            const resolvedPath = importPath.replace(prefix, `${path}/`);
+
+            // Check if this resolved path exists (synchronously)
+            try {
+              if (Bun.file(resolvedPath).existsSync()) {
+                return { path: resolvedPath };
+              }
+            } catch (e) {
+              // Continue to the next potential path
+            }
+          }
+
+          // If we reach here, try the first path as a fallback
+          return { path: importPath.replace(prefix, `${targetPath[0]}/`) };
+        } else {
+          // Single path case - just replace directly as before
+          return { path: importPath.replace(prefix, `${targetPath}/`) };
+        }
+      });
+    });
+  },
+});
+
+console.log("✅ Path aliases configured for tests");
 
 // Load test environment variables first
 config({ path: resolve(process.cwd(), ".env.test") });
@@ -225,3 +283,76 @@ mock.module("@scure/base", () => {
 });
 
 console.log("✅ Test setup complete");
+
+const PROJECT_ROOT = resolve(__dirname, "..");
+const DOCKER_COMPOSE_FILE = resolve(PROJECT_ROOT, "docker-compose.test.yml");
+
+// Only setup database for integration and e2e tests
+const needsDatabase =
+  process.env.NODE_ENV === "test" ||
+  process.argv.some(
+    (arg) => arg.includes("integration") || arg.includes("e2e"),
+  );
+
+if (needsDatabase) {
+  console.log("🐳 Setting up test database...");
+
+  try {
+    // Cleanup any existing containers
+    execSync(`docker-compose -f ${DOCKER_COMPOSE_FILE} down`, {
+      stdio: "inherit",
+    });
+
+    // Start database
+    execSync(`docker-compose -f ${DOCKER_COMPOSE_FILE} up -d db_test`, {
+      stdio: "inherit",
+    });
+
+    // Wait for database to be ready
+    let attempts = 0;
+    const maxAttempts = 20;
+
+    while (attempts < maxAttempts) {
+      try {
+        execSync(
+          `docker-compose -f ${DOCKER_COMPOSE_FILE} exec -T db_test pg_isready -U postgres`,
+        );
+        console.log("✅ Database is ready!");
+        break;
+      } catch (error) {
+        attempts++;
+        if (attempts === maxAttempts) {
+          throw new Error("Database failed to start after 20 attempts");
+        }
+        console.log(
+          `Waiting for database (attempt ${attempts}/${maxAttempts})...`,
+        );
+        execSync("sleep 1");
+      }
+    }
+
+    // Run migrations
+    console.log("🔄 Running migrations...");
+    execSync("bun run db:migrate", { stdio: "inherit" });
+
+    // Register cleanup on process exit
+    process.on("exit", () => {
+      console.log("🧹 Cleaning up test environment...");
+      execSync(`docker-compose -f ${DOCKER_COMPOSE_FILE} down`, {
+        stdio: "inherit",
+      });
+    });
+
+    // Handle interrupts
+    process.on("SIGINT", () => {
+      console.log("\n🛑 Test interrupted, cleaning up...");
+      execSync(`docker-compose -f ${DOCKER_COMPOSE_FILE} down`, {
+        stdio: "inherit",
+      });
+      process.exit(1);
+    });
+  } catch (error) {
+    console.error("❌ Failed to setup test environment:", error);
+    process.exit(1);
+  }
+}

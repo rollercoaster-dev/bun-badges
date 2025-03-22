@@ -106,6 +106,16 @@ export async function seedTestData() {
       // First key
       const keyId1 = await createTestSigningKey(issuerId, tx);
 
+      // Get the public key multibase for use in assertions
+      const signingKeyInfo = await tx
+        .select()
+        .from(signingKeys)
+        .where(sql`key_id = ${keyId1}`)
+        .execute();
+      const publicKeyMultibase =
+        signingKeyInfo[0]?.publicKeyMultibase ||
+        "z6MksSBa6fJgGBw4m3WxoLLHJ4mji9iodcYQXJmF7xT9wFQZ";
+
       console.log("Creating test signing key...");
 
       // Second key with slight variation for testing multiple keys
@@ -160,6 +170,16 @@ export async function seedTestData() {
             type: "hosted",
           },
           evidence: "https://example.org/evidence",
+          // Add OB3 proof for verification tests
+          proof: {
+            type: "DataIntegrityProof",
+            cryptosuite: "eddsa-rdfc-2022",
+            created: new Date().toISOString(),
+            verificationMethod: `did:key:${publicKeyMultibase}#${publicKeyMultibase}`,
+            proofPurpose: "assertionMethod",
+            proofValue:
+              "z4oey5q2M3XKaxup3tmzN4DRFTLVqpLMweBrSxMY2xnrHmKYhBrTuxmTcBNwDiond5bnVKXdK7xRMCa2Z2GuRQcKS",
+          },
         },
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -173,6 +193,13 @@ export async function seedTestData() {
         assertionId,
         signingKeyId1: keyId1,
         signingKeyId2: keyId2,
+
+        // Also provide the nested structure for backward compatibility
+        user: { userId },
+        issuer: { issuerId },
+        badge: { badgeId },
+        assertion: { assertionId },
+        signingKey: { keyId: keyId1 },
       };
     });
 
@@ -318,3 +345,32 @@ export async function createTestSigningKey(issuerId: string, tx?: any) {
 
 // Forward the export from mock-context.ts
 export { createMockContext };
+
+/**
+ * Get the assertion JSON directly from the database
+ * This is useful for tests that need to modify the assertion JSON
+ */
+export async function getAssertionJson(assertionId: string) {
+  const assertion = await db
+    .select()
+    .from(badgeAssertions)
+    .where(sql`assertion_id = ${assertionId}`)
+    .execute();
+
+  return assertion[0]?.assertionJson;
+}
+
+/**
+ * Update the assertion JSON in the database
+ * This is useful for tests that need to modify the assertion JSON
+ */
+export async function updateAssertionJson(
+  assertionId: string,
+  assertionJson: any,
+) {
+  await db
+    .update(badgeAssertions)
+    .set({ assertionJson })
+    .where(sql`assertion_id = ${assertionId}`)
+    .execute();
+}

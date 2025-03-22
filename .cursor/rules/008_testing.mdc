@@ -1,0 +1,107 @@
+---
+description: Testing Guidelines
+globs: 
+alwaysApply: false
+---
+ # Testing Guidelines
+
+## Test Structure
+- `tests/unit/`: Unit tests for individual components
+- `tests/integration/`: Integration tests for API endpoints and services
+- `tests/e2e/`: End-to-end tests for complete user flows
+  - `flows/`: Feature-specific test flows
+  - `helpers/`: Test utilities and setup
+  - `fixtures/`: Test data
+  - `setup/`: Test environment configuration
+
+## Test Commands
+
+### Basic Commands
+```bash
+# Run all tests
+bun test
+
+# Run tests in watch mode
+bun test:watch
+
+# Run specific test file
+bun test path/to/file.test.ts
+```
+
+### Test Types
+```bash
+# Unit tests
+bun test:unit
+
+# Integration tests
+bun test:integration
+
+# E2E tests
+bun test:e2e
+```
+
+## Test File Naming
+- Files must end in `.test.ts`
+- Names should be descriptive and indicate type
+- Examples:
+  - `user.service.test.ts`
+  - `auth.integration.test.ts`
+  - `badge-flow.test.ts`
+
+## Test Setup
+- Tests use Bun's built-in test runner
+- `tests/setup.ts` is preloaded for all tests
+- Environment variables:
+  - `NODE_ENV=test`: For integration/E2E tests
+  - `E2E_TEST=true`: For E2E tests only
+
+## Database Testing
+- Test database runs in Docker
+- Separate test database for isolation
+- Migrations run automatically
+- Data cleaned up between test runs
+
+## Best Practices
+1. **Isolation**: Each test should be independent
+2. **Cleanup**: Clean up resources after tests
+3. **Mocking**: Use mocks for external services
+4. **Coverage**: Aim for comprehensive coverage
+5. **Documentation**: Document test setup and data
+
+## Helper Functions
+```typescript
+// Create test server
+const { server, request } = createTestServer(app);
+
+// Auth helpers
+const user = await registerAndLoginUser(request);
+const response = await authenticatedRequest(request, 'get', '/endpoint', token);
+
+// Database helpers
+await resetDatabase();
+```
+
+## Example Test
+```typescript
+import { describe, it, expect } from 'vitest';
+import { createTestServer, registerAndLoginUser } from '../helpers/test-utils';
+
+describe('Badge API', () => {
+  const { server, request } = createTestServer(app);
+
+  it('should create a badge', async () => {
+    const user = await registerAndLoginUser(request);
+    const response = await authenticatedRequest(
+      request,
+      'post',
+      '/badges',
+      user.token,
+      { name: 'Test Badge' }
+    );
+    expect(response.status).toBe(201);
+  });
+});
+```
+```
+
+You can copy this content directly into `.cursor/rules/008_testing.mdc`. Would you like me to proceed with checking the status and creating a commit message for all our changes?

@@ -34,8 +34,8 @@ describe("IssuerController - Get Issuer", () => {
 
       const issuerData = (await response.json()) as any;
       expect(issuerData.issuerId).toBe(testData.issuer.issuerId);
-      expect(issuerData.name).toBe(testData.issuer.name);
-      expect(issuerData.url).toBe(testData.issuer.url);
+      expect(issuerData.name).toBe("Test Issuer");
+      expect(issuerData.url).toBe("https://example.org");
       expect(issuerData.issuerJson).toBeDefined();
     });
 

@@ -1,6 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { VerificationService } from "@/services/verification.service";
-import { seedTestData, clearTestData, TestData } from "@/utils/test/db-helpers";
+import {
+  seedTestData,
+  clearTestData,
+  TestData,
+  getAssertionJson,
+  updateAssertionJson,
+} from "@/utils/test/db-helpers";
 import { testDb } from "@/utils/test/integration-setup";
 import { badgeAssertions } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -26,8 +32,8 @@ describe("Verification Edge Cases Integration Tests", () => {
       // Get the assertion ID from the test data
       const assertionId = testData.assertion.assertionId;
 
-      // Create a tampered credential
-      const assertionJson = testData.assertion.assertionJson as any;
+      // Get the current assertion JSON
+      const assertionJson = await getAssertionJson(assertionId);
 
       // Add a proof property
       assertionJson.proof = {
@@ -54,12 +60,8 @@ describe("Verification Edge Cases Integration Tests", () => {
         };
       }
 
-      await testDb
-        .update(badgeAssertions)
-        .set({
-          assertionJson,
-        })
-        .where(eq(badgeAssertions.assertionId, assertionId));
+      // Update the assertion JSON in the database
+      await updateAssertionJson(assertionId, assertionJson);
 
       const result = await service.verifyAssertion(assertionId);
 
@@ -71,8 +73,8 @@ describe("Verification Edge Cases Integration Tests", () => {
       // Get the assertion ID from the test data
       const assertionId = testData.assertion.assertionId;
 
-      // Create a tampered proof
-      const assertionJson = testData.assertion.assertionJson as any;
+      // Get the current assertion JSON
+      const assertionJson = await getAssertionJson(assertionId);
 
       // Add an invalid proof property
       assertionJson.proof = {
@@ -84,12 +86,8 @@ describe("Verification Edge Cases Integration Tests", () => {
         proofValue: "VALID_SIGNATURE", // This should pass validation
       };
 
-      await testDb
-        .update(badgeAssertions)
-        .set({
-          assertionJson,
-        })
-        .where(eq(badgeAssertions.assertionId, assertionId));
+      // Update the assertion JSON in the database
+      await updateAssertionJson(assertionId, assertionJson);
 
       const result = await service.verifyAssertion(assertionId);
 
@@ -103,8 +101,8 @@ describe("Verification Edge Cases Integration Tests", () => {
       // Get the assertion ID from the test data
       const assertionId = testData.assertion.assertionId;
 
-      // Update the assertion to ensure it has no proof
-      const assertionJson = testData.assertion.assertionJson as any;
+      // Get the current assertion JSON
+      const assertionJson = await getAssertionJson(assertionId);
 
       // Ensure credential has OB3.0 context
       assertionJson["@context"] = [
@@ -125,12 +123,8 @@ describe("Verification Edge Cases Integration Tests", () => {
         delete assertionJson.proof;
       }
 
-      await testDb
-        .update(badgeAssertions)
-        .set({
-          assertionJson,
-        })
-        .where(eq(badgeAssertions.assertionId, assertionId));
+      // Update the assertion JSON in the database
+      await updateAssertionJson(assertionId, assertionJson);
 
       const result = await service.verifyAssertion(assertionId);
 
@@ -142,12 +136,12 @@ describe("Verification Edge Cases Integration Tests", () => {
       // Get the assertion ID from the test data
       const assertionId = testData.assertion.assertionId;
 
-      // Update with invalid proof type
-      const assertionJson = testData.assertion.assertionJson as any;
+      // Get the current assertion JSON
+      const assertionJson = await getAssertionJson(assertionId);
 
       // Add an invalid proof type
       assertionJson.proof = {
-        type: "DataIntegrityProof",
+        type: "InvalidProofType", // This should fail validation
         cryptosuite: "eddsa-rdfc-2022",
         created: new Date().toISOString(),
         verificationMethod: `did:key:${testData.signingKey.controller}#key-1`,
@@ -155,12 +149,8 @@ describe("Verification Edge Cases Integration Tests", () => {
         proofValue: "VALID_SIGNATURE",
       };
 
-      await testDb
-        .update(badgeAssertions)
-        .set({
-          assertionJson,
-        })
-        .where(eq(badgeAssertions.assertionId, assertionId));
+      // Update the assertion JSON in the database
+      await updateAssertionJson(assertionId, assertionJson);
 
       const result = await service.verifyOB3Assertion(assertionId);
 
@@ -196,8 +186,8 @@ describe("Verification Edge Cases Integration Tests", () => {
       // Get the assertion ID from the test data
       const assertionId = testData.assertion.assertionId;
 
-      // Update with mixed context versions
-      const assertionJson = testData.assertion.assertionJson as any;
+      // Get the current assertion JSON
+      const assertionJson = await getAssertionJson(assertionId);
 
       // Set mixed context versions
       assertionJson["@context"] = [
@@ -216,12 +206,8 @@ describe("Verification Edge Cases Integration Tests", () => {
         proofValue: "VALID_SIGNATURE", // Should match what our mocks expect
       };
 
-      await testDb
-        .update(badgeAssertions)
-        .set({
-          assertionJson,
-        })
-        .where(eq(badgeAssertions.assertionId, assertionId));
+      // Update the assertion JSON in the database
+      await updateAssertionJson(assertionId, assertionJson);
 
       const result = await service.verifyAssertion(assertionId);
 

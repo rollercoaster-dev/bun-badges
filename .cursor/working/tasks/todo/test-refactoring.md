@@ -127,3 +127,61 @@
 4. Fix module export issue in real-app-test.spec.ts
 5. Fix the remaining unit test mocking issues
 6. Update documentation for the new test structure
+
+## Description
+Fixing failing integration tests for the badge service. We need to address various test failures in the OAuth controller tests, verification tests, and other integration tests.
+
+## Tasks
+
+### High Priority
+- [x] Fix OAuth controller integration tests 
+  - Fixed with proper mock setup and signature verification
+  - 8/8 passing
+- [x] Fix Issuer controller tests 
+  - Fixed URL expectation in test cases
+  - 16/16 passing
+- [x] Fix Verification service tests
+  - Fixed OB3 format credential generation 
+  - Added helpers to get and update assertion JSON
+  - 6/6 passing
+- [x] Fix Verification edge cases tests
+  - Updated to use helper functions for getting and updating assertion JSON
+  - 7/7 passing
+- [ ] Fix Assertions API tests (6 failing tests)
+  - Current issue: Routes are returning 404 errors, suggesting an issue with route mounting
+  - Routes that are failing: assertions endpoints and verification endpoints
+
+### Progress
+
+Current integration test status:
+- OAuth Controller Integration Tests: 100% passing (8/8)
+- Issuer Controller Tests: 100% passing (16/16) 
+- Verification Service Tests: 100% passing (6/6)
+- Verification Edge Cases Tests: 100% passing (7/7)
+- Assertions API Tests: 0% passing (0/6)
+- Total: 91% passing (56/62)
+
+### Issues Resolved
+
+1. **Verification Tests**:
+   - Fixed OB3 credential format issues
+   - Added helper functions `getAssertionJson` and `updateAssertionJson` to properly retrieve and update assertion data
+   - Fixed signature validation for credentials
+
+2. **Issuer Controller Tests**: 
+   - Fixed URL expectation issue in tests
+   - Tests were expecting incorrect URL values (undefined vs. actual URLs)
+
+### Issues Remaining
+
+1. **Assertions API Integration Tests**:
+   - All 6 tests failing with 404 errors 
+   - Suggests problem with route mounting or path configurations
+   - Need to investigate:
+     - Route registration in test setup
+     - URL path configurations 
+     - Possible mismatch between client requests and server endpoints
+
+### Notes
+
+The test environment is working properly overall. The database connections, seeding test data, and most test mechanisms are functioning. The remaining issues appear to be specific to the assertions API endpoints and how they're being tested.
