@@ -1,5 +1,5 @@
 import { expect, test, describe, beforeEach, afterEach } from "bun:test";
-import { AssertionController } from "@/controllers/assertion.controller";
+import { AssertionController } from "@/controllers/assertions.controller";
 import { VerificationController } from "@/controllers/verification.controller";
 import {
   seedTestData,

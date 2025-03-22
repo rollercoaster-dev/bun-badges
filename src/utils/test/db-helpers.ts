@@ -8,9 +8,17 @@ import {
   revokedTokens,
 } from "@/db/schema";
 import { users } from "@/db/schema/index";
-import { sql } from "drizzle-orm";
+import { sql, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { createMockContext } from "./mock-context";
+import { OB2BadgeAssertion } from "@/services/verification.service";
+import { OpenBadgeCredential } from "@/models/credential.model";
+import {
+  getOB2AssertionJson,
+  getOB3CredentialJson,
+  updateOB2AssertionJson,
+  updateOB3CredentialJson,
+} from "../../../tests/helpers/test-utils";
 
 /**
  * Test data interface
@@ -347,30 +355,69 @@ export async function createTestSigningKey(issuerId: string, tx?: any) {
 export { createMockContext };
 
 /**
- * Get the assertion JSON directly from the database
- * This is useful for tests that need to modify the assertion JSON
+ * Get assertion JSON from the database
  */
-export async function getAssertionJson(assertionId: string) {
+export async function getAssertionJson(
+  assertionId: string,
+): Promise<OB2BadgeAssertion | OpenBadgeCredential> {
   const assertion = await db
     .select()
     .from(badgeAssertions)
-    .where(sql`assertion_id = ${assertionId}`)
-    .execute();
+    .where(eq(badgeAssertions.assertionId, assertionId))
+    .limit(1);
 
-  return assertion[0]?.assertionJson;
+  if (!assertion || assertion.length === 0) {
+    throw new Error(`Assertion ${assertionId} not found`);
+  }
+
+  const assertionJson = assertion[0].assertionJson;
+  if (!assertionJson) {
+    throw new Error(`Assertion ${assertionId} has no JSON data`);
+  }
+
+  // Check if it's an OB3 credential
+  const maybeOB3 = assertionJson as Record<string, unknown>;
+  if (
+    Array.isArray(maybeOB3["@context"]) &&
+    maybeOB3["@context"].some(
+      (ctx: unknown) =>
+        typeof ctx === "string" && ctx.includes("credentials/v1"),
+    )
+  ) {
+    return getOB3CredentialJson(assertionId);
+  }
+
+  return getOB2AssertionJson(assertionId);
 }
 
 /**
- * Update the assertion JSON in the database
- * This is useful for tests that need to modify the assertion JSON
+ * Update assertion JSON in the database
  */
 export async function updateAssertionJson(
   assertionId: string,
-  assertionJson: any,
-) {
+  updates: Partial<OB2BadgeAssertion | OpenBadgeCredential>,
+): Promise<void> {
+  // Check if it's an OB3 credential
+  const maybeOB3 = updates as Record<string, unknown>;
+  const updatedJson =
+    Array.isArray(maybeOB3["@context"]) &&
+    maybeOB3["@context"].some(
+      (ctx: unknown) =>
+        typeof ctx === "string" && ctx.includes("credentials/v1"),
+    )
+      ? updateOB3CredentialJson(
+          assertionId,
+          updates as Partial<OpenBadgeCredential>,
+        )
+      : updateOB2AssertionJson(
+          assertionId,
+          updates as Partial<OB2BadgeAssertion>,
+        );
+
   await db
     .update(badgeAssertions)
-    .set({ assertionJson })
-    .where(sql`assertion_id = ${assertionId}`)
-    .execute();
+    .set({
+      assertionJson: updatedJson,
+    })
+    .where(eq(badgeAssertions.assertionId, assertionId));
 }

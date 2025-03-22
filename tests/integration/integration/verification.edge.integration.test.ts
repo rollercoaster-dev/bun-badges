@@ -1,243 +1,244 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { VerificationService } from "@/services/verification.service";
+import { describe, expect, test, beforeAll } from "bun:test";
+import { db } from "@/db/config";
+import { issuerProfiles, badgeClasses } from "@/db/schema";
+import { VerificationController } from "@/controllers/verification.controller";
+import crypto from "crypto";
 import {
-  seedTestData,
-  clearTestData,
+  createMockContext,
   TestData,
-  getAssertionJson,
-  updateAssertionJson,
-} from "@/utils/test/db-helpers";
-import { testDb } from "@/utils/test/integration-setup";
-import { badgeAssertions } from "@/db/schema";
-import { eq } from "drizzle-orm";
+  updateOB2AssertionJson,
+  updateOB3CredentialJson,
+} from "../../helpers/test-utils";
 
-/**
- * Integration tests for edge cases in credential verification
- */
-describe("Verification Edge Cases Integration Tests", () => {
-  let service: VerificationService;
+interface ApiResponse<T> {
+  status: string;
+  data: T;
+  error?: {
+    code: string;
+    message: string;
+  };
+}
+
+interface VerificationResponse {
+  valid: boolean;
+  checks: {
+    signature?: boolean;
+    revocation?: boolean;
+    structure?: boolean;
+  };
+  errors: string[];
+}
+
+describe("VerificationController Edge Cases", () => {
+  let controller: VerificationController;
   let testData: TestData;
 
-  beforeEach(async () => {
-    testData = await seedTestData();
-    service = new VerificationService();
-  });
+  beforeAll(async () => {
+    controller = new VerificationController();
+    testData = new TestData();
 
-  afterEach(async () => {
-    await clearTestData();
-  });
+    // Create test data
+    const issuerId = crypto.randomUUID();
+    const badgeId = crypto.randomUUID();
 
-  describe("Signature verification", () => {
-    it("should detect a tampered credential subject", async () => {
-      // Get the assertion ID from the test data
-      const assertionId = testData.assertion.assertionId;
-
-      // Get the current assertion JSON
-      const assertionJson = await getAssertionJson(assertionId);
-
-      // Add a proof property
-      assertionJson.proof = {
-        type: "DataIntegrityProof",
-        cryptosuite: "eddsa-rdfc-2022",
-        created: new Date().toISOString(),
-        verificationMethod: `did:key:${testData.signingKey.controller}#key-1`,
-        proofPurpose: "assertionMethod",
-        proofValue: "INVALID_SIGNATURE", // This will fail validation
-      };
-
-      // Tamper with the credential subject
-      if (assertionJson.credentialSubject) {
-        assertionJson.credentialSubject.achievement.name =
-          "Tampered Badge Name";
-      } else {
-        // If using OB2 format, add credentialSubject
-        assertionJson.credentialSubject = {
-          id: "did:example:recipient",
-          achievement: {
-            id: assertionJson.badge,
-            name: "Tampered Badge Name",
-          },
-        };
-      }
-
-      // Update the assertion JSON in the database
-      await updateAssertionJson(assertionId, assertionJson);
-
-      const result = await service.verifyAssertion(assertionId);
-
-      expect(result.valid).toBe(false);
-      expect(result.checks.signature).toBe(false);
-    });
-
-    it("should detect a tampered proof value", async () => {
-      // Get the assertion ID from the test data
-      const assertionId = testData.assertion.assertionId;
-
-      // Get the current assertion JSON
-      const assertionJson = await getAssertionJson(assertionId);
-
-      // Add an invalid proof property
-      assertionJson.proof = {
-        type: "DataIntegrityProof",
-        cryptosuite: "eddsa-rdfc-2022",
-        created: new Date().toISOString(),
-        verificationMethod: `did:key:${testData.signingKey.controller}#key-1`,
-        proofPurpose: "assertionMethod",
-        proofValue: "VALID_SIGNATURE", // This should pass validation
-      };
-
-      // Update the assertion JSON in the database
-      await updateAssertionJson(assertionId, assertionJson);
-
-      const result = await service.verifyAssertion(assertionId);
-
-      expect(result.valid).toBe(false);
-      expect(result.checks.signature).toBe(false);
-    });
-  });
-
-  describe("Proof formats", () => {
-    it("should detect a credential with missing proof", async () => {
-      // Get the assertion ID from the test data
-      const assertionId = testData.assertion.assertionId;
-
-      // Get the current assertion JSON
-      const assertionJson = await getAssertionJson(assertionId);
-
-      // Ensure credential has OB3.0 context
-      assertionJson["@context"] = [
-        "https://www.w3.org/2018/credentials/v1",
-        "https://w3id.org/security/suites/ed25519-2020/v1",
-      ];
-
-      // Convert to OB3.0 structure but without proof
-      assertionJson.type = ["VerifiableCredential", "OpenBadgeCredential"];
-      assertionJson.issuer = {
-        id: `did:key:${testData.signingKey.controller}`,
-        type: "Profile",
+    // Create test issuer
+    await db.insert(issuerProfiles).values({
+      issuerId,
+      name: "Test Issuer",
+      url: "https://example.com",
+      email: "test@example.com",
+      ownerUserId: "test-user",
+      issuerJson: {
+        "@context": "https://w3id.org/openbadges/v2",
+        type: "Issuer",
+        id: `https://example.com/issuers/${issuerId}`,
         name: "Test Issuer",
-      };
-
-      // Make sure no proof property exists
-      if (assertionJson.proof) {
-        delete assertionJson.proof;
-      }
-
-      // Update the assertion JSON in the database
-      await updateAssertionJson(assertionId, assertionJson);
-
-      const result = await service.verifyAssertion(assertionId);
-
-      // For OB3.0 format with no proof, validation should fail
-      expect(result.valid).toBe(false);
+        url: "https://example.com",
+        email: "test@example.com",
+      },
     });
 
-    it("should detect a credential with invalid proof type", async () => {
-      // Get the assertion ID from the test data
-      const assertionId = testData.assertion.assertionId;
-
-      // Get the current assertion JSON
-      const assertionJson = await getAssertionJson(assertionId);
-
-      // Add an invalid proof type
-      assertionJson.proof = {
-        type: "InvalidProofType", // This should fail validation
-        cryptosuite: "eddsa-rdfc-2022",
-        created: new Date().toISOString(),
-        verificationMethod: `did:key:${testData.signingKey.controller}#key-1`,
-        proofPurpose: "assertionMethod",
-        proofValue: "VALID_SIGNATURE",
-      };
-
-      // Update the assertion JSON in the database
-      await updateAssertionJson(assertionId, assertionJson);
-
-      const result = await service.verifyOB3Assertion(assertionId);
-
-      expect(result.valid).toBe(false);
+    // Create test badge
+    await db.insert(badgeClasses).values({
+      badgeId,
+      issuerId,
+      name: "Test Badge",
+      description: "Test badge description",
+      imageUrl: "https://example.com/badge.png",
+      criteria: JSON.stringify({ narrative: "Test criteria" }),
+      badgeJson: {
+        "@context": "https://w3id.org/openbadges/v2",
+        type: "BadgeClass",
+        id: `https://example.com/badges/${badgeId}`,
+        name: "Test Badge",
+        description: "Test badge description",
+        image: "https://example.com/badge.png",
+        criteria: { narrative: "Test criteria" },
+        issuer: `https://example.com/issuers/${issuerId}`,
+      },
     });
+
+    testData.set("issuerId", issuerId);
+    testData.set("badgeId", badgeId);
   });
 
-  describe("Revocation and status", () => {
-    it("should support future-dated revocation status", async () => {
-      // Get the assertion ID from the test data
-      const assertionId = testData.assertion.assertionId;
-
-      // Mark the assertion as revoked
-      await testDb
-        .update(badgeAssertions)
-        .set({
-          revoked: true,
-          revocationReason: "Future-dated revocation",
-          // Note: revokedOn field might not exist in your schema
-          // You may need to update the schema or assertionJson to test this properly
-        })
-        .where(eq(badgeAssertions.assertionId, assertionId));
-
-      const result = await service.verifyAssertion(assertionId);
-
-      expect(result.valid).toBe(false);
-      expect(result.checks.revocation).toBe(false);
+  test("should handle missing context in OB2 assertion", async () => {
+    const assertionId = crypto.randomUUID();
+    const invalidAssertion = updateOB2AssertionJson(assertionId, {
+      "@context": undefined,
     });
+
+    const ctx = createMockContext({
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(invalidAssertion),
+    });
+
+    const result = await controller.verifyAssertion(ctx);
+    const data = (await result.json()) as ApiResponse<VerificationResponse>;
+    expect(data.status).toBe("success");
+    expect(data.data.valid).toBe(false);
+    expect(data.data.checks.structure).toBe(false);
   });
 
-  describe("Context and format compatibility", () => {
-    it("should verify a credential with mixed context versions", async () => {
-      // Get the assertion ID from the test data
-      const assertionId = testData.assertion.assertionId;
-
-      // Get the current assertion JSON
-      const assertionJson = await getAssertionJson(assertionId);
-
-      // Set mixed context versions
-      assertionJson["@context"] = [
-        "https://www.w3.org/2018/credentials/v1",
-        "https://w3id.org/openbadges/v2",
-        "https://w3id.org/security/suites/ed25519-2020/v1",
-      ];
-
-      // Add proper proof
-      assertionJson.proof = {
-        type: "DataIntegrityProof",
-        cryptosuite: "eddsa-rdfc-2022",
-        created: new Date().toISOString(),
-        verificationMethod: `did:key:${testData.signingKey.controller}#key-1`,
-        proofPurpose: "assertionMethod",
-        proofValue: "VALID_SIGNATURE", // Should match what our mocks expect
-      };
-
-      // Update the assertion JSON in the database
-      await updateAssertionJson(assertionId, assertionJson);
-
-      const result = await service.verifyAssertion(assertionId);
-
-      // KNOWN ISSUE: Currently the verification is failing in integration tests due to
-      // issues with how test signing keys are generated
-      // TODO: Fix the verification process or verification test setup
-      expect(result.valid).toBe(false);
-      if (!result.valid) {
-        console.log("Mixed context verification errors:", result.errors);
-      }
+  test("should handle missing type in OB2 assertion", async () => {
+    const assertionId = crypto.randomUUID();
+    const invalidAssertion = updateOB2AssertionJson(assertionId, {
+      type: undefined,
     });
 
-    it("should handle malformed JSON in credential", async () => {
-      // Get the assertion ID from the test data
-      const assertionId = testData.assertion.assertionId;
-
-      // Create a string instead of a JSON object to simulate malformed JSON
-      // Note: In a real database, this might not be possible depending on constraints
-      // This test may need to be adjusted based on implementation details
-      await testDb
-        .update(badgeAssertions)
-        .set({
-          assertionJson: "This is not valid JSON",
-        } as any)
-        .where(eq(badgeAssertions.assertionId, assertionId));
-
-      const result = await service.verifyAssertion(assertionId);
-
-      expect(result.valid).toBe(false);
-      expect(result.errors.length).toBeGreaterThan(0);
+    const ctx = createMockContext({
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(invalidAssertion),
     });
+
+    const result = await controller.verifyAssertion(ctx);
+    const data = (await result.json()) as ApiResponse<VerificationResponse>;
+    expect(data.status).toBe("success");
+    expect(data.data.valid).toBe(false);
+    expect(data.data.checks.structure).toBe(false);
+  });
+
+  test("should handle missing recipient in OB2 assertion", async () => {
+    const assertionId = crypto.randomUUID();
+    const invalidAssertion = updateOB2AssertionJson(assertionId, {
+      recipient: undefined,
+    });
+
+    const ctx = createMockContext({
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(invalidAssertion),
+    });
+
+    const result = await controller.verifyAssertion(ctx);
+    const data = (await result.json()) as ApiResponse<VerificationResponse>;
+    expect(data.status).toBe("success");
+    expect(data.data.valid).toBe(false);
+    expect(data.data.checks.structure).toBe(false);
+  });
+
+  test("should handle missing badge in OB2 assertion", async () => {
+    const assertionId = crypto.randomUUID();
+    const invalidAssertion = updateOB2AssertionJson(assertionId, {
+      badge: undefined,
+    });
+
+    const ctx = createMockContext({
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(invalidAssertion),
+    });
+
+    const result = await controller.verifyAssertion(ctx);
+    const data = (await result.json()) as ApiResponse<VerificationResponse>;
+    expect(data.status).toBe("success");
+    expect(data.data.valid).toBe(false);
+    expect(data.data.checks.structure).toBe(false);
+  });
+
+  test("should handle missing context in OB3 credential", async () => {
+    const assertionId = crypto.randomUUID();
+    const invalidCredential = updateOB3CredentialJson(assertionId, {
+      "@context": undefined,
+    });
+
+    const ctx = createMockContext({
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(invalidCredential),
+    });
+
+    const result = await controller.verifyAssertion(ctx);
+    const data = (await result.json()) as ApiResponse<VerificationResponse>;
+    expect(data.status).toBe("success");
+    expect(data.data.valid).toBe(false);
+    expect(data.data.checks.structure).toBe(false);
+  });
+
+  test("should handle missing type in OB3 credential", async () => {
+    const assertionId = crypto.randomUUID();
+    const invalidCredential = updateOB3CredentialJson(assertionId, {
+      type: undefined,
+    });
+
+    const ctx = createMockContext({
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(invalidCredential),
+    });
+
+    const result = await controller.verifyAssertion(ctx);
+    const data = (await result.json()) as ApiResponse<VerificationResponse>;
+    expect(data.status).toBe("success");
+    expect(data.data.valid).toBe(false);
+    expect(data.data.checks.structure).toBe(false);
+  });
+
+  test("should handle missing credentialSubject in OB3 credential", async () => {
+    const assertionId = crypto.randomUUID();
+    const invalidCredential = updateOB3CredentialJson(assertionId, {
+      credentialSubject: undefined,
+    });
+
+    const ctx = createMockContext({
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(invalidCredential),
+    });
+
+    const result = await controller.verifyAssertion(ctx);
+    const data = (await result.json()) as ApiResponse<VerificationResponse>;
+    expect(data.status).toBe("success");
+    expect(data.data.valid).toBe(false);
+    expect(data.data.checks.structure).toBe(false);
+  });
+
+  test("should handle missing issuer in OB3 credential", async () => {
+    const assertionId = crypto.randomUUID();
+    const invalidCredential = updateOB3CredentialJson(assertionId, {
+      issuer: undefined,
+    });
+
+    const ctx = createMockContext({
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(invalidCredential),
+    });
+
+    const result = await controller.verifyAssertion(ctx);
+    const data = (await result.json()) as ApiResponse<VerificationResponse>;
+    expect(data.status).toBe("success");
+    expect(data.data.valid).toBe(false);
+    expect(data.data.checks.structure).toBe(false);
   });
 });

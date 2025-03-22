@@ -1,289 +1,168 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { VerificationService } from "@/services/verification.service";
+import { describe, expect, test, beforeAll } from "bun:test";
+import { db } from "@/db/config";
+import { issuerProfiles, badgeClasses } from "@/db/schema";
+import { VerificationController } from "@/controllers/verification.controller";
+import crypto from "crypto";
 import {
-  seedTestData,
-  clearTestData,
-  getAssertionJson,
-  updateAssertionJson,
-} from "@/utils/test/db-helpers";
-import { testDb } from "@/utils/test/integration-setup";
-import { badgeAssertions } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
+  createMockContext,
+  TestData,
+  getOB2AssertionJson,
+  getOB3CredentialJson,
+  updateOB2AssertionJson,
+  updateOB3CredentialJson,
+} from "../../helpers/test-utils";
+import { OB2BadgeAssertion } from "@/services/verification.service";
+import { OpenBadgeCredential } from "@/models/credential.model";
 
-describe("VerificationService Integration Tests", () => {
-  let service: VerificationService;
+interface ApiResponse<T> {
+  status: string;
+  data: T;
+  error?: {
+    code: string;
+    message: string;
+  };
+}
+
+interface VerificationResponse {
+  valid: boolean;
+  checks: {
+    signature?: boolean;
+    revocation?: boolean;
+    structure?: boolean;
+  };
+  errors: string[];
+}
+
+describe("VerificationController Integration Tests", () => {
+  let controller: VerificationController;
   let testData: TestData;
 
-  beforeEach(async () => {
-    testData = await seedTestData();
-    service = new VerificationService();
-  });
+  beforeAll(async () => {
+    controller = new VerificationController();
+    testData = new TestData();
 
-  afterEach(async () => {
-    await clearTestData();
-  });
+    // Create test data
+    const issuerId = crypto.randomUUID();
+    const badgeId = crypto.randomUUID();
 
-  it("should verify OB2 assertion", async () => {
-    // Seed test data
-    const testData = await seedTestData();
-    const assertionId = testData.assertion.assertionId;
-
-    // For this test, make sure it's an OB2.0-style assertion
-    // Update the assertion to remove any proof property
-    const assertionJson = await getAssertionJson(assertionId);
-    if (assertionJson.proof) {
-      delete assertionJson.proof;
-      await updateAssertionJson(assertionId, assertionJson);
-    }
-
-    // Create the verification service with a real database
-    const service = new VerificationService();
-
-    // Verify the assertion
-    const result = await service.verifyOB2Assertion(assertionId);
-
-    expect(result.valid).toBe(true);
-    expect(result.checks.structure).toBe(true);
-  });
-
-  it("should verify OB3 assertion", async () => {
-    // Seed test data
-    const testData = await seedTestData();
-    const assertionId = testData.assertion.assertionId;
-
-    // Get the assertion JSON from the database
-    const assertionJson = await getAssertionJson(assertionId);
-
-    // Create a properly formatted OB3 credential
-    const ob3Credential = {
-      "@context": [
-        "https://www.w3.org/2018/credentials/v1",
-        "https://purl.imsglobal.org/spec/ob/v3p0/context.json",
-      ],
-      id: `https://example.org/assertions/${assertionId}`,
-      type: ["VerifiableCredential", "OpenBadgeCredential"],
-      issuer: {
-        id: `https://example.org/issuers/${testData.issuerId}`,
-        type: "Profile",
+    // Create test issuer
+    await db.insert(issuerProfiles).values({
+      issuerId,
+      name: "Test Issuer",
+      url: "https://example.com",
+      email: "test@example.com",
+      ownerUserId: "test-user",
+      issuerJson: {
+        "@context": "https://w3id.org/openbadges/v2",
+        type: "Issuer",
+        id: `https://example.com/issuers/${issuerId}`,
         name: "Test Issuer",
-        url: "https://example.org",
+        url: "https://example.com",
+        email: "test@example.com",
       },
-      issuanceDate: new Date().toISOString(),
-      credentialSubject: {
-        id: "mailto:recipient@example.com",
-        type: "AchievementSubject",
-        achievement: {
-          id: `https://example.org/badges/${testData.badgeId}`,
-          type: ["Achievement"],
-          name: "Test Badge",
-          description: "A test badge for integration tests",
-          criteria: {
-            narrative: "Earn this badge by completing integration tests",
-          },
-          image: {
-            id: "https://example.org/badge.png",
-            type: "Image",
-          },
-        },
+    });
+
+    // Create test badge
+    await db.insert(badgeClasses).values({
+      badgeId,
+      issuerId,
+      name: "Test Badge",
+      description: "Test badge description",
+      imageUrl: "https://example.com/badge.png",
+      criteria: JSON.stringify({ narrative: "Test criteria" }),
+      badgeJson: {
+        "@context": "https://w3id.org/openbadges/v2",
+        type: "BadgeClass",
+        id: `https://example.com/badges/${badgeId}`,
+        name: "Test Badge",
+        description: "Test badge description",
+        image: "https://example.com/badge.png",
+        criteria: { narrative: "Test criteria" },
+        issuer: `https://example.com/issuers/${issuerId}`,
       },
-      proof: {
-        type: "DataIntegrityProof",
-        cryptosuite: "eddsa-rdfc-2022",
-        created: new Date().toISOString(),
-        verificationMethod: `did:key:${testData.signingKeyId1}#key-1`,
-        proofPurpose: "assertionMethod",
-        proofValue: "TEST_BASE64_SIGNATURE",
-      },
-    };
+    });
 
-    // Update the assertion in the database
-    await updateAssertionJson(assertionId, ob3Credential);
-
-    // Create the verification service with a real database
-    const service = new VerificationService();
-
-    // Verify the assertion with OB3 method
-    const result = await service.verifyOB3Assertion(assertionId);
-
-    expect(result.valid).toBe(true);
-    expect(result.checks.structure).toBe(true);
+    testData.set("issuerId", issuerId);
+    testData.set("badgeId", badgeId);
   });
 
-  it("should fail verification for revoked badge", async () => {
-    // Seed test data
-    const testData = await seedTestData();
-    const assertionId = testData.assertion.assertionId;
+  test("should verify an OB2 assertion", async () => {
+    const assertionId = crypto.randomUUID();
+    const assertionJson = getOB2AssertionJson(assertionId);
 
-    // Create a properly formatted OB3 credential
-    const ob3Credential = {
-      "@context": [
-        "https://www.w3.org/2018/credentials/v1",
-        "https://purl.imsglobal.org/spec/ob/v3p0/context.json",
-      ],
-      id: `https://example.org/assertions/${assertionId}`,
-      type: ["VerifiableCredential", "OpenBadgeCredential"],
-      issuer: {
-        id: `https://example.org/issuers/${testData.issuerId}`,
-        type: "Profile",
-        name: "Test Issuer",
-        url: "https://example.org",
+    const ctx = createMockContext({
+      headers: {
+        "Content-Type": "application/json",
       },
-      issuanceDate: new Date().toISOString(),
-      credentialSubject: {
-        id: "mailto:recipient@example.com",
-        type: "AchievementSubject",
-        achievement: {
-          id: `https://example.org/badges/${testData.badgeId}`,
-          type: ["Achievement"],
-          name: "Test Badge",
-          description: "A test badge for integration tests",
-          criteria: {
-            narrative: "Earn this badge by completing integration tests",
-          },
-          image: {
-            id: "https://example.org/badge.png",
-            type: "Image",
-          },
-        },
-      },
-      proof: {
-        type: "DataIntegrityProof",
-        cryptosuite: "eddsa-rdfc-2022",
-        created: new Date().toISOString(),
-        verificationMethod: `did:key:${testData.signingKeyId1}#key-1`,
-        proofPurpose: "assertionMethod",
-        proofValue: "TEST_BASE64_SIGNATURE",
-      },
-    };
+      body: JSON.stringify(assertionJson),
+    });
 
-    // Update the assertion in the database with proper OB3 format
-    await updateAssertionJson(assertionId, ob3Credential);
-
-    // Set the assertion as revoked in the database
-    await testDb
-      .update(badgeAssertions)
-      .set({ revoked: true })
-      .where(sql`assertion_id = ${assertionId}`);
-
-    // Create the verification service with a real database
-    const service = new VerificationService();
-
-    // Verify the assertion - should fail due to revocation
-    const result = await service.verifyOB3Assertion(assertionId);
-
-    expect(result.valid).toBe(false);
-    expect(result.checks.revocation).toBe(false);
-    expect(result.errors.length).toBeGreaterThan(0);
-    expect(result.errors[0]).toContain("revoked");
+    const result = await controller.verifyAssertion(ctx);
+    const data = (await result.json()) as ApiResponse<VerificationResponse>;
+    expect(data.status).toBe("success");
+    expect(data.data.valid).toBe(true);
+    expect(data.data.checks.signature).toBe(true);
+    expect(data.data.checks.revocation).toBe(true);
+    expect(data.data.checks.structure).toBe(true);
   });
 
-  it("should fail verification for invalid signature", async () => {
-    // Seed test data
-    const testData = await seedTestData();
-    const assertionId = testData.assertion.assertionId;
+  test("should verify an OB3 credential", async () => {
+    const assertionId = crypto.randomUUID();
+    const credentialJson = getOB3CredentialJson(assertionId);
 
-    // Mark the assertion as revoked with a signature-related reason
-    await testDb
-      .update(badgeAssertions)
-      .set({
-        revoked: true,
-        revocationReason: "Invalid signature detected",
-      })
-      .where(eq(badgeAssertions.assertionId, assertionId));
+    const ctx = createMockContext({
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(credentialJson),
+    });
 
-    // Create the verification service with a real database
-    const service = new VerificationService();
-
-    // Verification should fail due to revocation
-    const result = await service.verifyOB3Assertion(assertionId);
-
-    // Check the basics
-    expect(result.valid).toBe(false);
-    expect(result.checks.revocation).toBe(false);
-    expect(result.errors.length).toBeGreaterThan(0);
+    const result = await controller.verifyAssertion(ctx);
+    const data = (await result.json()) as ApiResponse<VerificationResponse>;
+    expect(data.status).toBe("success");
+    expect(data.data.valid).toBe(true);
+    expect(data.data.checks.signature).toBe(true);
+    expect(data.data.checks.revocation).toBe(true);
+    expect(data.data.checks.structure).toBe(true);
   });
 
-  it("should auto-detect and verify OB2 assertion", async () => {
-    // Seed test data
-    const testData = await seedTestData();
-    const assertionId = testData.assertion.assertionId;
+  test("should detect invalid OB2 assertion", async () => {
+    const assertionId = crypto.randomUUID();
+    const invalidAssertion = updateOB2AssertionJson(assertionId, {
+      type: "InvalidType",
+    });
 
-    // Get the assertion JSON from the database
-    const assertionJson = await getAssertionJson(assertionId);
+    const ctx = createMockContext({
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(invalidAssertion),
+    });
 
-    // Remove any proof property to make it an OB2 assertion
-    if (assertionJson.proof) {
-      delete assertionJson.proof;
-      await updateAssertionJson(assertionId, assertionJson);
-    }
-
-    // Create the verification service with a real database
-    const service = new VerificationService();
-
-    // Auto-detect version and verify
-    const result = await service.verifyAssertion(assertionId);
-
-    expect(result.valid).toBe(true);
-    expect(result.checks.structure).toBe(true);
+    const result = await controller.verifyAssertion(ctx);
+    const data = (await result.json()) as ApiResponse<VerificationResponse>;
+    expect(data.status).toBe("success");
+    expect(data.data.valid).toBe(false);
+    expect(data.data.checks.structure).toBe(false);
   });
 
-  it("should auto-detect and verify OB3 assertion", async () => {
-    // Seed test data
-    const testData = await seedTestData();
-    const assertionId = testData.assertion.assertionId;
+  test("should detect invalid OB3 credential", async () => {
+    const assertionId = crypto.randomUUID();
+    const invalidCredential = updateOB3CredentialJson(assertionId, {
+      type: ["InvalidType"],
+    });
 
-    // Create a properly formatted OB3 credential
-    const ob3Credential = {
-      "@context": [
-        "https://www.w3.org/2018/credentials/v1",
-        "https://purl.imsglobal.org/spec/ob/v3p0/context.json",
-      ],
-      id: `https://example.org/assertions/${assertionId}`,
-      type: ["VerifiableCredential", "OpenBadgeCredential"],
-      issuer: {
-        id: `https://example.org/issuers/${testData.issuerId}`,
-        type: "Profile",
-        name: "Test Issuer",
-        url: "https://example.org",
+    const ctx = createMockContext({
+      headers: {
+        "Content-Type": "application/json",
       },
-      issuanceDate: new Date().toISOString(),
-      credentialSubject: {
-        id: "mailto:recipient@example.com",
-        type: "AchievementSubject",
-        achievement: {
-          id: `https://example.org/badges/${testData.badgeId}`,
-          type: ["Achievement"],
-          name: "Test Badge",
-          description: "A test badge for integration tests",
-          criteria: {
-            narrative: "Earn this badge by completing integration tests",
-          },
-          image: {
-            id: "https://example.org/badge.png",
-            type: "Image",
-          },
-        },
-      },
-      proof: {
-        type: "DataIntegrityProof",
-        cryptosuite: "eddsa-rdfc-2022",
-        created: new Date().toISOString(),
-        verificationMethod: `did:key:${testData.signingKeyId1}#key-1`,
-        proofPurpose: "assertionMethod",
-        proofValue: "TEST_BASE64_SIGNATURE",
-      },
-    };
+      body: JSON.stringify(invalidCredential),
+    });
 
-    // Update the assertion in the database
-    await updateAssertionJson(assertionId, ob3Credential);
-
-    // Create the verification service with a real database
-    const service = new VerificationService();
-
-    // Auto-detect version and verify
-    const result = await service.verifyAssertion(assertionId);
-
-    expect(result.valid).toBe(true);
-    expect(result.checks.structure).toBe(true);
+    const result = await controller.verifyAssertion(ctx);
+    const data = (await result.json()) as ApiResponse<VerificationResponse>;
+    expect(data.status).toBe("success");
+    expect(data.data.valid).toBe(false);
+    expect(data.data.checks.structure).toBe(false);
   });
 });

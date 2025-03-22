@@ -1,0 +1,530 @@
+import { Context } from "hono";
+import { db } from "@/db/config";
+import { badgeAssertions, badgeClasses, issuerProfiles } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { CredentialService } from "@/services/credential.service";
+import { VerificationService } from "@/services/verification.service";
+import { isValidUuid } from "@/utils/validation";
+import { OB2BadgeAssertion } from "@/services/verification.service";
+import { OpenBadgeCredential } from "@/models/credential.model";
+
+type AssertionJson = OB2BadgeAssertion | OpenBadgeCredential;
+
+export class AssertionController {
+  private credentialService: CredentialService;
+  private verificationService: VerificationService;
+
+  constructor() {
+    this.credentialService = new CredentialService();
+    this.verificationService = new VerificationService();
+  }
+
+  /**
+   * List all assertions with optional filters
+   */
+  async listAssertions(c: Context) {
+    try {
+      const query = c.req.query();
+      const badgeId = query.badgeId;
+      const issuerId = query.issuerId;
+      const format = query.format || "ob2";
+
+      // Validate UUIDs if provided
+      if (badgeId && !isValidUuid(badgeId)) {
+        return c.json({
+          status: "success",
+          data: {
+            assertions: [],
+          },
+        });
+      }
+
+      if (issuerId && !isValidUuid(issuerId)) {
+        return c.json({
+          status: "success",
+          data: {
+            assertions: [],
+          },
+        });
+      }
+
+      // Build query based on filters
+      let results;
+      if (badgeId) {
+        results = await db
+          .select()
+          .from(badgeAssertions)
+          .where(eq(badgeAssertions.badgeId, badgeId));
+      } else if (issuerId) {
+        results = await db
+          .select()
+          .from(badgeAssertions)
+          .where(eq(badgeAssertions.issuerId, issuerId));
+      } else {
+        results = await db.select().from(badgeAssertions);
+      }
+
+      // Map results and handle format conversion if needed
+      const assertions = await Promise.all(
+        results.map(async (result) => {
+          const assertionJson = result.assertionJson as AssertionJson;
+          if (format === "ob3" && !("proof" in assertionJson)) {
+            // Convert to OB3 if requested
+            const credential = await this.credentialService.createCredential(
+              new URL(c.req.url).origin,
+              result.assertionId,
+            );
+            return {
+              ...result,
+              assertionJson: credential,
+            };
+          }
+          return {
+            ...result,
+            assertionJson,
+          };
+        }),
+      );
+
+      return c.json({
+        status: "success",
+        data: {
+          assertions,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to list assertions:", error);
+      return c.json(
+        {
+          status: "error",
+          error: {
+            code: "SERVER_ERROR",
+            message: "Failed to retrieve assertions",
+          },
+        },
+        500,
+      );
+    }
+  }
+
+  /**
+   * Get a specific assertion by ID
+   */
+  async getAssertion(c: Context) {
+    try {
+      const assertionId = c.req.param("id");
+      const query = c.req.query();
+      const format = query.format || "ob2";
+
+      if (!assertionId || !isValidUuid(assertionId)) {
+        return c.json(
+          {
+            status: "error",
+            error: {
+              code: "VALIDATION",
+              message: "Invalid assertion ID",
+            },
+          },
+          400,
+        );
+      }
+
+      const assertion = await db
+        .select()
+        .from(badgeAssertions)
+        .where(eq(badgeAssertions.assertionId, assertionId))
+        .limit(1);
+
+      if (!assertion || assertion.length === 0) {
+        return c.json(
+          {
+            status: "error",
+            error: {
+              code: "NOT_FOUND",
+              message: "Assertion not found",
+            },
+          },
+          404,
+        );
+      }
+
+      const result = assertion[0];
+      const assertionJson = result.assertionJson as AssertionJson;
+
+      // Convert to OB3 if requested
+      if (format === "ob3" && !("proof" in assertionJson)) {
+        const credential = await this.credentialService.createCredential(
+          new URL(c.req.url).origin,
+          result.assertionId,
+        );
+        return c.json({
+          status: "success",
+          data: {
+            assertion: {
+              ...result,
+              assertionJson: credential,
+            },
+          },
+        });
+      }
+
+      return c.json({
+        status: "success",
+        data: {
+          assertion: {
+            ...result,
+            assertionJson,
+          },
+        },
+      });
+    } catch (error) {
+      console.error("Failed to get assertion:", error);
+      return c.json(
+        {
+          status: "error",
+          error: {
+            code: "SERVER_ERROR",
+            message: "Failed to retrieve assertion",
+          },
+        },
+        500,
+      );
+    }
+  }
+
+  /**
+   * Create a new badge assertion
+   */
+  async createAssertion(c: Context) {
+    try {
+      const body = await c.req.json();
+      const query = c.req.query();
+      const format = query.format || "ob2";
+
+      // Validate required fields
+      const { badgeId, recipient, evidence } = body;
+
+      if (!badgeId || !recipient) {
+        return c.json(
+          {
+            status: "error",
+            error: {
+              code: "VALIDATION",
+              message: "Missing required fields",
+            },
+          },
+          400,
+        );
+      }
+
+      // Validate recipient object
+      if (!recipient.type || !recipient.identity) {
+        return c.json(
+          {
+            status: "error",
+            error: {
+              code: "VALIDATION",
+              message: "Invalid recipient data",
+            },
+          },
+          400,
+        );
+      }
+
+      // Validate badge ID format
+      if (!isValidUuid(badgeId)) {
+        return c.json(
+          {
+            status: "error",
+            error: {
+              code: "NOT_FOUND",
+              message: "Badge not found",
+            },
+          },
+          404,
+        );
+      }
+
+      // Verify badge exists
+      const badge = await db
+        .select()
+        .from(badgeClasses)
+        .where(eq(badgeClasses.badgeId, badgeId))
+        .limit(1);
+
+      if (!badge || badge.length === 0) {
+        return c.json(
+          {
+            status: "error",
+            error: {
+              code: "NOT_FOUND",
+              message: "Badge not found",
+            },
+          },
+          404,
+        );
+      }
+
+      const issuerId = badge[0].issuerId;
+
+      // Verify issuer exists
+      const issuer = await db
+        .select()
+        .from(issuerProfiles)
+        .where(eq(issuerProfiles.issuerId, issuerId))
+        .limit(1);
+
+      if (!issuer || issuer.length === 0) {
+        return c.json(
+          {
+            status: "error",
+            error: {
+              code: "NOT_FOUND",
+              message: "Issuer not found",
+            },
+          },
+          404,
+        );
+      }
+
+      // Process recipient identity (hash if requested)
+      const shouldHash = recipient.hashed === true;
+      let recipientIdentity = recipient.identity;
+      let recipientHashed = false;
+      let salt = "";
+
+      if (shouldHash) {
+        salt = crypto.randomUUID();
+        recipientIdentity = await this.hashRecipientIdentity(
+          recipient.identity,
+          salt,
+        );
+        recipientHashed = true;
+      }
+
+      const issuedOn = new Date();
+      const hostUrl = new URL(c.req.url).origin;
+      const assertionId = crypto.randomUUID();
+
+      // Base assertion data
+      const assertionBase = {
+        assertionId,
+        badgeId,
+        issuerId,
+        recipientIdentity,
+        recipientType: recipient.type,
+        recipientHashed,
+        salt: recipientHashed ? salt : null,
+        issuedOn,
+        evidenceUrl: evidence?.url || null,
+        revoked: false,
+        revocationReason: null,
+      };
+
+      // Create assertion JSON based on format
+      let assertionJson: AssertionJson;
+
+      if (format === "ob3") {
+        // Create OB3 credential
+        assertionJson = await this.credentialService.createCredential(
+          hostUrl,
+          assertionId,
+        );
+      } else {
+        // Create OB2 assertion
+        assertionJson = {
+          "@context": "https://w3id.org/openbadges/v2",
+          type: "Assertion",
+          id: `${hostUrl}/assertions/${assertionId}`,
+          recipient: {
+            type: recipient.type,
+            identity: recipientIdentity,
+            hashed: recipientHashed,
+            ...(recipientHashed && { salt }),
+          },
+          badge: `${hostUrl}/badges/${badgeId}`,
+          issuedOn: issuedOn.toISOString(),
+          verification: {
+            type: "HostedBadge",
+          },
+          ...(evidence?.url && {
+            evidence: {
+              id: evidence.url,
+              type: "Evidence",
+            },
+          }),
+        };
+      }
+
+      // Insert the assertion
+      const result = await db
+        .insert(badgeAssertions)
+        .values({
+          ...assertionBase,
+          assertionJson,
+        })
+        .returning();
+
+      if (!result || result.length === 0) {
+        throw new Error("Failed to insert assertion");
+      }
+
+      return c.json(
+        {
+          status: "success",
+          data: {
+            assertionId: result[0].assertionId,
+            assertion: {
+              ...result[0],
+              assertionJson,
+            },
+          },
+        },
+        201,
+      );
+    } catch (error) {
+      console.error("Failed to create assertion:", error);
+      return c.json(
+        {
+          status: "error",
+          error: {
+            code: "SERVER_ERROR",
+            message: "Failed to create assertion",
+          },
+        },
+        500,
+      );
+    }
+  }
+
+  /**
+   * Revoke a badge assertion
+   */
+  async revokeAssertion(c: Context) {
+    try {
+      const assertionId = c.req.param("id");
+      const body = await c.req.json();
+      const query = c.req.query();
+      const format = query.format || "ob2";
+
+      // Validate required fields
+      const { reason } = body;
+
+      if (!reason) {
+        return c.json(
+          {
+            status: "error",
+            error: {
+              code: "VALIDATION",
+              message: "Revocation reason is required",
+            },
+          },
+          400,
+        );
+      }
+
+      if (!assertionId || !isValidUuid(assertionId)) {
+        return c.json(
+          {
+            status: "error",
+            error: {
+              code: "VALIDATION",
+              message: "Invalid assertion ID",
+            },
+          },
+          400,
+        );
+      }
+
+      // Get the assertion
+      const assertion = await db
+        .select()
+        .from(badgeAssertions)
+        .where(eq(badgeAssertions.assertionId, assertionId))
+        .limit(1);
+
+      if (!assertion || assertion.length === 0) {
+        return c.json(
+          {
+            status: "error",
+            error: {
+              code: "NOT_FOUND",
+              message: "Assertion not found",
+            },
+          },
+          404,
+        );
+      }
+
+      const result = assertion[0];
+      const assertionJson = result.assertionJson as AssertionJson;
+
+      // Update the assertion
+      const updatedAssertion = await db
+        .update(badgeAssertions)
+        .set({
+          revoked: true,
+          revocationReason: reason,
+        })
+        .where(eq(badgeAssertions.assertionId, assertionId))
+        .returning();
+
+      if (!updatedAssertion || updatedAssertion.length === 0) {
+        throw new Error("Failed to update assertion");
+      }
+
+      // Convert to OB3 if requested
+      if (format === "ob3" && !("proof" in assertionJson)) {
+        const credential = await this.credentialService.createCredential(
+          new URL(c.req.url).origin,
+          result.assertionId,
+        );
+        return c.json({
+          status: "success",
+          data: {
+            assertion: {
+              ...updatedAssertion[0],
+              assertionJson: credential,
+            },
+          },
+        });
+      }
+
+      return c.json({
+        status: "success",
+        data: {
+          assertion: {
+            ...updatedAssertion[0],
+            assertionJson,
+          },
+        },
+      });
+    } catch (error) {
+      console.error("Failed to revoke assertion:", error);
+      return c.json(
+        {
+          status: "error",
+          error: {
+            code: "SERVER_ERROR",
+            message: "Failed to revoke assertion",
+          },
+        },
+        500,
+      );
+    }
+  }
+
+  /**
+   * Hash a recipient identity using SHA-256
+   */
+  private async hashRecipientIdentity(
+    identity: string,
+    salt: string,
+  ): Promise<string> {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(identity + salt);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+}

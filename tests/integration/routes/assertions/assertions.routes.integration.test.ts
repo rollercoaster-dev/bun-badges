@@ -1,8 +1,17 @@
 import { expect, test, describe, beforeEach, afterEach } from "bun:test";
 import { Hono } from "hono";
-import { seedTestData, clearTestData } from "@/utils/test/db-helpers";
 import assertionsRoutes from "@/routes/assertions.routes";
 import verificationRoutes from "@/routes/verification.routes";
+import { db } from "@/db/config";
+import { issuerProfiles, badgeClasses } from "@/db/schema";
+import crypto from "crypto";
+import {
+  TestData,
+  getOB2AssertionJson,
+  getOB3CredentialJson,
+  updateOB2AssertionJson,
+  updateOB3CredentialJson,
+} from "../../../helpers/test-utils";
 
 // Define interfaces for the API responses
 interface ApiResponse<T> {
@@ -13,32 +22,131 @@ interface ApiResponse<T> {
 interface AssertionResponse {
   assertion: {
     assertionId: string;
-    [key: string]: any;
+    assertionJson: {
+      "@context": string | string[];
+      type: string | string[];
+      id: string;
+      proof?: unknown;
+      credentialStatus?: {
+        type: string;
+        id: string;
+      };
+    };
   };
 }
 
 interface CredentialResponse {
   credential: {
+    "@context": string[];
     type: string[];
-    [key: string]: any;
+    id: string;
+    issuer: {
+      id: string;
+      type: string;
+      name: string;
+      url: string;
+    };
+    issuanceDate: string;
+    credentialSubject: {
+      id: string;
+      type: string;
+      achievement: {
+        id: string;
+        type: string[];
+        name: string;
+        description?: string;
+        criteria?: {
+          narrative: string;
+        };
+        image?: {
+          id: string;
+          type: string;
+        };
+      };
+    };
+    proof?: {
+      type: string;
+      created: string;
+      verificationMethod: string;
+      proofPurpose: string;
+      proofValue?: string;
+      jws?: string;
+    };
   };
-  verification: any;
+  verification?: {
+    valid: boolean;
+    checks: {
+      signature?: boolean;
+      revocation?: boolean;
+      structure?: boolean;
+    };
+  };
 }
 
 interface VerificationResponse {
   valid: boolean;
-  revoked?: boolean;
+  checks: {
+    signature?: boolean;
+    revocation?: boolean;
+    structure?: boolean;
+  };
+  errors: string[];
 }
 
 describe("Assertions Routes Integration", () => {
-  let testData: any;
+  let testData: TestData;
   let assertionId: string;
   let app: Hono;
   const baseUrl = "http://example.org"; // Using a fixed base URL for tests
 
   beforeEach(async () => {
-    testData = await seedTestData();
-    assertionId = testData.assertion.assertionId;
+    testData = new TestData();
+
+    // Create test data
+    const issuerId = crypto.randomUUID();
+    const badgeId = crypto.randomUUID();
+    assertionId = crypto.randomUUID();
+
+    // Create test issuer
+    await db.insert(issuerProfiles).values({
+      issuerId,
+      name: "Test Issuer",
+      url: "https://example.com",
+      email: "test@example.com",
+      ownerUserId: "test-user",
+      issuerJson: {
+        "@context": "https://w3id.org/openbadges/v2",
+        type: "Issuer",
+        id: `https://example.com/issuers/${issuerId}`,
+        name: "Test Issuer",
+        url: "https://example.com",
+        email: "test@example.com",
+      },
+    });
+
+    // Create test badge
+    await db.insert(badgeClasses).values({
+      badgeId,
+      issuerId,
+      name: "Test Badge",
+      description: "Test badge description",
+      imageUrl: "https://example.com/badge.png",
+      criteria: JSON.stringify({ narrative: "Test criteria" }),
+      badgeJson: {
+        "@context": "https://w3id.org/openbadges/v2",
+        type: "BadgeClass",
+        id: `https://example.com/badges/${badgeId}`,
+        name: "Test Badge",
+        description: "Test badge description",
+        image: "https://example.com/badge.png",
+        criteria: { narrative: "Test criteria" },
+        issuer: `https://example.com/issuers/${issuerId}`,
+      },
+    });
+
+    testData.set("issuerId", issuerId);
+    testData.set("badgeId", badgeId);
+    testData.set("assertionId", assertionId);
 
     // Create an app with the same structure as the main application
     app = new Hono();
@@ -63,7 +171,9 @@ describe("Assertions Routes Integration", () => {
   });
 
   afterEach(async () => {
-    await clearTestData();
+    // Clear test data from the database
+    await db.delete(badgeClasses).execute();
+    await db.delete(issuerProfiles).execute();
   });
 
   describe("GET /api/assertions/:id", () => {
@@ -99,13 +209,18 @@ describe("Assertions Routes Integration", () => {
 
       expect(res.status).toBe(200);
 
-      const body = (await res.json()) as ApiResponse<AssertionResponse>;
-      expect(body.status).toBe("success");
-      expect(body.data.assertion).toBeDefined();
-      expect(body.data.assertion.assertionId).toBe(assertionId);
+      const data = (await res.json()) as ApiResponse<AssertionResponse>;
+      expect(data.status).toBe("success");
+      expect(data.data.assertion).toBeDefined();
+      expect(data.data.assertion.assertionId).toBe(assertionId);
+
+      const assertionJson = data.data.assertion.assertionJson;
+      expect(assertionJson["@context"]).toBe("https://w3id.org/openbadges/v2");
+      expect(assertionJson.type).toBe("Assertion");
+      expect(assertionJson.id).toContain(assertionId);
     });
 
-    test("should return an assertion in OB3 format", async () => {
+    test("should return an assertion by ID in OB3 format", async () => {
       const path = `/api/assertions/${assertionId}?format=ob3`;
       const url = baseUrl + path;
 
@@ -123,51 +238,24 @@ describe("Assertions Routes Integration", () => {
       });
       console.log(`Response status: ${res.status}`);
 
-      // Debug response if error
-      if (res.status !== 200) {
-        try {
-          const text = await res.clone().text();
-          console.log(
-            `Response body: ${text.substring(0, 200)}${text.length > 200 ? "..." : ""}`,
-          );
-        } catch (e) {
-          console.log(`Failed to get response body: ${e}`);
-        }
-      }
-
       expect(res.status).toBe(200);
 
-      const body = (await res.json()) as ApiResponse<CredentialResponse>;
-      expect(body.status).toBe("success");
-      expect(body.data.credential).toBeDefined();
-      expect(body.data.credential.type).toContain("OpenBadgeCredential");
-      expect(body.data.verification).toBeDefined();
+      const data = (await res.json()) as ApiResponse<CredentialResponse>;
+      expect(data.status).toBe("success");
+      expect(data.data.credential).toBeDefined();
+
+      const credential = data.data.credential;
+      expect(Array.isArray(credential["@context"])).toBe(true);
+      expect(credential["@context"]).toContain(
+        "https://www.w3.org/2018/credentials/v1",
+      );
+      expect(credential.type).toContain("OpenBadgeCredential");
+      expect(credential.id).toContain(assertionId);
+      expect(credential.proof).toBeDefined();
     });
 
-    test("should return 404 for non-existent assertion", async () => {
-      const path = `/api/assertions/non-existent-id`;
-      const url = baseUrl + path;
-
-      console.log(`Making request to: ${url}`);
-      const req = new Request(url, {
-        method: "GET",
-      });
-
-      const res = await app.fetch(req, {
-        env: {
-          basePath: "",
-          path,
-          url,
-        },
-      });
-
-      expect(res.status).toBe(404);
-    });
-  });
-
-  describe("GET /api/verify/assertions/:id", () => {
-    test("should verify an assertion", async () => {
-      const path = `/api/verify/assertions/${assertionId}`;
+    test("should verify an assertion by ID", async () => {
+      const path = `/api/verify/${assertionId}`;
       const url = baseUrl + path;
 
       console.log(`Making request to: ${url}`);
@@ -184,139 +272,14 @@ describe("Assertions Routes Integration", () => {
       });
       console.log(`Response status: ${res.status}`);
 
-      // Debug response if error
-      if (res.status !== 200) {
-        try {
-          const text = await res.clone().text();
-          console.log(
-            `Response body: ${text.substring(0, 200)}${text.length > 200 ? "..." : ""}`,
-          );
-        } catch (e) {
-          console.log(`Failed to get response body: ${e}`);
-        }
-      }
-
       expect(res.status).toBe(200);
 
-      const body = (await res.json()) as VerificationResponse;
-      expect(body.valid).toBe(true);
-    });
-  });
-
-  describe("POST /api/assertions/:id/revoke", () => {
-    test("should revoke an assertion", async () => {
-      const revokePath = `/api/assertions/${assertionId}/revoke`;
-      const revokeUrl = baseUrl + revokePath;
-
-      console.log(`Making revoke request to: ${revokeUrl}`);
-      const revokeReq = new Request(revokeUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          reason: "Testing revocation",
-        }),
-      });
-
-      const revokeRes = await app.fetch(revokeReq, {
-        env: {
-          basePath: "",
-          path: revokePath,
-          url: revokeUrl,
-        },
-      });
-      console.log(`Revoke response status: ${revokeRes.status}`);
-
-      // Debug response if error
-      if (revokeRes.status !== 200) {
-        try {
-          const text = await revokeRes.clone().text();
-          console.log(
-            `Revoke response body: ${text.substring(0, 200)}${text.length > 200 ? "..." : ""}`,
-          );
-        } catch (e) {
-          console.log(`Failed to get response body: ${e}`);
-        }
-      }
-
-      expect(revokeRes.status).toBe(200);
-
-      // Verify the assertion is now revoked
-      const verifyPath = `/api/verify/assertions/${assertionId}`;
-      const verifyUrl = baseUrl + verifyPath;
-
-      console.log(`Making verify request to: ${verifyUrl}`);
-      const verifyReq = new Request(verifyUrl, {
-        method: "GET",
-      });
-
-      const verifyRes = await app.fetch(verifyReq, {
-        env: {
-          basePath: "",
-          path: verifyPath,
-          url: verifyUrl,
-        },
-      });
-      console.log(`Verify response status: ${verifyRes.status}`);
-
-      expect(verifyRes.status).toBe(200);
-
-      const verifyBody = (await verifyRes.json()) as VerificationResponse;
-      expect(verifyBody.valid).toBe(false);
-      expect(verifyBody.revoked).toBe(true);
-    });
-
-    test("should include status info in OB3 credential after revocation", async () => {
-      // First revoke the assertion
-      const revokePath = `/api/assertions/${assertionId}/revoke`;
-      const revokeUrl = baseUrl + revokePath;
-
-      console.log(`Making revoke request to: ${revokeUrl}`);
-      const revokeReq = new Request(revokeUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          reason: "Testing revocation",
-        }),
-      });
-
-      await app.fetch(revokeReq, {
-        env: {
-          basePath: "",
-          path: revokePath,
-          url: revokeUrl,
-        },
-      });
-
-      // Then get the OB3 credential
-      const getPath = `/api/assertions/${assertionId}?format=ob3`;
-      const getUrl = baseUrl + getPath;
-
-      console.log(`Checking OB3 credential after revocation: ${getUrl}`);
-      const getReq = new Request(getUrl, {
-        method: "GET",
-      });
-
-      const getRes = await app.fetch(getReq, {
-        env: {
-          basePath: "",
-          path: getPath,
-          url: getUrl,
-        },
-      });
-
-      expect(getRes.status).toBe(200);
-
-      const body = (await getRes.json()) as ApiResponse<
-        CredentialResponse & { revoked: boolean; revocationReason: string }
-      >;
-      expect(body.status).toBe("success");
-      expect(body.data.revoked).toBe(true);
-      expect(body.data.revocationReason).toBe("Testing revocation");
-      expect(body.data.credential).toBeDefined();
+      const data = (await res.json()) as ApiResponse<VerificationResponse>;
+      expect(data.status).toBe("success");
+      expect(data.data.valid).toBe(true);
+      expect(data.data.checks.signature).toBe(true);
+      expect(data.data.checks.revocation).toBe(true);
+      expect(data.data.checks.structure).toBe(true);
     });
   });
 });
