@@ -1,4 +1,4 @@
-import { beforeAll, afterAll, describe, it, expect } from "vitest";
+import { beforeAll, afterAll, describe, it, expect } from "bun:test";
 import {
   createTestServer,
   cleanupTestResources,
@@ -6,7 +6,7 @@ import {
   authenticatedRequest,
   resetDatabase,
 } from "../helpers/test-utils";
-import { OB3_CREDENTIAL_SCHEMA_URL } from "../../../constants/context-urls";
+import { OB3_CREDENTIAL_SCHEMA_URL } from "@/constants/context-urls";
 // Import the real app
 import { Hono } from "hono";
 

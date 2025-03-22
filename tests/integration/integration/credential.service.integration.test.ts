@@ -4,7 +4,6 @@ import { badgeClasses, badgeAssertions } from "@/db/schema";
 import {
   testDb,
   tableExists as checkTableExists,
-  executeSql,
 } from "@/utils/test/integration-setup";
 import { DataIntegrityProof, CredentialProof } from "@/models/credential.model";
 import { seedTestData, clearTestData } from "@/utils/test/db-helpers";
@@ -45,49 +44,65 @@ describe("CredentialService Integration Tests", () => {
       return;
     }
 
-    // Create a test badge using executeSql helper for safer SQL execution
+    // Create a test badge using direct parameter binding for safety
     const badgeId = crypto.randomUUID();
-    const badges = await executeSql(
-      `INSERT INTO badge_classes (
-        badge_id,
-        issuer_id,
-        name,
-        description,
-        image_url,
-        criteria,
-        badge_json
-      ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7
-      ) RETURNING *`,
-      [
+
+    // Use parameterized query with testDb.execute
+    const badgeData = {
+      "@context": "https://w3id.org/openbadges/v2",
+      type: "BadgeClass",
+      name: "Achievement Test Badge",
+      description: "A test badge for achievement creation",
+      image: "https://example.com/badge.png",
+      criteria: { narrative: "Test achievement criteria" },
+      issuer: "https://example.com/issuer",
+    };
+
+    try {
+      // Create badge using direct SQL
+      const result = await testDb.execute(
+        `
+        INSERT INTO badge_classes (
+          badge_id,
+          issuer_id,
+          name,
+          description,
+          image_url,
+          criteria,
+          badge_json
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7
+        ) RETURNING *`,
+        [
+          badgeId,
+          testData.issuer.issuerId,
+          "Achievement Test Badge",
+          "A test badge for achievement creation",
+          "https://example.com/badge.png",
+          "Test achievement criteria",
+          JSON.stringify(badgeData),
+        ],
+      );
+
+      const badges = result.rows;
+      expect(badges.length).toBe(1);
+      const badge = badges[0];
+
+      // Test creating an achievement
+      const achievementResult = await service.createAchievement(
+        hostUrl,
         badgeId,
-        testData.issuer.issuerId,
-        "Achievement Test Badge",
-        "A test badge for achievement creation",
-        "https://example.com/badge.png",
-        "Test achievement criteria",
-        JSON.stringify({
-          "@context": "https://w3id.org/openbadges/v2",
-          type: "BadgeClass",
-          name: "Achievement Test Badge",
-          description: "A test badge for achievement creation",
-          image: "https://example.com/badge.png",
-          criteria: { narrative: "Test achievement criteria" },
-          issuer: "https://example.com/issuer",
-        }),
-      ],
-    );
+      );
 
-    const badge = badges[0];
-
-    // Test creating an achievement
-    const result = await service.createAchievement(hostUrl, badgeId);
-
-    // Verify results
-    expect(result).toBeDefined();
-    expect(result.id).toEqual(`${hostUrl}/badges/${badgeId}`);
-    expect(result.name).toEqual("Achievement Test Badge");
-    expect(result.type).toContain("AchievementCredential");
+      // Verify results
+      expect(achievementResult).toBeDefined();
+      expect(achievementResult.id).toEqual(`${hostUrl}/badges/${badgeId}`);
+      expect(achievementResult.name).toEqual("Achievement Test Badge");
+      expect(achievementResult.type).toContain("AchievementCredential");
+    } catch (error) {
+      console.error("Error in achievement test:", error);
+      throw error;
+    }
   });
 
   it("should sign a credential", async () => {
@@ -110,24 +125,29 @@ describe("CredentialService Integration Tests", () => {
       },
     };
 
-    // Sign the credential
-    const result = await service.signCredential(
-      testData.issuer.issuerId,
-      credential,
-    );
+    try {
+      // Sign the credential
+      const result = await service.signCredential(
+        testData.issuer.issuerId,
+        credential,
+      );
 
-    // Verify results
-    expect(result).toBeDefined();
-    expect(result.proof).toBeDefined();
-    expect(result.proof.type).toEqual("DataIntegrityProof");
-    expect((result.proof as DataIntegrityProof).cryptosuite).toEqual(
-      "eddsa-rdfc-2022",
-    );
-    expect(result.proof.proofValue).toBeDefined();
+      // Verify results
+      expect(result).toBeDefined();
+      expect(result.proof).toBeDefined();
+      expect(result.proof.type).toEqual("DataIntegrityProof");
+      expect((result.proof as DataIntegrityProof).cryptosuite).toEqual(
+        "eddsa-rdfc-2022",
+      );
+      expect(result.proof.proofValue).toBeDefined();
 
-    // Verify the signature is valid
-    const isValid = await service.verifySignature(result);
-    expect(isValid).toBe(true);
+      // Verify the signature is valid
+      const isValid = await service.verifySignature(result);
+      expect(isValid).toBe(true);
+    } catch (error) {
+      console.error("Error in signing test:", error);
+      throw error;
+    }
   });
 
   it("should verify a credential signature", async () => {
@@ -150,22 +170,27 @@ describe("CredentialService Integration Tests", () => {
       },
     };
 
-    // Sign the credential
-    const signedCredential = await service.signCredential(
-      testData.issuer.issuerId,
-      credential,
-    );
+    try {
+      // Sign the credential
+      const signedCredential = await service.signCredential(
+        testData.issuer.issuerId,
+        credential,
+      );
 
-    // Verify the signature
-    const result = await service.verifySignature(signedCredential);
-    expect(result).toBe(true);
+      // Verify the signature
+      const result = await service.verifySignature(signedCredential);
+      expect(result).toBe(true);
 
-    // Test tampering detection - modify the credential
-    const tamperedCredential = JSON.parse(JSON.stringify(signedCredential));
-    tamperedCredential.id = "tampered-credential";
+      // Test tampering detection - modify the credential
+      const tamperedCredential = JSON.parse(JSON.stringify(signedCredential));
+      tamperedCredential.id = "tampered-credential";
 
-    const isTamperedValid = await service.verifySignature(tamperedCredential);
-    expect(isTamperedValid).toBe(false);
+      const isTamperedValid = await service.verifySignature(tamperedCredential);
+      expect(isTamperedValid).toBe(false);
+    } catch (error) {
+      console.error("Error in verification test:", error);
+      throw error;
+    }
   });
 
   it("should return false for missing proof", async () => {
@@ -182,8 +207,13 @@ describe("CredentialService Integration Tests", () => {
       proof: undefined as unknown as CredentialProof,
     } as SignableCredential & { proof: CredentialProof };
 
-    const result = await service.verifySignature(credential);
-    expect(result).toBe(false);
+    try {
+      const result = await service.verifySignature(credential);
+      expect(result).toBe(false);
+    } catch (error) {
+      console.error("Error in missing proof test:", error);
+      throw error;
+    }
   });
 
   it("should create a verifiable credential", async () => {
@@ -210,58 +240,66 @@ describe("CredentialService Integration Tests", () => {
       issuedOn: new Date().toISOString(),
     };
 
-    // Create with executeSql helper for safer SQL execution
-    const assertionId = crypto.randomUUID();
-    const assertions = await executeSql(
-      `INSERT INTO badge_assertions (
-        assertion_id,
-        badge_id,
-        issuer_id,
-        recipient_identity,
-        recipient_type,
-        recipient_hashed,
-        issued_on,
-        assertion_json,
-        evidence_url,
-        revoked,
-        revocation_reason
-      ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
-      ) RETURNING *`,
-      [
-        assertionId,
-        testData.badge.badgeId,
-        testData.issuer.issuerId,
-        "test-recipient@example.com",
-        "email",
-        false,
-        new Date(),
-        JSON.stringify(assertionJson),
-        null,
-        false,
-        null,
-      ],
-    );
+    try {
+      // Create assertion using direct SQL
+      const assertionId = crypto.randomUUID();
 
-    const assertion = assertions[0];
+      const assertionResult = await testDb.execute(
+        `
+        INSERT INTO badge_assertions (
+          assertion_id,
+          badge_id,
+          issuer_id,
+          recipient_identity,
+          recipient_type,
+          recipient_hashed,
+          issued_on,
+          assertion_json,
+          evidence_url,
+          revoked,
+          revocation_reason
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+        ) RETURNING *`,
+        [
+          assertionId,
+          testData.badge.badgeId,
+          testData.issuer.issuerId,
+          "test-recipient@example.com",
+          "email",
+          false,
+          new Date(),
+          JSON.stringify(assertionJson),
+          null,
+          false,
+          null,
+        ],
+      );
 
-    // Create the credential
-    const result = await service.createCredential(hostUrl, assertionId);
+      const assertions = assertionResult.rows;
+      expect(assertions.length).toBe(1);
 
-    // Verify results
-    expect(result).toBeDefined();
-    expect(result.id).toEqual(`${hostUrl}/assertions/${assertionId}`);
-    expect(result.type).toContain("VerifiableCredential");
-    expect(result.type).toContain("OpenBadgeCredential");
-    expect(result.proof).toBeDefined();
-    expect(result.credentialSubject).toBeDefined();
-    expect(result.credentialSubject.achievement).toBeDefined();
+      // Create the credential
+      const result = await service.createCredential(hostUrl, assertionId);
 
-    // Verify the signature
-    const isValid = await service.verifySignature(
-      result as unknown as SignableCredential & { proof: CredentialProof },
-    );
-    expect(isValid).toBe(true);
+      // Verify results
+      expect(result).toBeDefined();
+      expect(result.id).toEqual(`${hostUrl}/assertions/${assertionId}`);
+      expect(result.type).toContain("VerifiableCredential");
+      expect(result.type).toContain("OpenBadgeCredential");
+      expect(result.proof).toBeDefined();
+      expect(result.credentialSubject).toBeDefined();
+      expect(result.credentialSubject.achievement).toBeDefined();
+
+      // Verify the signature
+      const isValid = await service.verifySignature(
+        result as unknown as SignableCredential & { proof: CredentialProof },
+      );
+      expect(isValid).toBe(true);
+    } catch (error) {
+      console.error("Error in verifiable credential test:", error);
+      throw error;
+    }
   });
 
   it("should ensure issuer key exists", async () => {
@@ -272,10 +310,19 @@ describe("CredentialService Integration Tests", () => {
     }
 
     try {
-      // Insert a signing key using executeSql helper
+      // Insert a signing key using direct SQL
       const keyId = crypto.randomUUID();
-      await executeSql(
-        `INSERT INTO signing_keys (
+
+      const keyInfo = {
+        id: "did:key:testController#key-1",
+        type: "Ed25519VerificationKey2020",
+        controller: "did:key:testController",
+        publicKeyMultibase: "z6MkrzXCdarP1kaZQXEX6CDRdcLYTk6bTEgGDgV5XQEyP4WB",
+      };
+
+      await testDb.execute(
+        `
+        INSERT INTO signing_keys (
           key_id,
           issuer_id,
           public_key_multibase,
@@ -293,13 +340,7 @@ describe("CredentialService Integration Tests", () => {
           "z3u2en7t8mxcz3s9wKaDTNWK1RA619VAXqLLGEY4ZD1vpCgPbR7yMkwk4Qj7TuuGJUTzpgvA",
           "did:key:testController",
           "Ed25519VerificationKey2020",
-          JSON.stringify({
-            id: "did:key:testController#key-1",
-            type: "Ed25519VerificationKey2020",
-            controller: "did:key:testController",
-            publicKeyMultibase:
-              "z6MkrzXCdarP1kaZQXEX6CDRdcLYTk6bTEgGDgV5XQEyP4WB",
-          }),
+          JSON.stringify(keyInfo),
         ],
       );
 

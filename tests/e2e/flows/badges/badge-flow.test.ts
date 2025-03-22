@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { Hono } from "hono";
 import {
   createTestServer,
@@ -6,7 +6,7 @@ import {
   registerAndLoginUser,
   authenticatedRequest,
   resetDatabase,
-} from "../helpers/test-utils";
+} from "../../helpers/test-utils";
 
 // This test demonstrates a complete badge lifecycle flow:
 // 1. User registration and login

@@ -1,4 +1,11 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  afterAll,
+  beforeEach,
+} from "bun:test";
 import { Hono } from "hono";
 import {
   createTestServer,
@@ -6,7 +13,7 @@ import {
   registerAndLoginUser,
   authenticatedRequest,
   resetDatabase,
-} from "../helpers/test-utils";
+} from "../../helpers/test-utils";
 import { dbPool } from "@/db/config";
 
 /**

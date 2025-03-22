@@ -372,23 +372,10 @@ export async function executeSql<T = any>(
   params: any[] = [],
 ): Promise<T[]> {
   try {
-    // Use parameterized queries for safety
-    const result = await testDb.execute(sql.raw(query, params));
-    return result.rows as T[];
-  } catch (error) {
-    console.error(`Error executing SQL query: ${query}`, error);
-    throw error;
-  }
-}
-
-// Helper function for performing direct SQL queries safely
-export async function executeSql<T = any>(
-  query: string,
-  params: any[] = [],
-): Promise<T[]> {
-  try {
-    // Use parameterized queries for safety
-    const result = await testDb.execute(sql.raw(query, params));
+    // Modified to fix parameter binding issues
+    // Instead of using sql.raw with an array of params, use direct parameter substitution
+    // This formats the query properly for PostgreSQL with $1, $2, etc. placeholders
+    const result = await testDb.execute(query, params);
     return result.rows as T[];
   } catch (error) {
     console.error(`Error executing SQL query: ${query}`, error);

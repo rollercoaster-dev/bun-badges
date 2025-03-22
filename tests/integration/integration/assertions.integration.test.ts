@@ -109,9 +109,15 @@ describe("AssertionController Integration Tests", () => {
 
     // Verify the assertion was created in the database
     const assertionId = data.data.assertionId;
-    const assertion = await db.select().from(badgeAssertions).limit(1);
 
-    expect(assertion.length).toBe(1);
+    // Use direct SQL query instead of ORM to verify
+    const results = await db.execute(
+      `SELECT * FROM badge_assertions WHERE assertion_id = $1 LIMIT 1`,
+      [assertionId],
+    );
+
+    // Check that we have a result
+    expect(results.rows.length).toBe(1);
   });
 
   it("should create an OB3 assertion", async () => {
@@ -130,31 +136,47 @@ describe("AssertionController Integration Tests", () => {
       },
     });
 
-    // Call the controller
-    const response = await controller.createAssertion(mockContext);
-    expect(response.status).toBe(200);
+    try {
+      // Call the controller
+      const response = await controller.createAssertion(mockContext);
+      expect(response.status).toBe(200);
 
-    // Verify the response
-    const data = await response.json();
-    expect(data.status).toBe("success");
-    expect(data.data.assertionId).toBeDefined();
+      // Verify the response
+      const data = await response.json();
+      console.log(
+        "OB3 assertion creation response:",
+        JSON.stringify(data, null, 2),
+      );
 
-    // Verify OB3 format has proof
-    expect(data.data.assertion.assertionJson.proof).toBeDefined();
-    expect(data.data.assertion.assertionJson["@context"]).toContain(
-      "https://www.w3.org/2018/credentials/v1",
-    );
+      expect(data.status).toBe("success");
+      expect(data.data.assertionId).toBeDefined();
+
+      // Verify OB3 format has proof
+      expect(data.data.assertion.assertionJson.proof).toBeDefined();
+      expect(data.data.assertion.assertionJson["@context"]).toContain(
+        "https://www.w3.org/2018/credentials/v1",
+      );
+    } catch (error) {
+      console.error("Failed to create assertion:", error);
+      throw error;
+    }
   });
 
   it("should verify an OB2 assertion", async () => {
-    // We need to get an existing assertion first
-    const assertions = await db.select().from(badgeAssertions).limit(1);
+    // Instead of querying the database, use the assertion we already created in the setup
+    // Create a direct SQL query to get the assertion ID
+    const results = await db.execute(
+      `SELECT assertion_id FROM badge_assertions LIMIT 1`,
+    );
 
-    if (assertions.length === 0) {
-      throw new Error("No assertions found for testing");
+    if (!results.rows.length) {
+      throw new Error(
+        "No assertions found for testing. Test setup may have failed.",
+      );
     }
 
-    const assertionId = assertions[0].assertionId;
+    const assertionId = results.rows[0].assertion_id;
+    console.log(`Found assertion ID for verification: ${assertionId}`);
 
     // Create a mock context for verification
     const mockContext = createMockContext({
@@ -170,22 +192,32 @@ describe("AssertionController Integration Tests", () => {
       params: { id: assertionId },
     });
 
-    const response = await controller.getAssertion(getContext);
-    expect(response.status).toBe(200);
+    try {
+      const response = await controller.getAssertion(getContext);
+      expect(response.status).toBe(200);
 
-    const data = await response.json();
-    expect(data.status).toBe("success");
+      const data = await response.json();
+      expect(data.status).toBe("success");
+    } catch (error) {
+      console.error("Error getting assertion:", error);
+      throw error;
+    }
   });
 
   it("should revoke an assertion", async () => {
-    // We need to get an existing assertion first
-    const assertions = await db.select().from(badgeAssertions).limit(1);
+    // Use direct SQL query to get an assertion
+    const results = await db.execute(
+      `SELECT assertion_id FROM badge_assertions LIMIT 1`,
+    );
 
-    if (assertions.length === 0) {
-      throw new Error("No assertions found for testing");
+    if (!results.rows.length) {
+      throw new Error(
+        "No assertions found for testing. Test setup may have failed.",
+      );
     }
 
-    const assertionId = assertions[0].assertionId;
+    const assertionId = results.rows[0].assertion_id;
+    console.log(`Found assertion ID for revocation: ${assertionId}`);
 
     // Create a mock context for revocation
     const mockContext = createMockContext({
@@ -197,19 +229,23 @@ describe("AssertionController Integration Tests", () => {
       },
     });
 
-    // Revoke the assertion
-    const response = await controller.revokeAssertion(mockContext);
-    expect(response.status).toBe(200);
+    try {
+      // Revoke the assertion
+      const response = await controller.revokeAssertion(mockContext);
+      expect(response.status).toBe(200);
 
-    // Verify the assertion is revoked
-    const revokedAssertion = await db
-      .select()
-      .from(badgeAssertions)
-      .where(eq(badgeAssertions.assertionId, assertionId))
-      .limit(1);
+      // Verify the assertion is revoked using direct SQL
+      const revokedResults = await db.execute(
+        `SELECT revoked, revocation_reason FROM badge_assertions WHERE assertion_id = $1 LIMIT 1`,
+        [assertionId],
+      );
 
-    expect(revokedAssertion.length).toBe(1);
-    expect(revokedAssertion[0].revoked).toBe(true);
-    expect(revokedAssertion[0].revocationReason).toBe("Test revocation");
+      expect(revokedResults.rows.length).toBe(1);
+      expect(revokedResults.rows[0].revoked).toBe(true);
+      expect(revokedResults.rows[0].revocation_reason).toBe("Test revocation");
+    } catch (error) {
+      console.error("Error revoking assertion:", error);
+      throw error;
+    }
   });
 });

@@ -1,4 +1,4 @@
-import { beforeAll, afterAll, describe, it, expect } from "vitest";
+import { beforeAll, afterAll, describe, it, expect } from "bun:test";
 import supertest from "supertest";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
