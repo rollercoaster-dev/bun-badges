@@ -1,6 +1,11 @@
 import { describe, expect, test, beforeAll } from "bun:test";
 import { db } from "@/db/config";
-import { issuerProfiles, badgeClasses } from "@/db/schema";
+import {
+  issuerProfiles,
+  badgeClasses,
+  users,
+  badgeAssertions,
+} from "@/db/schema";
 import { VerificationController } from "@/controllers/verification.controller";
 import crypto from "crypto";
 import {
@@ -44,14 +49,22 @@ describe("VerificationController Integration Tests", () => {
     // Create test data
     const issuerId = crypto.randomUUID();
     const badgeId = crypto.randomUUID();
+    const userId = crypto.randomUUID();
+
+    // Create test user
+    await db.insert(users).values({
+      userId,
+      email: "test-verification@example.com",
+      name: "Test User",
+    });
 
     // Create test issuer
     await db.insert(issuerProfiles).values({
       issuerId,
       name: "Test Issuer",
       url: "https://example.com",
-      email: "test@example.com",
-      ownerUserId: "test-user",
+      email: "test-issuer-verification@example.com",
+      ownerUserId: userId,
       issuerJson: {
         "@context": "https://w3id.org/openbadges/v2",
         type: "Issuer",
@@ -90,11 +103,21 @@ describe("VerificationController Integration Tests", () => {
     const assertionId = crypto.randomUUID();
     const assertionJson = getOB2AssertionJson(assertionId);
 
+    // Save the assertion to the database
+    await db.insert(badgeAssertions).values({
+      assertionId,
+      badgeId: testData.get("badgeId"),
+      issuerId: testData.get("issuerId"),
+      recipientType: "email",
+      recipientIdentity: "test@example.com",
+      recipientHashed: false,
+      issuedOn: new Date(),
+      revoked: false,
+      assertionJson,
+    });
+
     const ctx = createMockContext({
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(assertionJson),
+      params: { assertionId },
     });
 
     const result = await controller.verifyAssertion(ctx);
@@ -110,11 +133,21 @@ describe("VerificationController Integration Tests", () => {
     const assertionId = crypto.randomUUID();
     const credentialJson = getOB3CredentialJson(assertionId);
 
+    // Save the assertion to the database
+    await db.insert(badgeAssertions).values({
+      assertionId,
+      badgeId: testData.get("badgeId"),
+      issuerId: testData.get("issuerId"),
+      recipientType: "email",
+      recipientIdentity: "test@example.com",
+      recipientHashed: false,
+      issuedOn: new Date(),
+      revoked: false,
+      assertionJson: credentialJson,
+    });
+
     const ctx = createMockContext({
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(credentialJson),
+      params: { assertionId },
     });
 
     const result = await controller.verifyAssertion(ctx);

@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeAll } from "bun:test";
 import { db } from "@/db/config";
-import { issuerProfiles, badgeClasses } from "@/db/schema";
+import { issuerProfiles, badgeClasses, users } from "@/db/schema";
 import { VerificationController } from "@/controllers/verification.controller";
 import crypto from "crypto";
 import {
@@ -40,6 +40,14 @@ describe("VerificationController Edge Cases", () => {
     // Create test data
     const issuerId = crypto.randomUUID();
     const badgeId = crypto.randomUUID();
+    const userId = crypto.randomUUID();
+
+    // Create test user
+    await db.insert(users).values({
+      userId,
+      email: "test@example.com",
+      name: "Test User",
+    });
 
     // Create test issuer
     await db.insert(issuerProfiles).values({
@@ -47,7 +55,7 @@ describe("VerificationController Edge Cases", () => {
       name: "Test Issuer",
       url: "https://example.com",
       email: "test@example.com",
-      ownerUserId: "test-user",
+      ownerUserId: userId,
       issuerJson: {
         "@context": "https://w3id.org/openbadges/v2",
         type: "Issuer",

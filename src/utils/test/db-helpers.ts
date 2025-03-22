@@ -1,4 +1,4 @@
-import { db } from "@/db/config";
+import { db, dbPool } from "@/db/config";
 import {
   issuerProfiles,
   badgeClasses,
@@ -251,16 +251,13 @@ export async function clearTestData() {
   console.log("🧹 Clearing test data from database...");
   try {
     // Disable foreign key checks (for PostgreSQL)
-    await db.execute(sql`SET session_replication_role = 'replica'`);
+    await dbPool.query("SET session_replication_role = 'replica'");
 
     try {
       // Get a list of existing tables
-      const tablesResult = await db.execute(sql`
-        SELECT tablename FROM pg_tables
-        WHERE schemaname = 'public'
-        AND tablename IN ('badge_assertions', 'badge_classes', 'signing_keys', 
-                         'issuer_profiles', 'verification_codes', 'revoked_tokens', 'users')
-      `);
+      const tablesResult = await dbPool.query(
+        "SELECT tablename FROM pg_tables WHERE schemaname = 'public'",
+      );
 
       const existingTables = tablesResult.rows.map((row) => row.tablename);
       console.log(`Existing tables: ${existingTables.join(", ") || "none"}`);
@@ -302,7 +299,7 @@ export async function clearTestData() {
       }
     } finally {
       // Re-enable foreign key checks
-      await db.execute(sql`SET session_replication_role = 'origin'`);
+      await dbPool.query("SET session_replication_role = 'origin'");
     }
   } catch (error) {
     console.error("❌ Error clearing test data:", error);

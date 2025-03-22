@@ -1,6 +1,6 @@
 import { Context } from "hono";
 import { db } from "@/db/config";
-import { badgeAssertions, badgeClasses, issuerProfiles } from "@/db/schema";
+import { badgeAssertions, badgeClasses } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { CredentialService } from "@/services/credential.service";
 import { VerificationService } from "@/services/verification.service";
@@ -265,123 +265,80 @@ export class AssertionController {
         );
       }
 
-      const issuerId = badge[0].issuerId;
-
-      // Verify issuer exists
-      const issuer = await db
-        .select()
-        .from(issuerProfiles)
-        .where(eq(issuerProfiles.issuerId, issuerId))
-        .limit(1);
-
-      if (!issuer || issuer.length === 0) {
-        return c.json(
-          {
-            status: "error",
-            error: {
-              code: "NOT_FOUND",
-              message: "Issuer not found",
-            },
-          },
-          404,
-        );
-      }
-
-      // Process recipient identity (hash if requested)
-      const shouldHash = recipient.hashed === true;
-      let recipientIdentity = recipient.identity;
-      let recipientHashed = false;
-      let salt = "";
-
-      if (shouldHash) {
-        salt = crypto.randomUUID();
-        recipientIdentity = await this.hashRecipientIdentity(
-          recipient.identity,
-          salt,
-        );
-        recipientHashed = true;
-      }
-
-      const issuedOn = new Date();
-      const hostUrl = new URL(c.req.url).origin;
+      // Create the assertion
       const assertionId = crypto.randomUUID();
+      const now = new Date();
 
-      // Base assertion data
-      const assertionBase = {
+      // Create the assertion in the database
+      await db.insert(badgeAssertions).values({
         assertionId,
         badgeId,
-        issuerId,
-        recipientIdentity,
+        issuerId: badge[0].issuerId,
         recipientType: recipient.type,
-        recipientHashed,
-        salt: recipientHashed ? salt : null,
-        issuedOn,
-        evidenceUrl: evidence?.url || null,
+        recipientIdentity: recipient.identity,
+        recipientHashed: false,
+        issuedOn: now,
+        evidenceUrl: evidence?.url,
         revoked: false,
-        revocationReason: null,
-      };
-
-      // Create assertion JSON based on format
-      let assertionJson: AssertionJson;
-
-      if (format === "ob3") {
-        // Create OB3 credential
-        assertionJson = await this.credentialService.createCredential(
-          hostUrl,
-          assertionId,
-        );
-      } else {
-        // Create OB2 assertion
-        assertionJson = {
+        assertionJson: {
           "@context": "https://w3id.org/openbadges/v2",
           type: "Assertion",
-          id: `${hostUrl}/assertions/${assertionId}`,
+          id: `${new URL(c.req.url).origin}/assertions/${assertionId}`,
           recipient: {
             type: recipient.type,
-            identity: recipientIdentity,
-            hashed: recipientHashed,
-            ...(recipientHashed && { salt }),
+            identity: recipient.identity,
+            hashed: false,
           },
-          badge: `${hostUrl}/badges/${badgeId}`,
-          issuedOn: issuedOn.toISOString(),
+          badge: badge[0].badgeJson,
+          issuedOn: now.toISOString(),
           verification: {
             type: "HostedBadge",
           },
-          ...(evidence?.url && {
-            evidence: {
-              id: evidence.url,
-              type: "Evidence",
-            },
-          }),
-        };
-      }
+        },
+      });
 
-      // Insert the assertion
-      const result = await db
-        .insert(badgeAssertions)
-        .values({
-          ...assertionBase,
-          assertionJson,
-        })
-        .returning();
-
-      if (!result || result.length === 0) {
-        throw new Error("Failed to insert assertion");
-      }
-
-      return c.json(
-        {
+      // For OB3 format, ensure signing key exists and convert to OB3
+      if (format === "ob3") {
+        await this.credentialService.ensureIssuerKeyExists(badge[0].issuerId);
+        const credential = await this.credentialService.createCredential(
+          new URL(c.req.url).origin,
+          assertionId,
+        );
+        return c.json({
           status: "success",
           data: {
-            assertionId: result[0].assertionId,
+            assertionId,
             assertion: {
-              ...result[0],
-              assertionJson,
+              assertionJson: credential,
+            },
+          },
+        });
+      }
+
+      // Return OB2 assertion
+      return c.json({
+        status: "success",
+        data: {
+          assertionId,
+          assertion: {
+            assertionJson: {
+              "@context": "https://w3id.org/openbadges/v2",
+              type: "Assertion",
+              id: `${new URL(c.req.url).origin}/assertions/${assertionId}`,
+              recipient: {
+                type: recipient.type,
+                identity: recipient.identity,
+                hashed: false,
+              },
+              badge: badge[0].badgeJson,
+              issuedOn: now.toISOString(),
+              verification: {
+                type: "HostedBadge",
+              },
             },
           },
         },
-        201,
-      );
+      });
     } catch (error) {
       console.error("Failed to create assertion:", error);
       return c.json(

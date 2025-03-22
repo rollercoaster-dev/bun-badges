@@ -12,7 +12,10 @@ import { dbPool } from "@/db/config";
 import { Context } from "hono";
 import { mock } from "bun:test";
 import { OB2BadgeAssertion } from "@/services/verification.service";
-import { OpenBadgeCredential } from "@/models/credential.model";
+import {
+  OpenBadgeCredential,
+  DataIntegrityProof,
+} from "@/models/credential.model";
 
 /**
  * Create a test server with the provided Hono app
@@ -118,6 +121,14 @@ export function getOB3CredentialJson(assertionId: string): OpenBadgeCredential {
         },
       },
     },
+    proof: {
+      type: "DataIntegrityProof",
+      cryptosuite: "eddsa-rdfc-2022",
+      created: "2023-01-01T00:00:00Z",
+      verificationMethod: "https://example.com/issuers/789#key-1",
+      proofPurpose: "assertionMethod",
+      proofValue: "TEST_BASE64_SIGNATURE",
+    } as DataIntegrityProof,
   };
 }
 
@@ -153,6 +164,7 @@ export function createMockContext(
     query?: Record<string, string>;
     user?: any;
     body?: any;
+    url?: string;
   } = {},
 ): Context {
   const c = {
@@ -162,8 +174,9 @@ export function createMockContext(
         return options.headers?.[name] ?? null;
       },
       param: (name: string) => options.params?.[name] ?? null,
-      query: (name: string) => options.query?.[name] ?? null,
+      query: () => options.query ?? {},
       json: () => Promise.resolve(options.body || {}),
+      url: options.url || "https://example.com/assertions",
     },
     set: (key: string, value: any) => {
       (c as any)[key] = value;
@@ -177,7 +190,10 @@ export function createMockContext(
       (c as any).body = data;
       if (status) (c as any).statusCode = status;
       (c as any).finalized = true;
-      return c;
+      return {
+        json: () => Promise.resolve(data),
+        text: () => Promise.resolve(JSON.stringify(data)),
+      };
     },
     text: (data: string, status?: number) => {
       (c as any).body = data;

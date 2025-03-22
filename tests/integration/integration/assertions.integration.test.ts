@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeAll } from "bun:test";
 import { db } from "@/db/config";
-import { issuerProfiles, badgeClasses } from "@/db/schema";
+import { issuerProfiles, badgeClasses, users } from "@/db/schema";
 import { AssertionController } from "@/controllers/assertions.controller";
 import crypto from "crypto";
 import { createMockContext, TestData } from "../../helpers/test-utils";
@@ -41,6 +41,14 @@ describe("AssertionController Integration Tests", () => {
     // Create test data
     const issuerId = crypto.randomUUID();
     const badgeId = crypto.randomUUID();
+    const userId = crypto.randomUUID();
+
+    // Create test user
+    await db.insert(users).values({
+      userId,
+      email: "test@example.com",
+      name: "Test User",
+    });
 
     // Create test issuer
     await db.insert(issuerProfiles).values({
@@ -48,7 +56,7 @@ describe("AssertionController Integration Tests", () => {
       name: "Test Issuer",
       url: "https://example.com",
       email: "test@example.com",
-      ownerUserId: "test-user",
+      ownerUserId: userId,
       issuerJson: {
         "@context": "https://w3id.org/openbadges/v2",
         type: "Issuer",
