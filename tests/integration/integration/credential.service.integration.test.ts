@@ -4,6 +4,7 @@ import { badgeClasses, badgeAssertions } from "@/db/schema";
 import {
   testDb,
   tableExists as checkTableExists,
+  executeSql,
 } from "@/utils/test/integration-setup";
 import { DataIntegrityProof, CredentialProof } from "@/models/credential.model";
 import { seedTestData, clearTestData } from "@/utils/test/db-helpers";
@@ -44,16 +45,16 @@ describe("CredentialService Integration Tests", () => {
       return;
     }
 
-    // Create a test badge using SQL directly to avoid Drizzle ORM issues
+    // Create a test badge using executeSql helper for safer SQL execution
     const badgeId = crypto.randomUUID();
-    const badge = await testDb.execute(
+    const badges = await executeSql(
       `INSERT INTO badge_classes (
-        badge_id, 
-        issuer_id, 
-        name, 
-        description, 
-        image_url, 
-        criteria, 
+        badge_id,
+        issuer_id,
+        name,
+        description,
+        image_url,
+        criteria,
         badge_json
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7
@@ -76,6 +77,8 @@ describe("CredentialService Integration Tests", () => {
         }),
       ],
     );
+
+    const badge = badges[0];
 
     // Test creating an achievement
     const result = await service.createAchievement(hostUrl, badgeId);
@@ -207,9 +210,9 @@ describe("CredentialService Integration Tests", () => {
       issuedOn: new Date().toISOString(),
     };
 
-    // Create with direct SQL to avoid Drizzle ORM issues
+    // Create with executeSql helper for safer SQL execution
     const assertionId = crypto.randomUUID();
-    const assertions = await testDb.execute(
+    const assertions = await executeSql(
       `INSERT INTO badge_assertions (
         assertion_id,
         badge_id,
@@ -240,6 +243,8 @@ describe("CredentialService Integration Tests", () => {
       ],
     );
 
+    const assertion = assertions[0];
+
     // Create the credential
     const result = await service.createCredential(hostUrl, assertionId);
 
@@ -267,9 +272,9 @@ describe("CredentialService Integration Tests", () => {
     }
 
     try {
-      // Insert a signing key directly using SQL to avoid ORM issues
+      // Insert a signing key using executeSql helper
       const keyId = crypto.randomUUID();
-      await testDb.execute(
+      await executeSql(
         `INSERT INTO signing_keys (
           key_id,
           issuer_id,

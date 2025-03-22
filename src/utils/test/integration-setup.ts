@@ -272,8 +272,22 @@ beforeEach(async () => {
     const tablesExist = await tableExists(testDb, "users");
 
     if (tablesExist) {
-      // Clear existing data
-      await clearTestData();
+      // Clear existing data using the standard cleanupTestData function
+      try {
+        // Try the new utility function first
+        const { cleanupTestData } = await import(
+          "../../tests/helpers/db-test-utils"
+        );
+        await cleanupTestData();
+        console.log("✅ Test data cleared using db-test-utils");
+      } catch (utilError) {
+        // Fall back to the old method if the new one fails
+        console.log(
+          "⚠️ Failed to use db-test-utils, falling back to clearTestData",
+        );
+        await clearTestData();
+        console.log("✅ Test data cleared using legacy method");
+      }
     } else {
       console.log("⚠️ Tables don't exist yet, skipping data clearing");
     }
@@ -292,8 +306,21 @@ afterEach(async () => {
     const tablesExist = await tableExists(testDb, "users");
 
     if (tablesExist) {
-      await clearTestData();
-      console.log("✅ Test data cleared");
+      try {
+        // Try the new utility function first
+        const { cleanupTestData } = await import(
+          "../../tests/helpers/db-test-utils"
+        );
+        await cleanupTestData();
+        console.log("✅ Test data cleared using db-test-utils");
+      } catch (utilError) {
+        // Fall back to the old method if the new one fails
+        console.log(
+          "⚠️ Failed to use db-test-utils, falling back to clearTestData",
+        );
+        await clearTestData();
+        console.log("✅ Test data cleared using legacy method");
+      }
     } else {
       console.log("⚠️ Tables don't exist, skipping data clearing");
     }
@@ -338,6 +365,36 @@ function createTestDb(pool: Pool) {
 }
 
 console.log("✅ Integration test setup complete");
+
+// Helper function for performing direct SQL queries safely
+export async function executeSql<T = any>(
+  query: string,
+  params: any[] = [],
+): Promise<T[]> {
+  try {
+    // Use parameterized queries for safety
+    const result = await testDb.execute(sql.raw(query, params));
+    return result.rows as T[];
+  } catch (error) {
+    console.error(`Error executing SQL query: ${query}`, error);
+    throw error;
+  }
+}
+
+// Helper function for performing direct SQL queries safely
+export async function executeSql<T = any>(
+  query: string,
+  params: any[] = [],
+): Promise<T[]> {
+  try {
+    // Use parameterized queries for safety
+    const result = await testDb.execute(sql.raw(query, params));
+    return result.rows as T[];
+  } catch (error) {
+    console.error(`Error executing SQL query: ${query}`, error);
+    throw error;
+  }
+}
 
 // Export singleton instance, functions and constants
 export {

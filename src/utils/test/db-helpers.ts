@@ -188,6 +188,29 @@ export async function clearTestData() {
         await db.delete(signingKeys);
         await db.delete(issuerProfiles);
         await db.delete(verificationCodes);
+
+        // Try to delete from oauth tables if they exist
+        try {
+          await db.execute("DELETE FROM oauth_access_tokens");
+        } catch (e) {
+          // Suppress error if table doesn't exist
+          console.log("Note: oauth_access_tokens table might not exist yet");
+        }
+
+        try {
+          await db.execute("DELETE FROM authorization_codes");
+        } catch (e) {
+          // Suppress error if table doesn't exist
+          console.log("Note: authorization_codes table might not exist yet");
+        }
+
+        try {
+          await db.execute("DELETE FROM oauth_clients");
+        } catch (e) {
+          // Suppress error if table doesn't exist
+          console.log("Note: oauth_clients table might not exist yet");
+        }
+
         await db.delete(users);
 
         console.log("✅ Test data cleared successfully");
@@ -210,6 +233,29 @@ export async function clearTestData() {
       await dbPool.query("DELETE FROM issuer_profiles");
       await dbPool.query("DELETE FROM verification_codes");
       await dbPool.query("DELETE FROM revoked_tokens");
+
+      // Try to delete from oauth tables if they exist
+      try {
+        await dbPool.query("DELETE FROM oauth_access_tokens");
+      } catch (e) {
+        // Suppress error if table doesn't exist
+        console.log("Note: oauth_access_tokens table might not exist yet");
+      }
+
+      try {
+        await dbPool.query("DELETE FROM authorization_codes");
+      } catch (e) {
+        // Suppress error if table doesn't exist
+        console.log("Note: authorization_codes table might not exist yet");
+      }
+
+      try {
+        await dbPool.query("DELETE FROM oauth_clients");
+      } catch (e) {
+        // Suppress error if table doesn't exist
+        console.log("Note: oauth_clients table might not exist yet");
+      }
+
       await dbPool.query("DELETE FROM users");
 
       console.log("✅ Test data cleared successfully");

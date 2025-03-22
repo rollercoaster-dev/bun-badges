@@ -22,87 +22,75 @@ export async function createTestAssertionData() {
   const userId = crypto.randomUUID();
 
   // First create a test user
-  await db
-    .insert(users)
-    .values({
-      userId,
-      email: `test-${nanoid(6)}@example.com`,
-      name: `Test User ${nanoid(6)}`,
-      passwordHash: "not-a-real-hash",
-      role: "admin",
-    })
-    .execute();
+  await db.insert(users).values({
+    userId,
+    email: `test-${nanoid(6)}@example.com`,
+    name: `Test User ${nanoid(6)}`,
+    passwordHash: "not-a-real-hash",
+    role: "admin",
+  });
 
   // Then create a test issuer
-  await db
-    .insert(issuerProfiles)
-    .values({
-      issuerId,
+  await db.insert(issuerProfiles).values({
+    issuerId,
+    name: "Test Issuer",
+    url: "https://example.org",
+    description: "A test issuer",
+    email: "test-issuer@example.org",
+    ownerUserId: userId,
+    issuerJson: {
+      "@context": "https://w3id.org/openbadges/v2",
+      type: "Issuer",
+      id: `https://example.org/issuers/${issuerId}`,
       name: "Test Issuer",
       url: "https://example.org",
-      description: "A test issuer",
       email: "test-issuer@example.org",
-      ownerUserId: userId,
-      issuerJson: {
-        "@context": "https://w3id.org/openbadges/v2",
-        type: "Issuer",
-        id: `https://example.org/issuers/${issuerId}`,
-        name: "Test Issuer",
-        url: "https://example.org",
-        email: "test-issuer@example.org",
-        description: "A test issuer for testing purposes",
-      },
-    })
-    .execute();
+      description: "A test issuer for testing purposes",
+    },
+  });
 
   // Create a test badge class
-  await db
-    .insert(badgeClasses)
-    .values({
-      badgeId,
-      issuerId,
+  await db.insert(badgeClasses).values({
+    badgeId,
+    issuerId,
+    name: "Test Badge",
+    description: "A test badge",
+    imageUrl: "https://example.org/badge.png",
+    criteria: "Test criteria",
+    badgeJson: {
+      "@context": "https://w3id.org/openbadges/v2",
+      type: "BadgeClass",
+      id: `https://example.org/badges/${badgeId}`,
       name: "Test Badge",
       description: "A test badge",
-      imageUrl: "https://example.org/badge.png",
-      criteria: "Test criteria",
-      badgeJson: {
-        "@context": "https://w3id.org/openbadges/v2",
-        type: "BadgeClass",
-        id: `https://example.org/badges/${badgeId}`,
-        name: "Test Badge",
-        description: "A test badge",
-        image: "https://example.org/badge.png",
-        criteria: {
-          narrative: "Test criteria",
-        },
-        issuer: `https://example.org/issuers/${issuerId}`,
+      image: "https://example.org/badge.png",
+      criteria: {
+        narrative: "Test criteria",
       },
-    })
-    .execute();
+      issuer: `https://example.org/issuers/${issuerId}`,
+    },
+  });
 
   // Create a test signing key
   const keyId = crypto.randomUUID();
   const controller = `did:web:example.org`;
 
-  await db
-    .insert(signingKeys)
-    .values({
-      keyId,
-      issuerId,
+  await db.insert(signingKeys).values({
+    keyId,
+    issuerId,
+    type: "Ed25519VerificationKey2020",
+    publicKeyMultibase: "z6MkrzXCdarP1kaZQXEX6CDRdcLYTk6bTEgGDgV5XQEyP4WB", // Test key
+    privateKeyMultibase:
+      "z3u2en7t8mxcz3s9wKaDTNWK1RA619VAXqLLGEY4ZD1vpCgPbR7yMkwk4Qj7TuuGJUTzpgvA", // Test key
+    controller: controller,
+    keyInfo: {
+      id: `${controller}#key-1`,
       type: "Ed25519VerificationKey2020",
-      publicKeyMultibase: "z6MkrzXCdarP1kaZQXEX6CDRdcLYTk6bTEgGDgV5XQEyP4WB", // Test key
-      privateKeyMultibase:
-        "z3u2en7t8mxcz3s9wKaDTNWK1RA619VAXqLLGEY4ZD1vpCgPbR7yMkwk4Qj7TuuGJUTzpgvA", // Test key
       controller: controller,
-      keyInfo: {
-        id: `${controller}#key-1`,
-        type: "Ed25519VerificationKey2020",
-        controller: controller,
-        publicKeyMultibase: "z6MkrzXCdarP1kaZQXEX6CDRdcLYTk6bTEgGDgV5XQEyP4WB",
-      },
-      revoked: false,
-    })
-    .execute();
+      publicKeyMultibase: "z6MkrzXCdarP1kaZQXEX6CDRdcLYTk6bTEgGDgV5XQEyP4WB",
+    },
+    revoked: false,
+  });
 
   // Create a test assertion
   const testAssertion = {
@@ -145,7 +133,7 @@ export async function createTestAssertionData() {
   };
 
   // Store the assertion in the database
-  await db.insert(badgeAssertions).values(testAssertion).execute();
+  await db.insert(badgeAssertions).values(testAssertion);
 
   return {
     assertionId,
@@ -259,5 +247,146 @@ export async function setupAssertionTestUtils() {
 
       return result.length > 0 ? result[0].revoked : false;
     },
+  };
+}
+
+/**
+ * Creates mock assertion controller setup
+ * Use this for integration tests that need to test the controller
+ */
+export function mockAssertionController() {
+  // Mock the crypto operations
+  mockCryptoForTests();
+
+  // Create a test assertion data object - no database interaction
+  const assertionId = crypto.randomUUID();
+  const badgeId = crypto.randomUUID();
+  const issuerId = crypto.randomUUID();
+
+  // Mock the database responses
+  const mockAssertion = {
+    assertionId,
+    badgeId,
+    issuerId,
+    recipientType: "email",
+    recipientIdentity: "test@example.com",
+    recipientHashed: false,
+    issuedOn: new Date(),
+    evidenceUrl: "https://example.org/evidence",
+    revoked: false,
+    revocationReason: null,
+    assertionJson: {
+      "@context": "https://w3id.org/openbadges/v2",
+      type: "Assertion",
+      id: `https://example.org/assertions/${assertionId}`,
+      recipient: {
+        type: "email",
+        identity: "test@example.com",
+        hashed: false,
+      },
+      badge: {
+        "@context": "https://w3id.org/openbadges/v2",
+        type: "BadgeClass",
+        id: `https://example.org/badges/${badgeId}`,
+        name: "Test Badge",
+        description: "A test badge",
+        image: "https://example.org/badge.png",
+        criteria: {
+          narrative: "Test criteria",
+        },
+        issuer: `https://example.org/issuers/${issuerId}`,
+      },
+      issuedOn: new Date().toISOString(),
+      verification: {
+        type: "HostedBadge",
+      },
+    },
+  };
+
+  // Intercept database queries for badge assertions
+  mock.module("drizzle-orm", () => {
+    // Import the original module without using mock.original
+    // since it's not supported in Bun
+    return {
+      eq: (column: any, value: any) => ({ column, value, operator: "eq" }),
+    };
+  });
+
+  // Mock the database
+  mock.module("@/db/config", () => {
+    return {
+      db: {
+        select: () => ({
+          from: () => ({
+            where: () => ({
+              limit: () => Promise.resolve([mockAssertion]),
+            }),
+          }),
+        }),
+        insert: () => ({
+          values: () => ({
+            returning: () =>
+              Promise.resolve([{ assertionId: crypto.randomUUID() }]),
+            execute: () => Promise.resolve(),
+          }),
+        }),
+        update: () => ({
+          set: () => ({
+            where: () => ({
+              returning: () => Promise.resolve([mockAssertion]),
+            }),
+          }),
+        }),
+      },
+    };
+  });
+
+  // Mock the verification service
+  mock.module("@/services/verification.service", () => {
+    return {
+      VerificationService: class MockVerificationService {
+        async verifyAssertion() {
+          return {
+            valid: true,
+            errors: [],
+            checks: {
+              structure: { valid: true, errors: [] },
+              signature: { valid: true, errors: [] },
+              revocation: { valid: true, errors: [] },
+              expiration: { valid: true, errors: [] },
+            },
+          };
+        }
+
+        async verifyIssuer() {
+          return {
+            valid: true,
+            errors: [],
+          };
+        }
+      },
+    };
+  });
+
+  return {
+    assertionId,
+    badgeId,
+    issuerId,
+    mockAssertion,
+  };
+}
+
+/**
+ * Creates mock assertion data for tests
+ * This uses the same approach as mockAssertionController but returns just the data
+ */
+export function createMockAssertionData() {
+  const { assertionId, badgeId, issuerId, mockAssertion } =
+    mockAssertionController();
+  return {
+    assertionId,
+    badgeId,
+    issuerId,
+    assertion: mockAssertion,
   };
 }
