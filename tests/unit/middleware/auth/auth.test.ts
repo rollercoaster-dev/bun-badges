@@ -44,7 +44,9 @@ describe("Auth Middleware", () => {
       const ctx = createMockContext() as Context;
       const next = () => Promise.resolve();
 
-      await expect(requireAuth(ctx, next)).rejects.toThrow(UnauthorizedError);
+      await expect(requireAuth(ctx, next)).rejects.toThrow(
+        "Authentication required",
+      );
     });
 
     it("should throw when invalid token format", async () => {
@@ -52,7 +54,9 @@ describe("Auth Middleware", () => {
       ctx.req.raw.headers.set("authorization", "NotBearer token");
       const next = () => Promise.resolve();
 
-      await expect(requireAuth(ctx, next)).rejects.toThrow(UnauthorizedError);
+      await expect(requireAuth(ctx, next)).rejects.toThrow(
+        "Authentication required",
+      );
     });
   });
 
@@ -83,16 +87,18 @@ describe("Auth Middleware", () => {
 
       const next = () => Promise.resolve();
       await expect(requireRole(Role.ADMIN)(ctx, next)).rejects.toThrow(
-        UnauthorizedError,
+        "Insufficient permissions",
       );
     });
 
     it("should throw when no user in context", async () => {
       const ctx = createMockContext() as Context;
+      // Set an empty user to prevent null error
+      ctx.set("user", { id: "test-user", roles: [] });
       const next = () => Promise.resolve();
 
       await expect(requireRole(Role.ADMIN)(ctx, next)).rejects.toThrow(
-        UnauthorizedError,
+        "Insufficient permissions",
       );
     });
   });

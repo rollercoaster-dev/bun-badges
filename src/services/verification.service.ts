@@ -99,10 +99,18 @@ export class VerificationService {
 
     try {
       // Get the assertion from the database
-      const [assertion] = await db
+      const assertions = await db
         .select()
         .from(badgeAssertions)
         .where(eq(badgeAssertions.assertionId, assertionId));
+
+      // Check if we got results
+      if (!assertions || assertions.length === 0) {
+        result.errors.push("Assertion not found");
+        return result;
+      }
+
+      const assertion = assertions[0];
 
       if (!assertion) {
         result.errors.push("Assertion not found");
@@ -198,10 +206,18 @@ export class VerificationService {
 
     try {
       // Get the assertion from the database
-      const [assertion] = await db
+      const assertions = await db
         .select()
         .from(badgeAssertions)
         .where(eq(badgeAssertions.assertionId, assertionId));
+
+      // Check if we got results
+      if (!assertions || assertions.length === 0) {
+        result.errors.push("Assertion not found");
+        return result;
+      }
+
+      const assertion = assertions[0];
 
       if (!assertion) {
         result.errors.push("Assertion not found");
@@ -347,10 +363,25 @@ export class VerificationService {
     }
 
     // Get the assertion to determine format
-    const [assertion] = await db
+    const assertions = await db
       .select()
       .from(badgeAssertions)
       .where(eq(badgeAssertions.assertionId, assertionId));
+
+    // Check if we found any results
+    if (!assertions || assertions.length === 0) {
+      return {
+        valid: false,
+        checks: {
+          signature: false,
+          revocation: false,
+          structure: false,
+        },
+        errors: ["Assertion not found"],
+      };
+    }
+
+    const assertion = assertions[0];
 
     if (!assertion) {
       return {

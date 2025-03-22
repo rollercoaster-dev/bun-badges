@@ -108,41 +108,108 @@ describe("Assertions Routes Integration", () => {
     assertionId = crypto.randomUUID();
 
     // Create test issuer
-    await db.insert(issuerProfiles).values({
-      issuerId,
-      name: "Test Issuer",
-      url: "https://example.com",
-      email: "test@example.com",
-      ownerUserId: "test-user",
-      issuerJson: {
-        "@context": "https://w3id.org/openbadges/v2",
-        type: "Issuer",
-        id: `https://example.com/issuers/${issuerId}`,
-        name: "Test Issuer",
-        url: "https://example.com",
-        email: "test@example.com",
-      },
-    });
+    await db.execute(
+      `INSERT INTO issuer_profiles (
+        issuer_id, 
+        name, 
+        url, 
+        email, 
+        owner_user_id, 
+        issuer_json
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6
+      )`,
+      [
+        issuerId,
+        "Test Issuer",
+        "https://example.com",
+        "test@example.com",
+        "test-user",
+        JSON.stringify({
+          "@context": "https://w3id.org/openbadges/v2",
+          type: "Issuer",
+          id: `https://example.com/issuers/${issuerId}`,
+          name: "Test Issuer",
+          url: "https://example.com",
+          email: "test@example.com",
+        }),
+      ],
+    );
 
     // Create test badge
-    await db.insert(badgeClasses).values({
-      badgeId,
-      issuerId,
-      name: "Test Badge",
-      description: "Test badge description",
-      imageUrl: "https://example.com/badge.png",
-      criteria: JSON.stringify({ narrative: "Test criteria" }),
-      badgeJson: {
-        "@context": "https://w3id.org/openbadges/v2",
-        type: "BadgeClass",
-        id: `https://example.com/badges/${badgeId}`,
-        name: "Test Badge",
-        description: "Test badge description",
-        image: "https://example.com/badge.png",
-        criteria: { narrative: "Test criteria" },
-        issuer: `https://example.com/issuers/${issuerId}`,
-      },
-    });
+    await db.execute(
+      `INSERT INTO badge_classes (
+        badge_id, 
+        issuer_id, 
+        name, 
+        description, 
+        image_url, 
+        criteria, 
+        badge_json
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7
+      )`,
+      [
+        badgeId,
+        issuerId,
+        "Test Badge",
+        "Test badge description",
+        "https://example.com/badge.png",
+        "Test criteria",
+        JSON.stringify({
+          "@context": "https://w3id.org/openbadges/v2",
+          type: "BadgeClass",
+          id: `https://example.com/badges/${badgeId}`,
+          name: "Test Badge",
+          description: "Test badge description",
+          image: "https://example.com/badge.png",
+          criteria: { narrative: "Test criteria" },
+          issuer: `https://example.com/issuers/${issuerId}`,
+        }),
+      ],
+    );
+
+    // Create test assertion - this was missing before
+    await db.execute(
+      `INSERT INTO badge_assertions (
+        assertion_id,
+        badge_id,
+        issuer_id,
+        recipient_identity,
+        recipient_type,
+        recipient_hashed,
+        issued_on,
+        assertion_json,
+        revoked
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9
+      )`,
+      [
+        assertionId,
+        badgeId,
+        issuerId,
+        "test-recipient@example.com",
+        "email",
+        false,
+        new Date(),
+        JSON.stringify({
+          "@context": "https://w3id.org/openbadges/v2",
+          type: "Assertion",
+          id: `${baseUrl}/assertions/${assertionId}`,
+          recipient: {
+            identity: "test-recipient@example.com",
+            type: "email",
+            hashed: false,
+          },
+          badge: `${baseUrl}/badges/${badgeId}`,
+          issuedOn: new Date().toISOString(),
+          verification: {
+            type: "HostedBadge",
+          },
+        }),
+        false,
+      ],
+    );
 
     testData.set("issuerId", issuerId);
     testData.set("badgeId", badgeId);
