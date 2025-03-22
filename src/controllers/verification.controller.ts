@@ -13,7 +13,9 @@ export class VerificationController {
    */
   async verifyAssertion(c: Context): Promise<Response> {
     const assertionId = c.req.param("assertionId");
-    const format = c.req.query("format") || "default";
+    const query = c.req.query;
+    const format =
+      typeof query === "function" ? query("format") : query.format || "default";
 
     try {
       // Get the verification result
@@ -63,10 +65,12 @@ export class VerificationController {
    * Verify a badge by parsing the provided JSON
    */
   async verifyBadgeJson(c: Context): Promise<Response> {
-    try {
-      const body = await c.req.json();
-      const format = c.req.query("format") || "default";
+    const body = await c.req.json();
+    const query = c.req.query;
+    const format =
+      typeof query === "function" ? query("format") : query.format || "default";
 
+    try {
       if (!body.assertion && !body.credential) {
         return c.json(
           {

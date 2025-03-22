@@ -16,15 +16,19 @@ console.log(
 // Create a shared poolEnd function that will be called at the very end
 let poolEnd: () => Promise<void>;
 
-// Determine if we're running integration tests that need DB
+// Determine if we're running integration or e2e tests that need DB
 const isIntegrationTest =
   process.env.INTEGRATION_TEST === "true" || // Check environment variable first
   process.argv.some(
     (arg) => arg.includes("integration") || arg.includes("tests/integration"),
   );
 
+const isE2ETest =
+  process.env.E2E_TEST === "true" || // Check environment variable first
+  process.argv.some((arg) => arg.includes("e2e") || arg.includes("tests/e2e"));
+
 // Mock DB modules for unit tests
-if (!isIntegrationTest) {
+if (!isIntegrationTest && !isE2ETest) {
   console.log("🔄 Running in unit test mode, mocking database dependencies");
 
   // Mock the entire db/config module
@@ -58,7 +62,11 @@ if (!isIntegrationTest) {
     };
   });
 } else {
-  console.log("🔄 Running in integration test mode, using real database");
+  if (isIntegrationTest) {
+    console.log("🔄 Running in integration test mode, using real database");
+  } else {
+    console.log("🔄 Running in E2E test mode, using real database");
+  }
 
   // Import after mock setup to avoid circular dependencies
   try {

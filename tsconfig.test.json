@@ -18,9 +18,8 @@
     }
   },
   "include": [
-    "src/**/*.test.ts",
-    "src/__tests__/**/*",
-    "tests/**/*.ts"
+    "tests/**/*.ts",
+    "src/**/*.ts"
   ],
   "exclude": ["node_modules", "dist"]
 } 

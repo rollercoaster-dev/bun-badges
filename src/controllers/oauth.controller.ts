@@ -133,8 +133,18 @@ export class OAuthController {
     }
 
     // Initial authorization request (GET)
-    const query = c.req.query();
-    const { response_type, client_id, redirect_uri, scope, state } = query;
+    const query = c.req.query;
+    // Check if query is a function or an object and extract parameters accordingly
+    const response_type =
+      typeof query === "function"
+        ? query("response_type")
+        : query.response_type;
+    const client_id =
+      typeof query === "function" ? query("client_id") : query.client_id;
+    const redirect_uri =
+      typeof query === "function" ? query("redirect_uri") : query.redirect_uri;
+    const scope = typeof query === "function" ? query("scope") : query.scope;
+    const state = typeof query === "function" ? query("state") : query.state;
 
     // Validate required parameters
     if (!response_type || !client_id || !redirect_uri) {
@@ -379,7 +389,7 @@ export class OAuthController {
   // Handle token requests for authorization code and refresh token grants
   async token(c: Context) {
     try {
-      const body = await c.req.parseBody();
+      const body = await c.req.json();
       const {
         grant_type,
         code,
@@ -554,7 +564,7 @@ export class OAuthController {
   // Implements RFC 7662 - OAuth 2.0 Token Introspection
   async introspect(c: Context) {
     try {
-      const body = await c.req.parseBody();
+      const body = await c.req.json();
       const { token } = body;
       const clientId = c.req.header("Authorization")?.split(" ")[1];
 
@@ -619,7 +629,7 @@ export class OAuthController {
   // Implements RFC 7009 - OAuth 2.0 Token Revocation
   async revoke(c: Context) {
     try {
-      const body = await c.req.parseBody();
+      const body = await c.req.json();
       const { token } = body;
       const clientId = c.req.header("Authorization")?.split(" ")[1];
 

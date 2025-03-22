@@ -78,8 +78,8 @@ if [ "$RUNNER" == "--help" ] || [ "$RUNNER" == "-h" ]; then
   echo ""
   echo "Examples:"
   echo "  ./test-e2e.sh vitest                          # Run all E2E tests with Vitest"
-  echo "  ./test-e2e.sh vitest src/tests/e2e/auth.spec.ts  # Run specific test file with Vitest"
-  echo "  ./test-e2e.sh bun src/tests/e2e/              # Run all tests in directory with Bun"
+  echo "  ./test-e2e.sh vitest tests/e2e/auth.spec.ts  # Run specific test file with Vitest"
+  echo "  ./test-e2e.sh bun tests/e2e/              # Run all tests in directory with Bun"
   echo ""
   exit 0
 fi
@@ -157,7 +157,7 @@ else
   if [ "$RUNNER" = "vitest" ]; then
     if [ -z "$TEST_FILES" ]; then
       print_message "Running all E2E tests with Vitest..."
-      vitest run
+      vitest run tests/e2e
     else
       print_message "Running specific E2E tests with Vitest: $TEST_FILES"
       vitest run $TEST_FILES
@@ -165,7 +165,7 @@ else
   elif [ "$RUNNER" = "bun" ]; then
     if [ -z "$TEST_FILES" ]; then
       print_message "Running all E2E tests with Bun..."
-      bun test --preload ./tests/setup.ts
+      bun test --preload ./tests/setup.ts tests/e2e
     else
       print_message "Running specific E2E tests with Bun: $TEST_FILES"
       bun test --preload ./tests/setup.ts $TEST_FILES

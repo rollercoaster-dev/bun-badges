@@ -24,8 +24,11 @@ const verificationService = new VerificationService();
 // List all assertions (with optional filters)
 assertions.get(ASSERTION_ROUTES.LIST, async (c) => {
   try {
-    const badgeId = c.req.query("badgeId");
-    const issuerId = c.req.query("issuerId");
+    const query = c.req.query;
+    const badgeId =
+      typeof query === "function" ? query("badgeId") : query.badgeId;
+    const issuerId =
+      typeof query === "function" ? query("issuerId") : query.issuerId;
 
     // Validate UUIDs if provided - Early validation helps prevent DB errors
     if (badgeId && !isValidUuid(badgeId)) {
@@ -116,7 +119,9 @@ assertions.get(ASSERTION_ROUTES.LIST, async (c) => {
 assertions.get(ASSERTION_ROUTES.GET, async (c) => {
   try {
     const assertionId = c.req.param("id");
-    const format = c.req.query("format") || "default";
+    const query = c.req.query;
+    const format =
+      typeof query === "function" ? query("format") : query.format || "default";
 
     if (!assertionId) {
       return c.json(

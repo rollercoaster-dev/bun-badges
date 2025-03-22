@@ -19,19 +19,19 @@ fi
 
 # Start the test database
 echo -e "${YELLOW}Starting test database...${NC}"
-docker compose -f docker-compose.test.yml up -d test-db
+docker compose -f docker-compose.test.yml up -d db_test
 
 # Wait for the database to be ready
 echo -e "${YELLOW}Waiting for database to be ready...${NC}"
 for i in {1..20}; do
   echo "Checking database connection..."
-  if docker exec bun-badges-test-db pg_isready -U postgres -d bun_badges_test; then
+  if docker exec $(docker ps -q -f name=bun-badges-db_test) pg_isready -U postgres -d bun_badges_test; then
     echo -e "${GREEN}Database is ready!${NC}"
     break
   fi
   if [ $i -eq 20 ]; then
     echo -e "${RED}Database didn't start within the expected time.${NC}"
-    docker compose -f docker-compose.test.yml logs test-db
+    docker compose -f docker-compose.test.yml logs db_test
     docker compose -f docker-compose.test.yml down
     exit 1
   fi
@@ -57,7 +57,7 @@ if [ "$SINGLE_TEST" = true ]; then
 else
   # Find all integration test files
   echo -e "${YELLOW}Finding integration test files...${NC}"
-  TEST_FILES=$(find src -name "*.integration.test.ts" | tr '\n' ' ')
+  TEST_FILES=$(find tests/integration -name "*.integration.test.ts" | tr '\n' ' ')
 fi
 
 echo -e "${YELLOW}Test files to run:${NC}"
@@ -65,7 +65,7 @@ echo "$TEST_FILES"
 
 # Run the tests with the database URL pointing to the Docker container
 echo -e "${GREEN}Running tests...${NC}"
-DATABASE_URL=postgres://postgres:postgres@localhost:5434/bun_badges_test bun test --preload ./src/utils/test/integration-setup.ts $TEST_FILES
+INTEGRATION_TEST=true DATABASE_URL=postgres://postgres:postgres@localhost:5434/bun_badges_test bun test --preload ./tests/setup.ts $TEST_FILES
 TEST_EXIT_CODE=$?
 
 # Stop and remove the test database
