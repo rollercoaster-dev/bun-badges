@@ -1,20 +1,114 @@
 import { mock } from "bun:test";
-import { OpenBadgeCredential } from "@/models/credential.model";
-import { VerificationResult } from "@/services/verification.service";
-
-// Store assertions that are created and keep track of operations
-const testAssertions = new Map<string, any>();
-const revokedAssertions = new Set<string>();
+import { db } from "@/db/config";
+import {
+  badgeAssertions,
+  badgeClasses,
+  issuerProfiles,
+  users,
+  signingKeys,
+} from "@/db/schema";
+import { eq } from "drizzle-orm";
+import crypto from "crypto";
+import { nanoid } from "nanoid";
 
 /**
- * Creates mock assertion data for testing
+ * Creates test assertion data and stores it in the database
+ * @returns The created assertion data
  */
-export function createMockAssertionData() {
-  const assertionId = "test-assertion-id";
+export async function createTestAssertionData() {
+  const assertionId = crypto.randomUUID();
+  const badgeId = crypto.randomUUID();
+  const issuerId = crypto.randomUUID();
+  const userId = crypto.randomUUID();
+
+  // First create a test user
+  await db
+    .insert(users)
+    .values({
+      userId,
+      email: `test-${nanoid(6)}@example.com`,
+      name: `Test User ${nanoid(6)}`,
+      passwordHash: "not-a-real-hash",
+      role: "admin",
+    })
+    .execute();
+
+  // Then create a test issuer
+  await db
+    .insert(issuerProfiles)
+    .values({
+      issuerId,
+      name: "Test Issuer",
+      url: "https://example.org",
+      description: "A test issuer",
+      email: "test-issuer@example.org",
+      ownerUserId: userId,
+      issuerJson: {
+        "@context": "https://w3id.org/openbadges/v2",
+        type: "Issuer",
+        id: `https://example.org/issuers/${issuerId}`,
+        name: "Test Issuer",
+        url: "https://example.org",
+        email: "test-issuer@example.org",
+        description: "A test issuer for testing purposes",
+      },
+    })
+    .execute();
+
+  // Create a test badge class
+  await db
+    .insert(badgeClasses)
+    .values({
+      badgeId,
+      issuerId,
+      name: "Test Badge",
+      description: "A test badge",
+      imageUrl: "https://example.org/badge.png",
+      criteria: "Test criteria",
+      badgeJson: {
+        "@context": "https://w3id.org/openbadges/v2",
+        type: "BadgeClass",
+        id: `https://example.org/badges/${badgeId}`,
+        name: "Test Badge",
+        description: "A test badge",
+        image: "https://example.org/badge.png",
+        criteria: {
+          narrative: "Test criteria",
+        },
+        issuer: `https://example.org/issuers/${issuerId}`,
+      },
+    })
+    .execute();
+
+  // Create a test signing key
+  const keyId = crypto.randomUUID();
+  const controller = `did:web:example.org`;
+
+  await db
+    .insert(signingKeys)
+    .values({
+      keyId,
+      issuerId,
+      type: "Ed25519VerificationKey2020",
+      publicKeyMultibase: "z6MkrzXCdarP1kaZQXEX6CDRdcLYTk6bTEgGDgV5XQEyP4WB", // Test key
+      privateKeyMultibase:
+        "z3u2en7t8mxcz3s9wKaDTNWK1RA619VAXqLLGEY4ZD1vpCgPbR7yMkwk4Qj7TuuGJUTzpgvA", // Test key
+      controller: controller,
+      keyInfo: {
+        id: `${controller}#key-1`,
+        type: "Ed25519VerificationKey2020",
+        controller: controller,
+        publicKeyMultibase: "z6MkrzXCdarP1kaZQXEX6CDRdcLYTk6bTEgGDgV5XQEyP4WB",
+      },
+      revoked: false,
+    })
+    .execute();
+
+  // Create a test assertion
   const testAssertion = {
     assertionId,
-    badgeId: "test-badge-id",
-    issuerId: "test-issuer-id",
+    badgeId,
+    issuerId,
     recipientType: "email",
     recipientIdentity: "test@example.com",
     recipientHashed: false,
@@ -22,8 +116,6 @@ export function createMockAssertionData() {
     evidenceUrl: "https://example.org/evidence",
     revoked: false,
     revocationReason: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
     assertionJson: {
       "@context": "https://w3id.org/openbadges/v2",
       type: "Assertion",
@@ -36,14 +128,14 @@ export function createMockAssertionData() {
       badge: {
         "@context": "https://w3id.org/openbadges/v2",
         type: "BadgeClass",
-        id: "https://example.org/badges/test-badge-id",
+        id: `https://example.org/badges/${badgeId}`,
         name: "Test Badge",
         description: "A test badge",
         image: "https://example.org/badge.png",
         criteria: {
           narrative: "Test criteria",
         },
-        issuer: "https://example.org/issuers/test-issuer-id",
+        issuer: `https://example.org/issuers/${issuerId}`,
       },
       issuedOn: new Date().toISOString(),
       verification: {
@@ -52,378 +144,120 @@ export function createMockAssertionData() {
     },
   };
 
-  // Store the assertion in our testing map
-  testAssertions.set(assertionId, testAssertion);
+  // Store the assertion in the database
+  await db.insert(badgeAssertions).values(testAssertion).execute();
 
   return {
     assertionId,
+    badgeId,
+    issuerId,
+    userId,
+    keyId,
     assertion: testAssertion,
   };
 }
 
 /**
- * Mocks the assertion controller and related services for testing
+ * Set up the basic crypto mocks needed for testing credential verification
+ * This only mocks the cryptographic operations, not the database
  */
-export function mockAssertionController() {
-  // Reset the state for testing
-  testAssertions.clear();
-  revokedAssertions.clear();
-
-  // Create a test assertion
-  const { assertionId, assertion } = createMockAssertionData();
-  testAssertions.set(assertionId, assertion);
-
-  // Mocked badge assertions table
-  const badgeAssertionsTable = {
-    assertionId: { name: "assertion_id" },
-    badgeId: { name: "badge_id" },
-    issuerId: { name: "issuer_id" },
-  };
-
-  // Mock the drizzle-orm
-  mock.module("drizzle-orm", () => {
-    // Return a replacement for the eq function
+export function mockCryptoForTests() {
+  // Mock the noble-ed25519 module that's causing issues
+  mock.module("@noble/ed25519", () => {
     return {
-      eq: (field: any, value: any) => {
-        return {
-          field,
-          value,
-          operator: "eq",
-          args: [field, value],
-        };
-      },
-    };
-  });
-
-  // Mock the database schema
-  mock.module("@/db/schema/badges", () => {
-    return {
-      badgeAssertions: badgeAssertionsTable,
-      badgeClasses: {
-        badgeId: { name: "badge_id" },
-      },
-    };
-  });
-
-  // Mock the database module
-  mock.module("@/db/config", () => {
-    return {
-      db: {
-        select: () => ({
-          from: (table: any) => ({
-            where: (condition: any) => ({
-              limit: (limit: number) => {
-                // Extract the assertionId from the condition
-                if (condition && condition.operator === "eq") {
-                  // Check which field we're querying by
-                  if (
-                    condition.field &&
-                    condition.field.name === "assertion_id"
-                  ) {
-                    const id = condition.value;
-                    if (testAssertions.has(id)) {
-                      return [testAssertions.get(id)];
-                    }
-                  }
-                }
-                return [];
-              },
-            }),
-          }),
+      // Export all the functions that might be used by the credential service
+      getPublicKey: () => new Uint8Array(32).fill(1),
+      getPublicKeyAsync: async () => new Uint8Array(32).fill(1),
+      sign: () => new Uint8Array(64).fill(2),
+      signAsync: async () => new Uint8Array(64).fill(2),
+      verify: () => true,
+      verifyAsync: async () => true,
+      getSharedSecret: () => new Uint8Array(32).fill(3),
+      getSharedSecretAsync: async () => new Uint8Array(32).fill(3),
+      utils: {
+        randomPrivateKey: () => new Uint8Array(32).fill(4),
+        getExtendedPublicKey: () => ({
+          head: new Uint8Array(32).fill(5),
+          prefix: new Uint8Array(32).fill(6),
+          scalar: 42n,
+          point: { toRawBytes: () => new Uint8Array(32).fill(7) },
+          pointBytes: new Uint8Array(32).fill(8),
         }),
-        update: (table: any) => ({
-          set: (updates: any) => ({
-            where: (condition: any) => {
-              // Extract the assertionId from the condition
-              if (
-                condition &&
-                condition.operator === "eq" &&
-                condition.field &&
-                condition.field.name === "assertion_id"
-              ) {
-                const id = condition.value;
-                if (testAssertions.has(id)) {
-                  const assertion = testAssertions.get(id);
-                  const updatedAssertion = { ...assertion, ...updates };
-
-                  // If revoking, also track in our set
-                  if (updates.revoked === true) {
-                    revokedAssertions.add(id);
-                  } else if (updates.revoked === false) {
-                    revokedAssertions.delete(id);
-                  }
-
-                  testAssertions.set(id, updatedAssertion);
-                  return {
-                    returning: () => [updatedAssertion],
-                  };
-                }
-              }
-              return {
-                returning: () => [],
-              };
-            },
-          }),
-        }),
-        insert: (table: any) => ({
-          values: (data: any) => {
-            testAssertions.set(data.assertionId, data);
-            return {
-              returning: () => [data],
-            };
-          },
+        getExtendedPublicKeyAsync: async () => ({
+          head: new Uint8Array(32).fill(5),
+          prefix: new Uint8Array(32).fill(6),
+          scalar: 42n,
+          point: { toRawBytes: () => new Uint8Array(32).fill(7) },
+          pointBytes: new Uint8Array(32).fill(8),
         }),
       },
-      // Mock pool for direct queries
-      dbPool: {
-        connect: () => {
-          return Promise.resolve({
-            query: (sql: string, params: any[]) => {
-              // Handle common query patterns
-              if (sql.includes("SELECT") && sql.includes("badge_assertions")) {
-                const id = params[0];
-                if (testAssertions.has(id)) {
-                  return {
-                    rows: [testAssertions.get(id)],
-                  };
-                }
-                return { rows: [] };
-              }
-              return { rows: [] };
-            },
-            release: () => {},
-          });
-        },
+      // Mock any other exported values from the library
+      CURVE: { p: 0n, n: 0n },
+      etc: {
+        bytesToHex: (bytes: Uint8Array) =>
+          Array.from(bytes)
+            .map((b) => b.toString(16).padStart(2, "0"))
+            .join(""),
+        hexToBytes: (hex: string) => new Uint8Array(hex.length / 2),
+        sha512Sync: (...messages: Uint8Array[]) => new Uint8Array(64).fill(9),
+        sha512Async: async (...messages: Uint8Array[]) =>
+          new Uint8Array(64).fill(9),
+        randomBytes: (len = 32) => new Uint8Array(len).fill(10),
       },
     };
   });
+}
 
-  // Mock the verification service
-  mock.module("@/services/verification.service", () => {
-    const VerificationService = function () {
-      return {
-        verifyAssertion: async (
-          assertionId: string,
-        ): Promise<VerificationResult> => {
-          // Check if this assertion exists in our map
-          if (!testAssertions.has(assertionId)) {
-            return {
-              valid: false,
-              checks: {},
-              errors: ["Assertion not found"],
-            };
-          }
+/**
+ * Provides utility functions for working with assertions in tests
+ * This replaces the old database mocking approach with real database operations
+ */
+export async function setupAssertionTestUtils() {
+  // Mock crypto operations (only the ones we need to mock)
+  mockCryptoForTests();
 
-          // Check if it's been revoked
-          const isRevoked = revokedAssertions.has(assertionId);
-
-          // Return verification result
-          if (isRevoked) {
-            return {
-              valid: false,
-              checks: {
-                structure: true,
-                revocation: false,
-              },
-              errors: ["Credential has been revoked"],
-            };
-          }
-
-          return {
-            valid: true,
-            checks: {
-              structure: true,
-              revocation: true,
-              signature: true,
-              expiration: true,
-            },
-            errors: [],
-          };
-        },
-        verifyBadgeJson: async (
-          badgeJson: any,
-        ): Promise<VerificationResult> => {
-          // Simplified badge JSON verification
-          if (!badgeJson) {
-            return {
-              valid: false,
-              checks: {},
-              errors: ["Badge JSON is empty"],
-            };
-          }
-
-          return {
-            valid: true,
-            checks: {
-              structure: true,
-              revocation: true,
-              signature: true,
-              expiration: true,
-            },
-            errors: [],
-          };
-        },
-      };
-    };
-
-    return {
-      VerificationService,
-      isOB2BadgeAssertion: (obj: any) => {
-        return (
-          obj &&
-          obj["@context"] === "https://w3id.org/openbadges/v2" &&
-          obj.type === "Assertion"
-        );
-      },
-    };
-  });
-
-  // Mock the credential service
-  mock.module("@/services/credential.service", () => {
-    const CredentialService = function () {
-      return {
-        createCredential: async (
-          hostUrl: string,
-          assertionId: string,
-        ): Promise<OpenBadgeCredential> => {
-          const assertion = testAssertions.get(assertionId);
-          if (!assertion) {
-            throw new Error("Assertion not found");
-          }
-
-          // Create a simple OB3 credential
-          return {
-            "@context": [
-              "https://www.w3.org/2018/credentials/v1",
-              "https://purl.imsglobal.org/spec/ob/v3p0/context.json",
-            ],
-            id: `${hostUrl}/assertions/${assertionId}`,
-            type: ["VerifiableCredential", "OpenBadgeCredential"],
-            issuer: `${hostUrl}/issuers/${assertion.issuerId}`,
-            issuanceDate: new Date().toISOString(),
-            credentialSubject: {
-              id: assertion.recipientIdentity,
-              type: "AchievementSubject",
-              achievement: {
-                id: `${hostUrl}/badges/${assertion.badgeId}`,
-                type: ["Achievement"],
-                name: "Test Achievement",
-                description: "Test achievement description",
-                criteria: {
-                  narrative: "Test criteria",
-                },
-                image: {
-                  id: "https://example.org/badge.png",
-                  type: "Image",
-                },
-              },
-            },
-            proof: {
-              type: "Ed25519Signature2020",
-              created: new Date().toISOString(),
-              verificationMethod: `${hostUrl}/issuers/${assertion.issuerId}#key-1`,
-              proofPurpose: "assertionMethod",
-              proofValue:
-                "z4oey5q2M3XKaxup3tmzN4DRFTLVqpLMweBrSxMY2xnrHmKYhBrTuxmTcBNwDiond5bnVKXdK7xRMCa2Z2GuRQcKS",
-            },
-          };
-        },
-        ensureIssuerKeyExists: async (issuerId: string) => {
-          return {
-            id: `key-${issuerId}`,
-            key: "test-key",
-          };
-        },
-      };
-    };
-
-    return { CredentialService };
-  });
-
-  // Also mock the validation utility
-  mock.module("@/utils/validation", () => {
-    return {
-      isValidUuid: (id: string) => {
-        // Return true for our test IDs and valid-looking UUIDs
-        if (
-          id === "test-assertion-id" ||
-          (id.includes("-") && id.length > 30)
-        ) {
-          return true;
-        }
-        return false;
-      },
-    };
-  });
-
-  // Mock the VerificationController
-  mock.module("@/controllers/verification.controller", () => {
-    const VerificationController = function () {
-      return {
-        verifyAssertion: async (c: any) => {
-          const assertionId = c.req.param("assertionId");
-
-          // Check if the assertion exists
-          if (!testAssertions.has(assertionId)) {
-            return c.json(
-              {
-                status: "error",
-                error: {
-                  code: "NOT_FOUND",
-                  message: "Assertion not found",
-                },
-              },
-              404,
-            );
-          }
-
-          // Check if it's revoked
-          const isRevoked = revokedAssertions.has(assertionId);
-
-          if (isRevoked) {
-            return c.json({
-              status: "success",
-              data: {
-                valid: false,
-                checks: {
-                  structure: true,
-                  revocation: false,
-                },
-                errors: ["Credential has been revoked"],
-              },
-            });
-          }
-
-          return c.json({
-            status: "success",
-            data: {
-              valid: true,
-              checks: {
-                structure: true,
-                revocation: true,
-                signature: true,
-                expiration: true,
-              },
-              errors: [],
-            },
-          });
-        },
-      };
-    };
-
-    return { VerificationController };
-  });
+  // Create a test assertion in the database
+  const testData = await createTestAssertionData();
 
   return {
-    assertionId,
-    getTestAssertions: () => testAssertions,
-    getRevokedAssertions: () => revokedAssertions,
-    addTestAssertion: (id: string, data: any) => {
-      testAssertions.set(id, data);
+    assertionId: testData.assertionId,
+    badgeId: testData.badgeId,
+    issuerId: testData.issuerId,
+    userId: testData.userId,
+    keyId: testData.keyId,
+
+    // Helper to get assertion from DB
+    getAssertion: async (id: string) => {
+      const result = await db
+        .select()
+        .from(badgeAssertions)
+        .where(eq(badgeAssertions.assertionId, id))
+        .limit(1);
+
+      return result.length > 0 ? result[0] : null;
     },
-    clearTestData: () => {
-      testAssertions.clear();
-      revokedAssertions.clear();
+
+    // Helper to revoke an assertion
+    revokeAssertion: async (id: string, reason: string = "Test revocation") => {
+      return await db
+        .update(badgeAssertions)
+        .set({
+          revoked: true,
+          revocationReason: reason,
+        })
+        .where(eq(badgeAssertions.assertionId, id))
+        .returning();
+    },
+
+    // Helper to check if assertion is revoked
+    isRevoked: async (id: string) => {
+      const result = await db
+        .select({ revoked: badgeAssertions.revoked })
+        .from(badgeAssertions)
+        .where(eq(badgeAssertions.assertionId, id))
+        .limit(1);
+
+      return result.length > 0 ? result[0].revoked : false;
     },
   };
 }

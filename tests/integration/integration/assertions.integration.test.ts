@@ -1,4 +1,12 @@
-import { describe, expect, test, beforeAll, afterAll, mock } from "bun:test";
+import {
+  describe,
+  expect,
+  test,
+  beforeAll,
+  afterAll,
+  afterEach,
+  mock,
+} from "bun:test";
 import { db } from "@/db/config";
 import {
   issuerProfiles,
@@ -10,53 +18,15 @@ import { AssertionController } from "@/controllers/assertions.controller";
 import crypto from "crypto";
 import { createMockContext } from "@/utils/test/mock-context";
 import { nanoid } from "nanoid";
-import { sql, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { seedTestData, clearTestData } from "@/utils/test/db-helpers";
+import {
+  mockCryptoForTests,
+  setupAssertionTestUtils,
+} from "@/utils/test/assertion-test-utils";
 
-// Create a complete mock for the noble-ed25519 module that's causing issues
-mock.module("@noble/ed25519", () => {
-  return {
-    // Export all the functions that might be used by the credential service
-    getPublicKey: () => new Uint8Array(32).fill(1),
-    getPublicKeyAsync: async () => new Uint8Array(32).fill(1),
-    sign: () => new Uint8Array(64).fill(2),
-    signAsync: async () => new Uint8Array(64).fill(2),
-    verify: () => true,
-    verifyAsync: async () => true,
-    getSharedSecret: () => new Uint8Array(32).fill(3),
-    getSharedSecretAsync: async () => new Uint8Array(32).fill(3),
-    utils: {
-      randomPrivateKey: () => new Uint8Array(32).fill(4),
-      getExtendedPublicKey: () => ({
-        head: new Uint8Array(32).fill(5),
-        prefix: new Uint8Array(32).fill(6),
-        scalar: 42n,
-        point: { toRawBytes: () => new Uint8Array(32).fill(7) },
-        pointBytes: new Uint8Array(32).fill(8),
-      }),
-      getExtendedPublicKeyAsync: async () => ({
-        head: new Uint8Array(32).fill(5),
-        prefix: new Uint8Array(32).fill(6),
-        scalar: 42n,
-        point: { toRawBytes: () => new Uint8Array(32).fill(7) },
-        pointBytes: new Uint8Array(32).fill(8),
-      }),
-    },
-    // Mock any other exported values from the library
-    CURVE: { p: 0n, n: 0n },
-    etc: {
-      bytesToHex: (bytes: Uint8Array) =>
-        Array.from(bytes)
-          .map((b) => b.toString(16).padStart(2, "0"))
-          .join(""),
-      hexToBytes: (hex: string) => new Uint8Array(hex.length / 2),
-      sha512Sync: (...messages: Uint8Array[]) => new Uint8Array(64).fill(9),
-      sha512Async: async (...messages: Uint8Array[]) =>
-        new Uint8Array(64).fill(9),
-      randomBytes: (len = 32) => new Uint8Array(len).fill(10),
-    },
-  };
-});
+// Mock cryptographic operations for deterministic tests
+mockCryptoForTests();
 
 // Create a Map to store test data
 const testData = new Map<string, string>();
@@ -90,6 +60,8 @@ describe("AssertionController Integration Tests", () => {
 
   beforeAll(async () => {
     try {
+      console.log("Setting up test environment with real database...");
+
       // Create controller - no mocking needed for integration tests
       controller = new AssertionController();
 
@@ -109,6 +81,8 @@ describe("AssertionController Integration Tests", () => {
           userId,
           email: uniqueEmail,
           name: "Test User",
+          passwordHash: "test-password-hash", // Hash is not used in tests
+          role: "admin",
         })
         .execute();
 
@@ -190,6 +164,16 @@ describe("AssertionController Integration Tests", () => {
     if (data.status === "success" && data.data.assertionId) {
       testData.set("ob2AssertionId", data.data.assertionId);
       console.log(`Created OB2 assertion: ${data.data.assertionId}`);
+
+      // Verify the assertion was actually created in the database
+      const dbAssertion = await db
+        .select()
+        .from(badgeAssertions)
+        .where(eq(badgeAssertions.assertionId, data.data.assertionId))
+        .limit(1);
+
+      expect(dbAssertion.length).toBe(1);
+      expect(dbAssertion[0].badgeId).toBe(testData.get("badgeId"));
     }
   });
 
@@ -215,6 +199,24 @@ describe("AssertionController Integration Tests", () => {
     if (data.status === "success" && data.data.assertionId) {
       testData.set("ob3AssertionId", data.data.assertionId);
       console.log(`Created OB3 assertion: ${data.data.assertionId}`);
+
+      // Verify the assertion was actually created in the database
+      const dbAssertion = await db
+        .select()
+        .from(badgeAssertions)
+        .where(eq(badgeAssertions.assertionId, data.data.assertionId))
+        .limit(1);
+
+      expect(dbAssertion.length).toBe(1);
+
+      // Check that it has the OB3 context
+      const assertionJson = dbAssertion[0].assertionJson as any;
+      expect(Array.isArray(assertionJson["@context"])).toBe(true);
+      expect(
+        assertionJson["@context"].includes(
+          "https://www.w3.org/2018/credentials/v1",
+        ),
+      ).toBe(true);
     }
   });
 
@@ -274,10 +276,9 @@ describe("AssertionController Integration Tests", () => {
         .where(eq(badgeAssertions.assertionId, assertionId))
         .limit(1);
 
-      if (revokedAssertion.length > 0) {
-        expect(revokedAssertion[0].revoked).toBe(true);
-        expect(revokedAssertion[0].revocationReason).toBe("Test revocation");
-      }
+      expect(revokedAssertion.length).toBe(1);
+      expect(revokedAssertion[0].revoked).toBe(true);
+      expect(revokedAssertion[0].revocationReason).toBe("Test revocation");
     }
   });
 
@@ -305,6 +306,12 @@ describe("AssertionController Integration Tests", () => {
       const assertionData = data.data.assertion.assertionJson;
       expect(assertionData.credentialStatus).toBeDefined();
     }
+  });
+
+  // Clean up after each test to prevent test pollution
+  afterEach(async () => {
+    // We don't need to clean up after each test for these tests since they build on each other
+    // But in other test suites, this would be a good place to reset state
   });
 
   // Add afterAll block for cleanup
