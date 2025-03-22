@@ -1,4 +1,11 @@
-import { describe, expect, test, beforeAll } from "bun:test";
+import {
+  describe,
+  expect,
+  test,
+  beforeAll,
+  beforeEach,
+  afterAll,
+} from "bun:test";
 import { db } from "@/db/config";
 import {
   issuerProfiles,
@@ -18,6 +25,7 @@ import {
 } from "../../helpers/test-utils";
 import { OB2BadgeAssertion } from "@/services/verification.service";
 import { OpenBadgeCredential } from "@/models/credential.model";
+import { eq, ilike } from "drizzle-orm";
 
 interface ApiResponse<T> {
   status: string;
@@ -41,62 +49,103 @@ interface VerificationResponse {
 describe("VerificationController Integration Tests", () => {
   let controller: VerificationController;
   let testData: TestData;
+  const testRunId = crypto.randomUUID().substring(0, 8);
 
   beforeAll(async () => {
     controller = new VerificationController();
     testData = new TestData();
 
-    // Create test data
-    const issuerId = crypto.randomUUID();
-    const badgeId = crypto.randomUUID();
-    const userId = crypto.randomUUID();
+    // Clean up any existing test data
+    try {
+      await db.delete(badgeAssertions);
+      await db.delete(badgeClasses);
+      await db.delete(issuerProfiles);
+      await db
+        .delete(users)
+        .where(ilike(users.email, `%verification-test-${testRunId}%`));
 
-    // Create test user
-    await db.insert(users).values({
-      userId,
-      email: "test-verification@example.com",
-      name: "Test User",
-    });
+      // Create test data
+      const issuerId = crypto.randomUUID();
+      const badgeId = crypto.randomUUID();
+      const userId = crypto.randomUUID();
 
-    // Create test issuer
-    await db.insert(issuerProfiles).values({
-      issuerId,
-      name: "Test Issuer",
-      url: "https://example.com",
-      email: "test-issuer-verification@example.com",
-      ownerUserId: userId,
-      issuerJson: {
-        "@context": "https://w3id.org/openbadges/v2",
-        type: "Issuer",
-        id: `https://example.com/issuers/${issuerId}`,
+      // Create test user with unique email
+      await db.insert(users).values({
+        userId,
+        email: `verification-test-${testRunId}@example.com`,
+        name: "Test User",
+      });
+
+      // Create test issuer
+      await db.insert(issuerProfiles).values({
+        issuerId,
         name: "Test Issuer",
         url: "https://example.com",
-        email: "test@example.com",
-      },
-    });
+        email: `issuer-verification-test-${testRunId}@example.com`,
+        ownerUserId: userId,
+        issuerJson: {
+          "@context": "https://w3id.org/openbadges/v2",
+          type: "Issuer",
+          id: `https://example.com/issuers/${issuerId}`,
+          name: "Test Issuer",
+          url: "https://example.com",
+          email: `issuer-verification-test-${testRunId}@example.com`,
+        },
+      });
 
-    // Create test badge
-    await db.insert(badgeClasses).values({
-      badgeId,
-      issuerId,
-      name: "Test Badge",
-      description: "Test badge description",
-      imageUrl: "https://example.com/badge.png",
-      criteria: JSON.stringify({ narrative: "Test criteria" }),
-      badgeJson: {
-        "@context": "https://w3id.org/openbadges/v2",
-        type: "BadgeClass",
-        id: `https://example.com/badges/${badgeId}`,
+      // Create test badge
+      await db.insert(badgeClasses).values({
+        badgeId,
+        issuerId,
         name: "Test Badge",
         description: "Test badge description",
-        image: "https://example.com/badge.png",
-        criteria: { narrative: "Test criteria" },
-        issuer: `https://example.com/issuers/${issuerId}`,
-      },
-    });
+        imageUrl: "https://example.com/badge.png",
+        criteria: JSON.stringify({ narrative: "Test criteria" }),
+        badgeJson: {
+          "@context": "https://w3id.org/openbadges/v2",
+          type: "BadgeClass",
+          id: `https://example.com/badges/${badgeId}`,
+          name: "Test Badge",
+          description: "Test badge description",
+          image: "https://example.com/badge.png",
+          criteria: { narrative: "Test criteria" },
+          issuer: `https://example.com/issuers/${issuerId}`,
+        },
+      });
 
-    testData.set("issuerId", issuerId);
-    testData.set("badgeId", badgeId);
+      testData.set("issuerId", issuerId);
+      testData.set("badgeId", badgeId);
+    } catch (error) {
+      console.error("Setup error:", error);
+      throw error;
+    }
+  });
+
+  afterAll(async () => {
+    // Clean up test data
+    try {
+      await db.delete(badgeAssertions);
+      await db
+        .delete(badgeClasses)
+        .where(eq(badgeClasses.badgeId, testData.get("badgeId")));
+      await db
+        .delete(issuerProfiles)
+        .where(eq(issuerProfiles.issuerId, testData.get("issuerId")));
+      await db
+        .delete(users)
+        .where(ilike(users.email, `%verification-test-${testRunId}%`));
+    } catch (error) {
+      console.error("Cleanup error:", error);
+    }
+  });
+
+  // Clear assertions between tests
+  beforeEach(async () => {
+    try {
+      await db.delete(badgeAssertions);
+    } catch (error) {
+      console.error("beforeEach cleanup error:", error);
+    }
   });
 
   test("should verify an OB2 assertion", async () => {
@@ -109,7 +158,7 @@ describe("VerificationController Integration Tests", () => {
       badgeId: testData.get("badgeId"),
       issuerId: testData.get("issuerId"),
       recipientType: "email",
-      recipientIdentity: "test@example.com",
+      recipientIdentity: `recipient-ob2-${testRunId}@example.com`,
       recipientHashed: false,
       issuedOn: new Date(),
       revoked: false,
@@ -139,7 +188,7 @@ describe("VerificationController Integration Tests", () => {
       badgeId: testData.get("badgeId"),
       issuerId: testData.get("issuerId"),
       recipientType: "email",
-      recipientIdentity: "test@example.com",
+      recipientIdentity: `recipient-ob3-${testRunId}@example.com`,
       recipientHashed: false,
       issuedOn: new Date(),
       revoked: false,
