@@ -28,9 +28,7 @@ interface BadgeClassJson {
 badges.get(BADGE_ROUTES.LIST, async (c) => {
   try {
     // Get badge classes (with optional filtering by issuer)
-    const query = c.req.query;
-    const issuerId =
-      typeof query === "function" ? query("issuerId") : query.issuerId;
+    const issuerId = c.req.query("issuerId");
 
     // Validate UUID format if issuerId is provided
     if (issuerId && !isValidUuid(issuerId)) {

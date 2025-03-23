@@ -39,7 +39,7 @@ export async function executeTypedQuery(
   try {
     // First try with db.execute if available
     if (db && typeof db.execute === "function") {
-      return await db.execute(typedSql, params);
+      return await db.execute(typedSql);
     }
     // Otherwise try with dbPool
     else if (dbPool && typeof dbPool.query === "function") {
@@ -48,7 +48,7 @@ export async function executeTypedQuery(
     // If still no success, try with sql-tagged template if possible
     else if (db && typeof sql === "function") {
       // This approach doesn't use the types parameter but at least gives a fallback
-      const sqlTemplate = sql.raw(sqlQuery, ...params);
+      const sqlTemplate = sql.raw(sqlQuery);
       return await db.execute(sqlTemplate);
     }
     // Last resort - throw an error
@@ -143,7 +143,7 @@ export async function safeInsert(
 
       if (table) {
         // Convert columns and values to an object
-        const data = {};
+        const data: Record<string, any> = {};
         columns.forEach((col, i) => {
           data[col] = values[i];
         });
@@ -213,13 +213,12 @@ export async function safeUpdate(
 
       if (table) {
         // Convert columns and values to an object
-        const data = {};
+        const data: Record<string, any> = {};
         columnsToUpdate.forEach((col, i) => {
           data[col] = values[i];
         });
 
-        // Create a condition using the eq operator
-        const eq = (a, b) => ({ operator: "=", left: a, right: b });
+        // Create a condition using the eq operator from drizzle-orm
         const condition = eq(table[conditionColumn], conditionValue);
 
         // Update using the ORM

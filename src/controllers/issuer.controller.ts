@@ -50,15 +50,10 @@ export class IssuerController {
    * List all issuer profiles with optional pagination
    */
   async listIssuers(c: Context) {
-    // Access query parameters, handling both function-style and property-style access
-    const query = c.req.query;
-    // Check if query is a function or an object and extract parameters accordingly
-    const page =
-      typeof query === "function" ? query("page") : query.page || "1";
-    const limit =
-      typeof query === "function" ? query("limit") : query.limit || "20";
-    const version =
-      typeof query === "function" ? query("version") : query.version || "2.0";
+    // Access query parameters - use the function form consistently to avoid typescript errors
+    const page = c.req.query("page") || "1";
+    const limit = c.req.query("limit") || "20";
+    const version = c.req.query("version") || "2.0";
 
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
@@ -132,7 +127,7 @@ export class IssuerController {
    */
   async getIssuer(c: Context) {
     const issuerId = c.req.param("id");
-    const version = c.req.query.version || "2.0";
+    const version = c.req.query("version") || "2.0";
 
     try {
       const issuer = await db

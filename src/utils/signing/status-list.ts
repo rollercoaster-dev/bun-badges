@@ -75,8 +75,8 @@ export function updateCredentialStatus(
   if (revoked) {
     bitSet.set(index);
   } else {
-    // Use unset() method instead of clear() since clear() removes all bits
-    bitSet.unset(index);
+    // Use clear() method to unset a specific bit
+    bitSet.clear(index);
   }
 
   return encodeBitString(bitSet);

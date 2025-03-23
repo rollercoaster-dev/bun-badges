@@ -88,8 +88,8 @@ const testOB2Assertion: OB2BadgeAssertion = {
   issuedOn: "2023-01-01T00:00:00Z",
 };
 
-// Create a logger for type checking
-const logger = createLogger("type-check");
+// Import console logger for tests
+import { logger } from "./logger";
 
 // Test type guards
 logger.info("Is valid OB3 credential:", isOpenBadgeCredential(testCredential));

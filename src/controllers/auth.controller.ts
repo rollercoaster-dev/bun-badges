@@ -7,7 +7,7 @@ import {
   verifyToken,
 } from "@utils/auth/jwt";
 import { DatabaseService } from "@services/db.service";
-import * as bcrypt from "bcrypt";
+// Use Bun's built-in password hashing instead of bcrypt
 
 type CodeRequestBody = {
   username: string;
@@ -81,9 +81,11 @@ export class AuthController {
         return c.json({ error: "User already exists" }, 409);
       }
 
-      // Hash the password
-      const salt = await bcrypt.genSalt(10);
-      const passwordHash = await bcrypt.hash(body.password, salt);
+      // Hash the password using Bun's built-in password functions
+      const passwordHash = await Bun.password.hash(body.password, {
+        algorithm: "bcrypt",
+        cost: 10,
+      });
 
       // Create the user
       const user = await this.db.createUser({
@@ -135,8 +137,8 @@ export class AuthController {
         return c.json({ error: "Invalid credentials" }, 401);
       }
 
-      // Verify password
-      const passwordValid = await bcrypt.compare(
+      // Verify password using Bun's built-in password functions
+      const passwordValid = await Bun.password.verify(
         body.password,
         user.passwordHash,
       );

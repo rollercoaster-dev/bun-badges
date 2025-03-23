@@ -3,7 +3,6 @@ import { db } from "@/db/config";
 import { badgeAssertions, badgeClasses } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { CredentialService } from "@/services/credential.service";
-import { VerificationService } from "@/services/verification.service";
 import { isValidUuid } from "@/utils/validation";
 import { OB2BadgeAssertion } from "@/services/verification.service";
 import { OpenBadgeCredential } from "@/models/credential.model";
@@ -12,11 +11,9 @@ type AssertionJson = OB2BadgeAssertion | OpenBadgeCredential;
 
 export class AssertionController {
   private credentialService: CredentialService;
-  private verificationService: VerificationService;
-
+  // Initialize services
   constructor() {
     this.credentialService = new CredentialService();
-    this.verificationService = new VerificationService();
   }
 
   /**
@@ -498,17 +495,5 @@ export class AssertionController {
     }
   }
 
-  /**
-   * Hash a recipient identity using SHA-256
-   */
-  private async hashRecipientIdentity(
-    identity: string,
-    salt: string,
-  ): Promise<string> {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(identity + salt);
-    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-  }
+  // Removed unused function: hashRecipientIdentity
 }

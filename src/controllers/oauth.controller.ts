@@ -132,19 +132,12 @@ export class OAuthController {
       return this.handleAuthorizationDecision(c);
     }
 
-    // Initial authorization request (GET)
-    const query = c.req.query;
-    // Check if query is a function or an object and extract parameters accordingly
-    const response_type =
-      typeof query === "function"
-        ? query("response_type")
-        : query.response_type;
-    const client_id =
-      typeof query === "function" ? query("client_id") : query.client_id;
-    const redirect_uri =
-      typeof query === "function" ? query("redirect_uri") : query.redirect_uri;
-    const scope = typeof query === "function" ? query("scope") : query.scope;
-    const state = typeof query === "function" ? query("state") : query.state;
+    // Initial authorization request (GET) - use function form consistently
+    const response_type = c.req.query("response_type");
+    const client_id = c.req.query("client_id");
+    const redirect_uri = c.req.query("redirect_uri");
+    const scope = c.req.query("scope");
+    const state = c.req.query("state");
 
     // Validate required parameters
     if (!response_type || !client_id || !redirect_uri) {
