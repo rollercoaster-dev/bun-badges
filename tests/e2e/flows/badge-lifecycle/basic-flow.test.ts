@@ -3,7 +3,7 @@
  *
  * A simplified test that checks if our test infrastructure is working
  */
-import { describe, it, expect, beforeAll, afterAll } from "bun:test";
+import { describe, it, expect, afterAll } from "bun:test";
 import { Hono } from "hono";
 import { createTestServer } from "../../setup/server-setup";
 
@@ -28,6 +28,6 @@ describe("Basic Test Infrastructure", () => {
     const response = await request.get("/health");
 
     expect(response.status).toBe(200);
-    expect(response.body.status).toBe("ok");
+    expect((response.body as any).status).toBe("ok");
   });
 });

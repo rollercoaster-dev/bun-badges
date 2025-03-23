@@ -293,7 +293,6 @@ async function createTestSigningKey(issuerId: string) {
         controller: controller,
         publicKeyMultibase: "z6MkrzXCdarP1kaZQXEX6CDRdcLYTk6bTEgGDgV5XQEyP4WB",
       },
-      revoked: false,
     })
     .returning();
 

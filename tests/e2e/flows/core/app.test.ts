@@ -1,10 +1,8 @@
 import { describe, expect, it, beforeAll, afterAll } from "bun:test";
 import { resetDatabase } from "../../helpers/test-utils";
 import { Hono } from "hono";
-import { Server } from "bun";
 
 describe("Real Application E2E Test", () => {
-  let server: Server;
   const port = 9876; // Use a specific port for testing
   let baseUrl: string;
   // Create a single shared app for all tests
@@ -51,21 +49,6 @@ describe("Real Application E2E Test", () => {
       status: response.status,
       body,
     };
-  }
-
-  // Helper for authenticated requests
-  async function authenticatedFetch(
-    path: string,
-    token: string,
-    options: RequestInit = {},
-  ) {
-    return testFetch(path, {
-      ...options,
-      headers: {
-        ...options.headers,
-        Authorization: `Bearer ${token}`,
-      },
-    });
   }
 
   beforeAll(async () => {

@@ -6,7 +6,6 @@
  */
 
 import { Hono } from "hono";
-import supertest from "supertest";
 import { testRunId } from "./environment";
 
 interface TestServerOptions {
@@ -112,7 +111,11 @@ export function createTestServer(app: Hono, options: TestServerOptions = {}) {
       body?: any,
     ) {
       const headers = { Authorization: `Bearer ${token}` };
-      return await this[method](path, body, headers);
+      if (method === "get" || method === "delete") {
+        return await this[method](path, headers);
+      } else {
+        return await this[method](path, body, headers);
+      }
     },
   };
 

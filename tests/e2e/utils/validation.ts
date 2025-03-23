@@ -5,11 +5,7 @@
  * against schemas, contexts, and cryptographic requirements.
  */
 
-import Ajv from "ajv";
 import { OB3_CREDENTIAL_SCHEMA_URL } from "@/constants/context-urls";
-
-// Create AJV instance
-const ajv = new Ajv({ allErrors: true, strict: false });
 
 /**
  * Validates that a credential contains the required OB3 contexts

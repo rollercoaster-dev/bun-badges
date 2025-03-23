@@ -20,7 +20,7 @@ let globalPool: Pool;
 let _testDb: ReturnType<typeof drizzle>;
 
 // Handle database connection with retries
-function createDatabaseConnection() {
+export function createDatabaseConnection() {
   const maxRetries = 5;
   let retryCount = 0;
   let lastError: Error | null = null;

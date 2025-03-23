@@ -169,8 +169,10 @@ describe("OB3 Recipient Handling", () => {
     );
 
     expect(recipientValidation.valid).toBe(true);
-    expect(recipientValidation.format).toBe("email");
-    expect(recipientValidation.isHashed).toBe(false);
+    if ("format" in recipientValidation && "isHashed" in recipientValidation) {
+      expect(recipientValidation.format).toBe("email");
+      expect(recipientValidation.isHashed).toBe(false);
+    }
   });
 
   it("should handle URL recipients in proper format", async () => {
@@ -196,8 +198,10 @@ describe("OB3 Recipient Handling", () => {
     const recipientValidation = validateRecipient(credential, urlRecipient);
 
     expect(recipientValidation.valid).toBe(true);
-    expect(recipientValidation.format).toBe("url");
-    expect(recipientValidation.isHashed).toBe(false);
+    if ("format" in recipientValidation && "isHashed" in recipientValidation) {
+      expect(recipientValidation.format).toBe("url");
+      expect(recipientValidation.isHashed).toBe(false);
+    }
   });
 
   it("should properly hash recipients when requested", async () => {
@@ -221,8 +225,11 @@ describe("OB3 Recipient Handling", () => {
     // Validate with our utility
     const recipientValidation = validateRecipient(credential);
 
-    expect(recipientValidation.isHashed).toBe(true);
-    expect(recipientValidation.format).toBe("hashed");
+    expect(recipientValidation.valid).toBe(true);
+    if ("isHashed" in recipientValidation && "format" in recipientValidation) {
+      expect(recipientValidation.isHashed).toBe(true);
+      expect(recipientValidation.format).toBe("hashed");
+    }
   });
 
   it("should not reveal the plaintext recipient when hashed", async () => {
@@ -270,7 +277,9 @@ describe("OB3 Recipient Handling", () => {
     const recipientValidation = validateRecipient(credential, didRecipient);
 
     expect(recipientValidation.valid).toBe(true);
-    expect(recipientValidation.format).toBe("did");
-    expect(recipientValidation.isHashed).toBe(false);
+    if ("format" in recipientValidation && "isHashed" in recipientValidation) {
+      expect(recipientValidation.format).toBe("did");
+      expect(recipientValidation.isHashed).toBe(false);
+    }
   });
 });

@@ -162,6 +162,7 @@ describe("OB3 Status List and Revocation", () => {
           verificationMethod: "did:example:issuer#key-1",
           proofValue: "test-proof-value",
         },
+        revoked: isRevoked,
       });
     });
 
@@ -187,11 +188,13 @@ describe("OB3 Status List and Revocation", () => {
     app.post("/api/assertions/:id/revoke", async (c) => {
       const id = c.req.param("id");
       const body = await c.req.json();
+      const reason = body?.reason || "No reason provided";
       revokedCredentials.add(id);
 
       return c.json({
         id,
         revoked: true,
+        reason,
         statusListCredential: "https://example.com/status/list",
         statusListIndex: 123,
       });

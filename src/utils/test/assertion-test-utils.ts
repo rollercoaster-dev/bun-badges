@@ -88,7 +88,6 @@ export async function createTestAssertionData() {
       controller: controller,
       publicKeyMultibase: "z6MkrzXCdarP1kaZQXEX6CDRdcLYTk6bTEgGDgV5XQEyP4WB",
     },
-    revoked: false,
   });
 
   // Create a test assertion

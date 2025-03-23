@@ -2,6 +2,7 @@ import { resolve } from "path";
 import { config } from "dotenv";
 import { mock, type Mock } from "bun:test";
 import { execSync } from "child_process";
+import * as fs from "fs";
 
 console.log("Setting up test environment...");
 
@@ -41,7 +42,7 @@ Bun.plugin({
 
             // Check if this resolved path exists (synchronously)
             try {
-              if (Bun.file(resolvedPath).existsSync()) {
+              if (fs.existsSync(resolvedPath)) {
                 return { path: resolvedPath };
               }
             } catch (e) {
@@ -380,7 +381,7 @@ if (needsDatabase) {
 // Create a function that returns a chainable mock
 const createChainableMock = () => {
   const handler = {
-    get: (target: object, prop: string | symbol) => {
+    get: (_: object, prop: string | symbol) => {
       if (prop === "array") {
         return () => new Proxy({}, handler);
       }

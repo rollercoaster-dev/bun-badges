@@ -136,10 +136,12 @@ export function createMalformedCredential(malformationType: string) {
       credential.type = ["VerifiableCredential"]; // Remove OpenBadgeCredential
       break;
     case "missing-schema":
-      delete credential.credentialSchema;
+      delete (credential as any).credentialSchema;
       break;
     case "invalid-proof":
-      credential.proof.proofValue = "INVALID_PROOF_VALUE";
+      if (credential.proof) {
+        credential.proof.proofValue = "INVALID_PROOF_VALUE";
+      }
       break;
     case "missing-proof":
       delete credential.proof;

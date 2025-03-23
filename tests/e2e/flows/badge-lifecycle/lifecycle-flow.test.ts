@@ -28,7 +28,6 @@ import { registerAndLoginUser } from "../../helpers/test-utils";
 
 describe("Badge Lifecycle Flow Tests", () => {
   // Test environment state
-  let testEnv: any;
   let server: any;
   let request: any;
   let user: any;
@@ -39,7 +38,7 @@ describe("Badge Lifecycle Flow Tests", () => {
   // Set up test environment
   beforeAll(async () => {
     // Initialize test environment
-    testEnv = await setupTestEnvironment();
+    await setupTestEnvironment();
 
     // Create a mock app for testing
     const mockApp = new Hono();

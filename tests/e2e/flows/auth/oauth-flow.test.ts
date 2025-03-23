@@ -11,7 +11,6 @@ import {
   setupTestEnvironment,
   teardownTestEnvironment,
 } from "../../setup/environment";
-import { authenticatedRequest } from "../../helpers/test-utils";
 
 describe("OAuth Authentication Flow", () => {
   // Test environment state

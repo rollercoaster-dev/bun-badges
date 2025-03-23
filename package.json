@@ -30,6 +30,7 @@
     "db:compare": "bun compare-db-environments.ts",
     "verify:credential": "NODE_ENV=development bun --preload ./tests/setup.ts ./verify-credential-service.ts",
     "test": "bun test --preload ./tests/setup.ts",
+    "test:all": "bun test:unit && bun test:integration && bun test:e2e",
     "test:watch": "bun test --preload ./tests/setup.ts --watch",
     "test:unit": "bun test --preload ./tests/setup.ts tests/unit/**/*.test.ts",
     "test:integration": "NODE_ENV=test bun test --preload ./tests/setup.ts tests/integration/**/*.test.ts",

@@ -10,6 +10,7 @@ process.env.NODE_ENV = "test";
 process.env.E2E_TEST = "true";
 
 // Import setup utilities
+import { beforeAll, afterAll } from "bun:test";
 import {
   setupTestEnvironment,
   teardownTestEnvironment,
@@ -76,9 +77,27 @@ export * from "./helpers/test-utils";
 export * from "./utils/request";
 export * from "./utils/validation";
 export * from "./utils/schema-validator";
-export * from "./utils/db-utils";
-export * from "./setup/environment";
-export * from "./setup/server-setup";
+
+// Export specific functions from db-utils to avoid ambiguity
+import {
+  resetDatabase as resetDbUtils,
+  createTestTransaction,
+} from "./utils/db-utils";
+export { resetDbUtils, createTestTransaction };
+
+// Export specific functions from environment
+import {
+  setupTestEnvironment as setupEnv,
+  teardownTestEnvironment as teardownEnv,
+} from "./setup/environment";
+export { setupEnv, teardownEnv };
+
+// Export specific functions from server-setup
+import {
+  createTestServer as createServer,
+  createTestApp as createApp,
+} from "./setup/server-setup";
+export { createServer, createApp };
 
 // Export fixtures for convenience
 export * from "./fixtures/constants";

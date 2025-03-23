@@ -15,7 +15,7 @@ import {
   teardownTestEnvironment,
 } from "../../setup/environment";
 import { resetDatabase } from "../../utils/db-utils";
-import { issueTestBadge, getCredential } from "../../utils/request";
+import { issueTestBadge } from "../../utils/request";
 import { validateOB3Structure } from "../../utils/validation";
 import { registerAndLoginUser } from "../../helpers/test-utils";
 

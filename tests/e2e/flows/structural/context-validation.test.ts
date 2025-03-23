@@ -147,7 +147,9 @@ describe("OB3 Context Validation", () => {
     const contextValidation = validateContexts(badgeData.credential);
 
     expect(contextValidation.valid).toBe(true);
-    expect(contextValidation.contexts.required.missing).toHaveLength(0);
+    if ("contexts" in contextValidation) {
+      expect(contextValidation.contexts.required.missing).toHaveLength(0);
+    }
 
     // Verify each required context is present
     for (const context of requiredContexts) {
@@ -186,6 +188,14 @@ describe("OB3 Context Validation", () => {
         "https://w3id.org/vc/status-list/2021/v1",
       );
     }
+
+    // Validate the credential's contexts
+    const contextValidation = validateContexts(badgeData.credential);
+
+    expect(contextValidation.valid).toBe(true);
+    if ("contexts" in contextValidation) {
+      expect(contextValidation.contexts.required.missing).toHaveLength(0);
+    }
   });
 
   it("should maintain contexts when retrieving an existing credential", async () => {
@@ -209,7 +219,9 @@ describe("OB3 Context Validation", () => {
     const contextValidation = validateContexts(credential);
 
     expect(contextValidation.valid).toBe(true);
-    expect(contextValidation.contexts.required.missing).toHaveLength(0);
+    if ("contexts" in contextValidation) {
+      expect(contextValidation.contexts.required.missing).toHaveLength(0);
+    }
 
     // Verify each required context is present in the retrieved credential
     for (const context of requiredContexts) {
