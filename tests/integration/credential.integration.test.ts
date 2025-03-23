@@ -52,7 +52,7 @@ describe("Credential Service Integration Tests", () => {
 
     try {
       // 0. Get the test issuer from the database
-      const issuers = await testDb
+      const issuers = await testDb()
         .select()
         .from(issuerProfiles)
         .where(eq(issuerProfiles.name, "Test Issuer"));
@@ -77,7 +77,7 @@ describe("Credential Service Integration Tests", () => {
         issuer: "https://example.com/issuer",
       };
 
-      const badges = await testDb
+      const badges = await testDb()
         .insert(badgeClasses)
         .values({
           name: "Test Badge",
@@ -109,7 +109,7 @@ describe("Credential Service Integration Tests", () => {
         issuedOn: new Date().toISOString(),
       };
 
-      const assertions = await testDb
+      const assertions = await testDb()
         .insert(badgeAssertions)
         .values({
           badgeId: badge.badgeId,
@@ -197,7 +197,7 @@ describe("Credential Service Integration Tests", () => {
 
     try {
       // Get the test issuer from the database
-      const issuers = await testDb
+      const issuers = await testDb()
         .select()
         .from(issuerProfiles)
         .where(eq(issuerProfiles.name, "Test Issuer"));
