@@ -94,6 +94,32 @@ let poolClosed = false;
 // This is a known issue in drizzle-orm 0.41.0
 // See also: JSONB-NOTES.md for details on the jsonb handling approach
 mock.module("drizzle-orm/pg-core", () => {
+  // Only apply the mock for unit tests, not for integration tests
+  if (isIntegrationTest || isE2ETest) {
+    // For integration tests, we want to use the real module
+    // But we need to add the missing jsonb export
+    const realModule = require("drizzle-orm/pg-core");
+
+    // If the real module doesn't have jsonb, add it
+    if (!realModule.jsonb) {
+      realModule.jsonb = realModule.json; // Use json as a fallback
+    }
+
+    // Make sure PgTransaction is exported
+    if (!realModule.PgTransaction) {
+      // Create a basic transaction class if needed
+      realModule.PgTransaction = class PgTransaction {
+        client: any;
+        constructor(client: any) {
+          this.client = client;
+        }
+      };
+    }
+
+    return realModule;
+  }
+
+  // For unit tests, use the mock implementation
   // Define column types that have chainable methods
   const createColumn = (type: string) => {
     const column = (name: string, options?: any) => {
@@ -116,15 +142,34 @@ mock.module("drizzle-orm/pg-core", () => {
     return column;
   };
 
+  // Create a more complete mock for unit tests
+  const Table = {
+    Symbol: {
+      Columns: Symbol("columns"),
+    },
+  };
+
+  class PgTransaction {
+    client: any;
+    constructor(client: any) {
+      this.client = client;
+    }
+  }
+
   return {
-    pgTable: (name: string, columns: Record<string, unknown>) => ({
-      name,
-      columns,
-    }),
+    pgTable: (name: string, columns: Record<string, unknown>) => {
+      const table = {
+        name,
+        columns,
+        [Table.Symbol.Columns]: columns,
+      };
+      return table;
+    },
     uuid: createColumn("uuid"),
     varchar: createColumn("varchar"),
     timestamp: createColumn("timestamp"),
     jsonb: createColumn("jsonb"),
+    json: createColumn("json"),
     text: createColumn("text"),
     boolean: createColumn("boolean"),
     integer: createColumn("integer"),
@@ -137,6 +182,8 @@ mock.module("drizzle-orm/pg-core", () => {
       strings,
       values,
     }),
+    Table,
+    PgTransaction,
   };
 });
 
