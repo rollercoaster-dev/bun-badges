@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, json } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { issuerProfiles } from "./issuers";
 
 // Signing keys for credential issuance
@@ -11,7 +11,7 @@ export const signingKeys = pgTable("signing_keys", {
   privateKeyMultibase: text("private_key_multibase").notNull(),
   controller: text("controller").notNull(),
   type: text("type").notNull().default("Ed25519VerificationKey2020"),
-  keyInfo: json("key_info").notNull(), // Public key information in JSON-LD format
+  keyInfo: jsonb("key_info").notNull(), // Public key information in JSON-LD format
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

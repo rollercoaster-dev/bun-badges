@@ -5,7 +5,7 @@ import {
   text,
   timestamp,
   boolean,
-  json,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { issuerProfiles } from "./issuers";
 
@@ -19,7 +19,7 @@ export const badgeClasses = pgTable("badge_classes", {
   description: text("description").notNull(),
   imageUrl: text("image_url").notNull(),
   criteria: text("criteria").notNull(),
-  badgeJson: json("badge_json").notNull(), // Full Open Badges badge class JSON
+  badgeJson: jsonb("badge_json").notNull(), // Full Open Badges badge class JSON
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -40,7 +40,7 @@ export const badgeAssertions = pgTable("badge_assertions", {
   evidenceUrl: text("evidence_url"),
   revoked: boolean("revoked").default(false).notNull(),
   revocationReason: text("revocation_reason"),
-  assertionJson: json("assertion_json").notNull(), // Full Open Badges assertion JSON
+  assertionJson: jsonb("assertion_json").notNull(), // Full Open Badges assertion JSON
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

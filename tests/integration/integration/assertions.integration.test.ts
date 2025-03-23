@@ -13,6 +13,20 @@ import { eq, sql } from "drizzle-orm";
 import crypto from "crypto";
 import { nanoid } from "nanoid";
 
+// Define response interface for type safety
+interface AssertionResponse {
+  status: string;
+  data: {
+    assertionId: string;
+    assertion: {
+      assertionJson: {
+        proof?: any;
+        "@context": string | string[];
+      };
+    };
+  };
+}
+
 // Simplified test suite for the AssertionController
 describe("AssertionController Integration Tests", () => {
   let controller: AssertionController;
@@ -29,13 +43,13 @@ describe("AssertionController Integration Tests", () => {
     issuerId = crypto.randomUUID();
     badgeId = crypto.randomUUID();
 
-    // Create a test user
+    // Create a test user - only include fields that exist in the schema
     await db.insert(users).values({
       userId,
       email: `test-${nanoid(6)}@example.com`,
       name: "Test User",
       passwordHash: "test-hash",
-      role: "admin",
+      // Remove role field as it's causing type errors
     });
 
     // Create a test issuer
@@ -111,20 +125,22 @@ describe("AssertionController Integration Tests", () => {
     expect(response.status).toBe(200);
 
     // Verify the response
-    const data = await response.json();
+    const data = (await response.json()) as AssertionResponse;
     expect(data.status).toBe("success");
     expect(data.data.assertionId).toBeDefined();
 
     // Verify the assertion was created in the database
     const assertionId = data.data.assertionId;
 
-    // Use SQL tagged template instead of direct execute with parameters
-    const results = await db.execute(sql`
-      SELECT * FROM badge_assertions WHERE assertion_id = ${assertionId} LIMIT 1
-    `);
+    // Use the query builder instead of SQL tagged template
+    const results = await db
+      .select()
+      .from(badgeAssertions)
+      .where(eq(badgeAssertions.assertionId, assertionId))
+      .limit(1);
 
     // Check that we have a result
-    expect(results.rows.length).toBe(1);
+    expect(results.length).toBe(1);
   });
 
   it("should create an OB3 assertion", async () => {
@@ -149,7 +165,7 @@ describe("AssertionController Integration Tests", () => {
       expect(response.status).toBe(200);
 
       // Verify the response
-      const data = await response.json();
+      const data = (await response.json()) as AssertionResponse;
       console.log(
         "OB3 assertion creation response:",
         JSON.stringify(data, null, 2),
@@ -171,18 +187,19 @@ describe("AssertionController Integration Tests", () => {
 
   it("should verify an OB2 assertion", async () => {
     // Instead of querying the database, use the assertion we already created in the setup
-    // Create a direct SQL query to get the assertion ID using SQL tagged template
-    const results = await db.execute(sql`
-      SELECT assertion_id FROM badge_assertions LIMIT 1
-    `);
+    // Use query builder instead of SQL tagged template
+    const results = await db
+      .select({ assertionId: badgeAssertions.assertionId })
+      .from(badgeAssertions)
+      .limit(1);
 
-    if (!results.rows.length) {
+    if (!results.length) {
       throw new Error(
         "No assertions found for testing. Test setup may have failed.",
       );
     }
 
-    const assertionId = results.rows[0].assertion_id;
+    const assertionId = results[0].assertionId;
     console.log(`Found assertion ID for verification: ${assertionId}`);
 
     // Create a mock context for verification
@@ -203,7 +220,7 @@ describe("AssertionController Integration Tests", () => {
       const response = await controller.getAssertion(getContext);
       expect(response.status).toBe(200);
 
-      const data = await response.json();
+      const data = (await response.json()) as { status: string };
       expect(data.status).toBe("success");
     } catch (error) {
       console.error("Error getting assertion:", error);
@@ -212,18 +229,19 @@ describe("AssertionController Integration Tests", () => {
   });
 
   it("should revoke an assertion", async () => {
-    // Use SQL tagged template for the query
-    const results = await db.execute(sql`
-      SELECT assertion_id FROM badge_assertions LIMIT 1
-    `);
+    // Use query builder instead of SQL tagged template
+    const results = await db
+      .select({ assertionId: badgeAssertions.assertionId })
+      .from(badgeAssertions)
+      .limit(1);
 
-    if (!results.rows.length) {
+    if (!results.length) {
       throw new Error(
         "No assertions found for testing. Test setup may have failed.",
       );
     }
 
-    const assertionId = results.rows[0].assertion_id;
+    const assertionId = results[0].assertionId;
     console.log(`Found assertion ID for revocation: ${assertionId}`);
 
     // Create a mock context for revocation
@@ -241,15 +259,19 @@ describe("AssertionController Integration Tests", () => {
       const response = await controller.revokeAssertion(mockContext);
       expect(response.status).toBe(200);
 
-      // Verify the assertion is revoked using SQL tagged template
-      const revokedResults = await db.execute(sql`
-        SELECT revoked, revocation_reason FROM badge_assertions 
-        WHERE assertion_id = ${assertionId} LIMIT 1
-      `);
+      // Verify the assertion is revoked using query builder
+      const revokedResults = await db
+        .select({
+          revoked: badgeAssertions.revoked,
+          revocationReason: badgeAssertions.revocationReason,
+        })
+        .from(badgeAssertions)
+        .where(eq(badgeAssertions.assertionId, assertionId))
+        .limit(1);
 
-      expect(revokedResults.rows.length).toBe(1);
-      expect(revokedResults.rows[0].revoked).toBe(true);
-      expect(revokedResults.rows[0].revocation_reason).toBe("Test revocation");
+      expect(revokedResults.length).toBe(1);
+      expect(revokedResults[0].revoked).toBe(true);
+      expect(revokedResults[0].revocationReason).toBe("Test revocation");
     } catch (error) {
       console.error("Error revoking assertion:", error);
       throw error;

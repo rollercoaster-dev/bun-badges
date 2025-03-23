@@ -1,5 +1,4 @@
-import { pgTable, uuid, timestamp } from "drizzle-orm/pg-core";
-import { json } from "drizzle-orm/pg-core";
+import { pgTable, uuid, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { issuerProfiles } from "./index";
 
 // Status lists for credential revocation
@@ -8,7 +7,7 @@ export const statusLists = pgTable("status_lists", {
   issuerId: uuid("issuer_id")
     .references(() => issuerProfiles.issuerId)
     .notNull(),
-  statusListJson: json("status_list_json").notNull(), // Full Status List 2021 credential in JSON format
+  statusListJson: jsonb("status_list_json").notNull(), // Full Status List 2021 credential in JSON format
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
