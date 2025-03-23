@@ -1,9 +1,10 @@
 import { base58 } from "@scure/base";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { DatabaseService } from "@/services/db.service";
 import { signingKeys } from "@/db/schema/signing";
 import { type IssuerProfile } from "@/models/issuer.model";
 import * as ed from "@noble/ed25519";
+import { toJsonb } from "@/utils/db-helpers";
 
 const db = DatabaseService.db;
 
@@ -87,7 +88,11 @@ export async function generateSigningKey(
 
     await db.insert(signingKeys).values({
       issuerId,
-      ...storedKeyPair,
+      publicKeyMultibase: storedKeyPair.publicKeyMultibase,
+      privateKeyMultibase: storedKeyPair.privateKeyMultibase,
+      controller: storedKeyPair.controller,
+      type: storedKeyPair.type,
+      keyInfo: toJsonb(storedKeyPair.keyInfo),
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -113,9 +118,7 @@ export async function getSigningKey(
   const [key] = await db
     .select()
     .from(signingKeys)
-    .where(
-      and(eq(signingKeys.issuerId, issuerId), eq(signingKeys.revoked, false)),
-    )
+    .where(eq(signingKeys.issuerId, issuerId))
     .limit(1);
 
   if (!key) {

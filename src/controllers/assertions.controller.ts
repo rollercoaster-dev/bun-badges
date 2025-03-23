@@ -6,6 +6,7 @@ import { CredentialService } from "@/services/credential.service";
 import { isValidUuid } from "@/utils/validation";
 import { OB2BadgeAssertion } from "@/services/verification.service";
 import { OpenBadgeCredential } from "@/models/credential.model";
+import { toJsonb } from "@/utils/db-helpers";
 
 type AssertionJson = OB2BadgeAssertion | OpenBadgeCredential;
 
@@ -295,7 +296,7 @@ export class AssertionController {
         issuedOn: now,
         evidenceUrl: evidence?.url,
         revoked: false,
-        assertionJson: {
+        assertionJson: toJsonb({
           "@context": "https://w3id.org/openbadges/v2",
           type: "Assertion",
           id: `${new URL(c.req.url).origin}/assertions/${assertionId}`,
@@ -309,7 +310,7 @@ export class AssertionController {
           verification: {
             type: "HostedBadge",
           },
-        },
+        }),
       });
 
       // For OB3 format, ensure signing key exists and convert to OB3
