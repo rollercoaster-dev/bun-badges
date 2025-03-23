@@ -62,13 +62,8 @@ export async function setupTestEnvironment() {
 export async function teardownTestEnvironment() {
   console.log(`Tearing down test environment with run ID: ${testRunId}`);
 
-  // Close database pool
-  try {
-    await dbPool.end();
-    console.log("Database pool closed");
-  } catch (error) {
-    console.error("Error closing database pool:", error);
-  }
+  // Note: We don't close the database pool here anymore.
+  // The pool is managed globally in the main setup.ts file.
 }
 
 /**

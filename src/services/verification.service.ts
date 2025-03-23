@@ -154,6 +154,8 @@ export class VerificationService {
             ? `Credential has been revoked: ${assertion.revocationReason}`
             : "Credential has been revoked",
         );
+        // Important: If revoked, the credential is not valid regardless of other checks
+        result.valid = false;
       } else {
         result.checks.revocation = true;
       }
@@ -293,6 +295,10 @@ export class VerificationService {
             ? `Credential has been revoked: ${assertion.revocationReason}`
             : "Credential has been revoked",
         );
+        // Important: If revoked, the credential is not valid regardless of other checks
+        result.valid = false;
+        // Return early since revocation is a critical failure
+        return result;
       } else {
         result.checks.revocation = true;
       }

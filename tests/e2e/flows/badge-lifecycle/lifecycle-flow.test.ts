@@ -75,13 +75,24 @@ describe("Badge Lifecycle Flow Tests", () => {
               name: "Test Badge",
               description: "Test Description",
               criteria: { narrative: "Test criteria" },
+              type: ["Achievement"],
             },
           },
           "@context": [
             "https://www.w3.org/2018/credentials/v1",
             "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json",
+            "https://w3id.org/security/data-integrity/v1",
           ],
           type: ["VerifiableCredential", "OpenBadgeCredential"],
+          issuer: {
+            id: "https://example.com/issuers/1",
+            name: "Test Issuer",
+          },
+          issuanceDate: new Date().toISOString(),
+          credentialSchema: {
+            id: "https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json",
+            type: "JsonSchemaValidator2018",
+          },
           proof: {
             type: "DataIntegrityProof",
             cryptosuite: "eddsa-rdfc-2022",
@@ -102,13 +113,24 @@ describe("Badge Lifecycle Flow Tests", () => {
           achievement: {
             name: "Test Badge",
             description: "Test Description",
+            type: ["Achievement"],
           },
         },
         "@context": [
           "https://www.w3.org/2018/credentials/v1",
           "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json",
+          "https://w3id.org/security/data-integrity/v1",
         ],
         type: ["VerifiableCredential", "OpenBadgeCredential"],
+        issuer: {
+          id: "https://example.com/issuers/1",
+          name: "Test Issuer",
+        },
+        issuanceDate: new Date().toISOString(),
+        credentialSchema: {
+          id: "https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json",
+          type: "JsonSchemaValidator2018",
+        },
         proof: {
           type: "DataIntegrityProof",
           cryptosuite: "eddsa-rdfc-2022",

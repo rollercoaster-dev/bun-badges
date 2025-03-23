@@ -14,6 +14,10 @@ alwaysApply: false
   - `fixtures/`: Test data
   - `setup/`: Test environment configuration
 
+## E2E tests
+
+E2E tests should varify that the actuall app follows and iplements Open Badges 3.0 protocols
+
 ## Test Commands
 
 ### Basic Commands

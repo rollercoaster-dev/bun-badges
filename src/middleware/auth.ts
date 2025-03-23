@@ -50,9 +50,29 @@ const adminLimiter = new RateLimiter({
   period: 60 * 60 * 1000,
 });
 
-// Helper to check if user has required role
-function hasRole(user: AuthUser, requiredRole: Role): boolean {
-  if (user.roles.includes(Role.ADMIN)) return true;
+/**
+ * Check if user has the required role
+ * @param user The authenticated user
+ * @param requiredRole The role or roles required
+ * @returns true if the user has the required role, false otherwise
+ */
+function hasRole(user: AuthUser, requiredRole: Role | Role[]): boolean {
+  // Null check for user and user.roles
+  if (!user || !user.roles) {
+    return false;
+  }
+
+  // ADMIN role has access to everything
+  if (user.roles.includes(Role.ADMIN)) {
+    return true;
+  }
+
+  // If requiredRole is an array, check if user has any of the roles
+  if (Array.isArray(requiredRole)) {
+    return requiredRole.some((role) => user.roles.includes(role));
+  }
+
+  // Check for a single required role
   return user.roles.includes(requiredRole);
 }
 
@@ -143,17 +163,54 @@ function isValidJWTPayload(payload: unknown): payload is JWTPayload {
   return true;
 }
 
-// Role-based authorization middleware
+/**
+ * Role-based authorization middleware
+ * Creates a middleware that checks if the user has the required role
+ * @param role The role or roles required
+ * @returns Middleware function that checks for the required role
+ */
 export function requireRole(role: Role | Role[]) {
   return async function roleMiddleware(c: Context, next: Next): Promise<void> {
-    const user = c.get("user") as AuthUser;
-    const requiredRoles = Array.isArray(role) ? role : [role];
-    if (!requiredRoles.some((r) => hasRole(user, r))) {
-      throw new HTTPException(403, {
-        message: AUTH_ERRORS.INSUFFICIENT_PERMISSIONS,
+    try {
+      // Get the user from context
+      const user = c.get("user") as AuthUser;
+
+      // Ensure user exists in context
+      if (!user) {
+        throw new HTTPException(401, {
+          message: AUTH_ERRORS.MISSING_TOKEN,
+        });
+      }
+
+      // Ensure user has roles array
+      if (!user.roles || !Array.isArray(user.roles)) {
+        throw new HTTPException(403, {
+          message: AUTH_ERRORS.INSUFFICIENT_PERMISSIONS,
+        });
+      }
+
+      // Check if the user has the required role
+      const hasRequiredRole = hasRole(user, role);
+
+      if (!hasRequiredRole) {
+        throw new HTTPException(403, {
+          message: AUTH_ERRORS.INSUFFICIENT_PERMISSIONS,
+        });
+      }
+
+      // Continue to the next middleware if role check passes
+      await next();
+    } catch (error) {
+      // Re-throw HTTP exceptions
+      if (error instanceof HTTPException) {
+        throw error;
+      }
+
+      // Wrap other errors
+      throw new HTTPException(500, {
+        message: `Role authorization error: ${error instanceof Error ? error.message : "Unknown error"}`,
       });
     }
-    await next();
   };
 }
 

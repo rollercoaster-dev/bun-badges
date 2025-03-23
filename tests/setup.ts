@@ -85,6 +85,9 @@ const isE2ETest =
   process.env.E2E_TEST === "true" || // Check environment variable first
   process.argv.some((arg) => arg.includes("e2e") || arg.includes("tests/e2e"));
 
+// Track whether the pool has been closed
+let poolClosed = false;
+
 // Mock DB modules for unit tests
 if (!isIntegrationTest && !isE2ETest) {
   console.log("🔄 Running in unit test mode, mocking database dependencies");
@@ -141,8 +144,11 @@ if (!isIntegrationTest && !isE2ETest) {
 
       // Set up global pool end function
       poolEnd = async () => {
-        console.log("Closing database pool...");
-        await pool.end();
+        if (!poolClosed) {
+          console.log("Closing database pool...");
+          poolClosed = true;
+          await pool.end();
+        }
       };
 
       // Create Drizzle instance
@@ -196,6 +202,20 @@ process.on("exit", () => {
     } catch (e) {
       console.error("Error cleaning up database connections:", e);
     }
+  }
+});
+
+// Also ensure we close the pool if the process is terminated
+process.on("SIGINT", () => {
+  if (poolEnd) {
+    try {
+      poolEnd().then(() => process.exit(0));
+    } catch (e) {
+      console.error("Error cleaning up database connections:", e);
+      process.exit(1);
+    }
+  } else {
+    process.exit(0);
   }
 });
 

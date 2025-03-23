@@ -75,6 +75,11 @@ describe("OB3 Schema Validation", () => {
     });
 
     mockApp.post("/api/assertions", async (c) => {
+      const body = await c.req.json();
+
+      // Do comprehensive logging to debug the issue
+      console.log("Assertion request body:", body);
+
       return c.json(
         {
           id: `assertion-${Date.now()}`,
@@ -94,13 +99,14 @@ describe("OB3 Schema Validation", () => {
             type: "JsonSchemaValidator2018",
           },
           credentialSubject: {
-            id: "mailto:test@example.com",
+            id: `mailto:${body.recipient?.identity || "test@example.com"}`,
             type: ["AchievementSubject"],
             achievement: {
               id: "https://example.com/achievements/1",
               type: ["Achievement"],
-              name: "Test Badge",
-              description: "Test Description",
+              name: body.name || "Subject Test Badge",
+              description:
+                body.description || "Testing credential subject structure",
               criteria: { narrative: "Test criteria" },
             },
           },

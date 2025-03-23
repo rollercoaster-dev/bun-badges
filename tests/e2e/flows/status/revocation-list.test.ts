@@ -76,7 +76,8 @@ describe("OB3 Status List and Revocation", () => {
 
     app.post("/api/assertions", async (c) => {
       const timestamp = new Date().toISOString();
-      const id = `assertion-${Date.now()}`;
+      // Create a unique ID using both timestamp and a random number
+      const id = `assertion-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
       return c.json(
         {
           id,
@@ -197,7 +198,7 @@ describe("OB3 Status List and Revocation", () => {
     });
 
     // Status list endpoint
-    app.get("/status/list", (c) => {
+    app.get("/status/list", async (c) => {
       return c.json({
         "@context": [
           "https://www.w3.org/2018/credentials/v1",
