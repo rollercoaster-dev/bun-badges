@@ -23,8 +23,14 @@ jobs:
       - name: Type check
         run: bun run tsc
         
-      - name: Run tests
-        run: bun test
+      - name: Run unit tests
+        run: bun run test:unit
+
+      - name: Run integration tests
+        run: bun run test:integration
+
+      - name: Run e2e tests
+        run: bun run test:e2e
         
       - name: Run linter
         run: bun run lint
