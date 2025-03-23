@@ -108,4 +108,95 @@ When adding new tests:
 1. Place unit tests in `tests/unit/`
 2. Place integration tests in `tests/integration/`
 3. Place e2e tests in `tests/e2e/`
-4. Ensure your tests can run with both real and mocked databases 
+4. Ensure your tests can run with both real and mocked databases
+
+## CI Test Setup
+
+For CI environments, we now use a dedicated setup script that helps prepare and clean the test environment in a more robust way:
+
+```bash
+# Run the CI test setup script
+./tasks/ci-test-setup.sh
+```
+
+The script performs the following actions:
+- Cleans up any existing test containers and artifacts
+- Creates required test directories
+- Sets up environment variables
+- Checks for Docker availability
+- Handles database setup (real or mock)
+- Manages database migrations
+
+For GitHub Actions, the script is automatically called as part of the CI workflow. This ensures consistent test environments across both local development and CI pipelines.
+
+### Configuration Options
+
+The script behavior can be controlled with environment variables:
+
+#### Test Control Variables
+- `FORCE_MOCK_DB=true` - Always use mock database even if Docker is available
+- `SKIP_DOCKER=true` - Skip Docker container setup entirely
+- `CI=true` - Indicates running in a CI environment
+- `LOG_LEVEL=error` - Sets the logging level for tests
+
+#### Database Configuration
+- `DB_USER` - Database username (default: `postgres`)
+- `DB_PASSWORD` - Database password (default: `postgres`)
+- `DB_HOST` - Database host (default: `localhost`)
+- `DB_PORT` - Database port (default: `5432` for CI, `5434` for Docker)
+- `DB_NAME` - Database name (default: `bun_badges_test`)
+- `TEST_JWT_SECRET` - JWT secret for tests (default: `test-jwt-secret-for-ci-tests`)
+
+Examples:
+
+```bash
+# Run with a mock database regardless of Docker availability
+FORCE_MOCK_DB=true ./tasks/ci-test-setup.sh
+
+# Run with custom database credentials
+DB_USER=test_user DB_PASSWORD=secure_password DB_NAME=custom_test_db ./tasks/ci-test-setup.sh
+
+# Run in CI environment with specific database port
+CI=true DB_PORT=5433 ./tasks/ci-test-setup.sh
+```
+
+In GitHub Actions, these variables can be set as action secrets or variables for added security. 
+
+### Setting Up GitHub Variables and Secrets
+
+We've included a helper script to set up GitHub repository variables and secrets automatically using the GitHub CLI (`gh`):
+
+```bash
+# Run the GitHub variables setup script
+./tasks/setup-github-vars.sh
+```
+
+This script will:
+1. Check if the GitHub CLI is installed and authenticated
+2. Detect your repository from git remote (or prompt you for it)
+3. Load variables from a .env file
+4. Set up GitHub repository variables and secrets based on the .env file
+
+The script automatically determines which variables should be encrypted secrets based on their names. Any variable with "password", "secret", "key", or "token" in its name (case insensitive) will be set as an encrypted secret, while all others will be set as public variables.
+
+**Example .env File**:
+
+We've provided an example file at `examples/github-vars-example.env` that you can copy and modify:
+
+```bash
+# Copy the example file
+cp examples/github-vars-example.env .env
+
+# Edit with your values
+nano .env  # or your preferred editor
+
+# Run the script
+./tasks/setup-github-vars.sh
+```
+
+**Requirements:**
+- GitHub CLI (`gh`) must be installed. Install from https://cli.github.com/
+- You must be authenticated with GitHub CLI. Run `gh auth login` if needed.
+- A .env file containing the variables you want to set
+
+Once these variables are set in your GitHub repository, the CI workflow will automatically use them when running tests. 

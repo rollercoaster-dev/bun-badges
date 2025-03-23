@@ -9,6 +9,21 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ${{ vars.DB_USER || 'postgres' }}
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD || 'postgres' }}
+          POSTGRES_DB: ${{ vars.DB_NAME || 'bun_badges_test' }}
+          POSTGRES_INITDB_ARGS: "--nosync"
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       
@@ -19,9 +34,25 @@ jobs:
           
       - name: Install dependencies
         run: bun install
+      
+      - name: Make setup script executable
+        run: chmod +x tasks/ci-test-setup.sh
         
-      - name: Setup CI environment
-        run: cp .env.ci .env
+      - name: Setup CI test environment
+        run: ./tasks/ci-test-setup.sh
+        env:
+          CI: "true"
+          FORCE_MOCK_DB: "false" # We're using a real DB from GitHub Actions services
+          SKIP_DOCKER: "true"    # Skip Docker in CI since we're using services
+          NODE_ENV: "test"
+          DB_USER: ${{ vars.DB_USER || 'postgres' }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD || 'postgres' }}
+          DB_HOST: "localhost"
+          DB_PORT: "5432"
+          DB_NAME: ${{ vars.DB_NAME || 'bun_badges_test' }}
+          TEST_JWT_SECRET: ${{ secrets.TEST_JWT_SECRET || 'test-jwt-secret-for-ci-tests' }}
+          LOG_LEVEL: "error"
+          DATABASE_URL: "postgres://${{ vars.DB_USER || 'postgres' }}:${{ secrets.DB_PASSWORD || 'postgres' }}@localhost:5432/${{ vars.DB_NAME || 'bun_badges_test' }}"
         
       - name: Type check
         run: bun run tsc
@@ -31,23 +62,28 @@ jobs:
         
       - name: Run unit tests
         run: bun run test:unit
-
+        
       - name: Run integration tests
         run: bun run test:integration
         env:
           CI: "true"
-          FORCE_MOCK_DB: "true"
-          SKIP_DOCKER: "true"
-          NODE_ENV: "test"
-
-      - name: Run e2e tests
+          DB_USER: ${{ vars.DB_USER || 'postgres' }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD || 'postgres' }}
+          DB_HOST: "localhost"
+          DB_PORT: "5432"
+          DB_NAME: ${{ vars.DB_NAME || 'bun_badges_test' }}
+          DATABASE_URL: "postgres://${{ vars.DB_USER || 'postgres' }}:${{ secrets.DB_PASSWORD || 'postgres' }}@localhost:5432/${{ vars.DB_NAME || 'bun_badges_test' }}"
+          
+      - name: Run E2E tests
         run: bun run test:e2e
         env:
           CI: "true"
-          FORCE_MOCK_DB: "true"
-          SKIP_DOCKER: "true"
-          NODE_ENV: "test"
-      
+          DB_USER: ${{ vars.DB_USER || 'postgres' }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD || 'postgres' }}
+          DB_HOST: "localhost"
+          DB_PORT: "5432"
+          DB_NAME: ${{ vars.DB_NAME || 'bun_badges_test' }}
+          DATABASE_URL: "postgres://${{ vars.DB_USER || 'postgres' }}:${{ secrets.DB_PASSWORD || 'postgres' }}@localhost:5432/${{ vars.DB_NAME || 'bun_badges_test' }}"
 
   build:
     needs: test

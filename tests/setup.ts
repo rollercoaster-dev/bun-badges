@@ -212,142 +212,157 @@ if (!useRealDatabase) {
 
   // Mock the entire db/config module
   mock.module("../src/db/config", () => {
-    // Create a more comprehensive mock pool for integration tests
-    const mockRows: Record<string, any[]> = {
-      users: [
-        {
-          userId: "test-user-id",
-          email: "test@example.com",
-          name: "Test User",
-        },
-      ],
-      issuer_profiles: [
-        {
-          issuerId: "test-issuer-id",
-          name: "Test Issuer",
-          ownerUserId: "test-user-id",
-        },
-      ],
-      badge_classes: [
-        {
-          badgeId: "test-badge-id",
-          name: "Test Badge",
-          issuerId: "test-issuer-id",
-        },
-      ],
-      badge_assertions: [
-        {
-          assertionId: "test-assertion-id",
-          badgeId: "test-badge-id",
-          issuerId: "test-issuer-id",
-        },
-      ],
-      signing_keys: [
-        {
-          keyId: "test-key-id",
-          issuerId: "test-issuer-id",
-          publicKeyMultibase: "test-key",
-          type: "Ed25519VerificationKey2020",
-        },
-      ],
+    // Use the predefined test data instead of creating new empty mockRows
+    const mockRows = { ...TEST_MOCK_DATA };
+
+    // For integration tests, provide a more intelligent query response system
+    const getMockDataByQuery = (text: string) => {
+      console.log(
+        `Mock DB Query: ${text.substring(0, 100)}${text.length > 100 ? "..." : ""}`,
+      );
+
+      // Test connection queries
+      if (text.toLowerCase().includes("select 1")) {
+        return { rows: [{ "?column?": 1 }] };
+      }
+
+      // Basic table queries
+      if (text.toLowerCase().includes("from users")) {
+        return { rows: mockRows.users };
+      }
+      if (text.toLowerCase().includes("from issuer_profiles")) {
+        return { rows: mockRows.issuer_profiles };
+      }
+      if (text.toLowerCase().includes("from badge_classes")) {
+        return { rows: mockRows.badge_classes };
+      }
+      if (text.toLowerCase().includes("from badge_assertions")) {
+        return { rows: mockRows.badge_assertions };
+      }
+      if (text.toLowerCase().includes("from signing_keys")) {
+        return { rows: mockRows.signing_keys };
+      }
+      if (text.toLowerCase().includes("from oauth_clients")) {
+        return { rows: mockRows.oauth_clients };
+      }
+      if (text.toLowerCase().includes("from oauth_access_tokens")) {
+        return { rows: mockRows.oauth_access_tokens };
+      }
+
+      // Handle INSERT queries by adding to mockRows
+      if (text.toLowerCase().includes("insert into")) {
+        // Extract table name from query
+        const tableMatch = text.match(/insert into (\w+)/i);
+        const tableName = tableMatch ? tableMatch[1] : null;
+
+        if (tableName && mockRows[tableName]) {
+          // For simplicity, just add a mock object to the appropriate table
+          const mockObj = { id: `mock-${tableName}-id-${Date.now()}` };
+          mockRows[tableName].push(mockObj);
+          return { rows: [mockObj] };
+        }
+      }
+
+      return { rows: [] };
     };
 
     const mockPool = {
       query: ((text: string, _params?: any[]) => {
-        console.log(
-          `Mock DB Query: ${text.substring(0, 50)}${text.length > 50 ? "..." : ""}`,
-        );
-
-        // Return appropriate mock data based on the query
-        if (text.toLowerCase().includes("select 1 as test")) {
-          return Promise.resolve({ rows: [{ test: 1 }] });
-        }
-
-        if (text.toLowerCase().includes("select 1 as one")) {
-          return Promise.resolve({ rows: [{ one: 1 }] });
-        }
-
-        if (text.toLowerCase().includes("select 1 as drizzle_test")) {
-          return Promise.resolve({ rows: [{ drizzle_test: 1 }] });
-        }
-
-        if (text.toLowerCase().includes("select 1")) {
-          return Promise.resolve({ rows: [{ "?column?": 1 }] });
-        }
-
-        if (text.toLowerCase().includes("select * from users")) {
-          return Promise.resolve({ rows: mockRows.users });
-        }
-
-        if (text.toLowerCase().includes("select * from issuer_profiles")) {
-          return Promise.resolve({ rows: mockRows.issuer_profiles });
-        }
-
-        if (text.toLowerCase().includes("select * from badge_classes")) {
-          return Promise.resolve({ rows: mockRows.badge_classes });
-        }
-
-        if (text.toLowerCase().includes("select * from badge_assertions")) {
-          return Promise.resolve({ rows: mockRows.badge_assertions });
-        }
-
-        if (text.toLowerCase().includes("select * from signing_keys")) {
-          return Promise.resolve({ rows: mockRows.signing_keys });
-        }
-
-        // Default mock response for any query
-        return Promise.resolve({ rows: [{ mock_data: "test" }] });
+        // Use the enhanced query handler
+        return Promise.resolve(getMockDataByQuery(text));
       }) as Mock<any>,
+
       connect: (() =>
         Promise.resolve({
           query: ((text: string) => {
-            console.log(
-              `Mock Client Query: ${text.substring(0, 50)}${text.length > 50 ? "..." : ""}`,
-            );
-            return Promise.resolve({ rows: [{ test: 1 }] });
+            // Use the same enhanced query handler for client queries
+            return Promise.resolve(getMockDataByQuery(text));
           }) as Mock<any>,
           release: (() => {}) as Mock<any>,
         })) as Mock<any>,
       end: (() => Promise.resolve()) as Mock<any>,
     };
 
-    // Create mock db with more comprehensive execute functionality
+    // Create an enhanced mockDb with better table operation handling
     const mockDb = {
       execute: ((query: any) => {
         console.log(
           `Mock Drizzle Execute: ${JSON.stringify(query).substring(0, 50)}...`,
         );
 
-        // Handle different types of queries with appropriate mock responses
-        if (typeof query === "object" && query.type === "select") {
-          if (query.table === "users") {
-            return Promise.resolve(mockRows.users);
+        // Use table name from query object when available
+        const tableName = query.table
+          ? typeof query.table === "string"
+            ? query.table
+            : query.table.name
+          : null;
+
+        // Handle different query types with appropriate mock responses
+        if (query.type === "select") {
+          // Return data from the appropriate table if it exists
+          if (tableName && mockRows[tableName]) {
+            return Promise.resolve(mockRows[tableName]);
           }
-          if (query.table === "issuer_profiles") {
-            return Promise.resolve(mockRows.issuer_profiles);
-          }
-          if (query.table === "badge_classes") {
-            return Promise.resolve(mockRows.badge_classes);
-          }
-          if (query.table === "badge_assertions") {
-            return Promise.resolve(mockRows.badge_assertions);
-          }
-          if (query.table === "signing_keys") {
-            return Promise.resolve(mockRows.signing_keys);
-          }
+
+          // For joins or complex queries, return generic data
+          return Promise.resolve([
+            { mock_data: true, id: `mock-id-${Date.now()}` },
+          ]);
         }
 
         return Promise.resolve([{ drizzle_test: 1 }]);
       }) as Mock<any>,
 
       insert: ((table: any) => {
+        const tableName =
+          typeof table === "string" ? table : table.name || "unknown";
+
         return {
           values: ((data: any) => {
             console.log(
-              `Mock DB Insert: ${table.name || "unknown"} table - ${JSON.stringify(data).substring(0, 50)}...`,
+              `Mock DB Insert: ${tableName} table - ${JSON.stringify(data).substring(0, 50)}...`,
             );
+
             const mockData = Array.isArray(data) ? data[0] : data;
-            const returnData = { ...mockData, id: "mock-id-" + Date.now() };
+
+            // Generate appropriate IDs based on table
+            let idField = "id";
+            let idValue = `mock-id-${Date.now()}`;
+
+            if (tableName === "users") {
+              idField = "userId";
+              idValue = mockData.userId || `user-${Date.now()}`;
+            } else if (tableName === "issuer_profiles") {
+              idField = "issuerId";
+              idValue = mockData.issuerId || `issuer-${Date.now()}`;
+            } else if (tableName === "badge_classes") {
+              idField = "badgeId";
+              idValue = mockData.badgeId || `badge-${Date.now()}`;
+            } else if (tableName === "badge_assertions") {
+              idField = "assertionId";
+              idValue = mockData.assertionId || `assertion-${Date.now()}`;
+            } else if (tableName === "signing_keys") {
+              idField = "keyId";
+              idValue = mockData.keyId || `key-${Date.now()}`;
+              // Ensure key data is present
+              if (!mockData.publicKeyMultibase) {
+                mockData.publicKeyMultibase =
+                  "z6MkrJ6q4Mu4KQkWLvqkYJPPJxhqhcQ84ZpeCEcP4SCj5g7c";
+              }
+            }
+
+            // Create the return object with the appropriate ID
+            const returnData = {
+              ...mockData,
+              [idField]: idValue,
+              created_at: mockData.created_at || new Date().toISOString(),
+            };
+
+            // Add to mock data if table exists
+            if (mockRows[tableName]) {
+              mockRows[tableName].push(returnData);
+            }
+
             return {
               returning: () => Promise.resolve([returnData]),
               execute: () => Promise.resolve([returnData]),
@@ -359,33 +374,61 @@ if (!useRealDatabase) {
       select: ((_fields: any) => {
         return {
           from: ((table: any) => {
-            const tableName = typeof table === "string" ? table : table.name;
-            console.log(`Mock DB Select from: ${tableName || "unknown"}`);
+            const tableName =
+              typeof table === "string" ? table : table.name || "unknown";
+            console.log(`Mock DB Select from: ${tableName}`);
 
             return {
-              where: (() => {
+              where: ((condition: any) => {
+                console.log(
+                  `Mock DB Where condition: ${JSON.stringify(condition).substring(0, 50)}...`,
+                );
+
+                // Try to extract ID from condition
+                let idField = "id";
+                let idValue = null;
+
+                if (condition && typeof condition === "object") {
+                  // Handle common ID fields
+                  if (condition.userId) idValue = condition.userId;
+                  else if (condition.issuerId) idValue = condition.issuerId;
+                  else if (condition.badgeId) idValue = condition.badgeId;
+                  else if (condition.assertionId)
+                    idValue = condition.assertionId;
+                  else if (condition.keyId) idValue = condition.keyId;
+
+                  // Try to extract from eq operator
+                  if (condition.left && condition.operator === "=") {
+                    if (
+                      typeof condition.left === "string" &&
+                      condition.left.includes("id")
+                    ) {
+                      idField = condition.left;
+                      idValue = condition.right;
+                    }
+                  }
+                }
+
+                // Filter results if we have mockRows for this table
+                let results = mockRows[tableName] || [];
+                if (idValue && results.length > 0) {
+                  results = results.filter((row) => row[idField] === idValue);
+                }
+
                 return {
                   limit: ((_limit: number) => {
-                    return Promise.resolve(
-                      mockRows[tableName] || [{ id: "mock-id" }],
-                    );
+                    return Promise.resolve(results);
                   }) as Mock<any>,
                   execute: (() => {
-                    return Promise.resolve(
-                      mockRows[tableName] || [{ id: "mock-id" }],
-                    );
+                    return Promise.resolve(results);
                   }) as Mock<any>,
                 };
               }) as Mock<any>,
               limit: ((_limit: number) => {
-                return Promise.resolve(
-                  mockRows[tableName] || [{ id: "mock-id" }],
-                );
+                return Promise.resolve(mockRows[tableName] || []);
               }) as Mock<any>,
               execute: (() => {
-                return Promise.resolve(
-                  mockRows[tableName] || [{ id: "mock-id" }],
-                );
+                return Promise.resolve(mockRows[tableName] || []);
               }) as Mock<any>,
             };
           }) as Mock<any>,
@@ -393,17 +436,65 @@ if (!useRealDatabase) {
       }) as Mock<any>,
 
       update: ((table: any) => {
-        const tableName = typeof table === "string" ? table : table.name;
-        console.log(`Mock DB Update: ${tableName || "unknown"} table`);
+        const tableName =
+          typeof table === "string" ? table : table.name || "unknown";
+        console.log(`Mock DB Update: ${tableName} table`);
 
         return {
           set: ((data: any) => {
             return {
-              where: (() => {
-                return Promise.resolve([{ ...data, id: "mock-id" }]);
+              where: ((condition: any) => {
+                console.log(
+                  `Mock DB Update where condition: ${JSON.stringify(condition).substring(0, 50)}...`,
+                );
+
+                // Try to extract ID from condition
+                let idField = "id";
+                let idValue = null;
+
+                if (condition && typeof condition === "object") {
+                  // Handle common ID fields
+                  if (condition.userId) idValue = condition.userId;
+                  else if (condition.issuerId) idValue = condition.issuerId;
+                  else if (condition.badgeId) idValue = condition.badgeId;
+                  else if (condition.assertionId)
+                    idValue = condition.assertionId;
+                  else if (condition.keyId) idValue = condition.keyId;
+
+                  // Try to extract from eq operator
+                  if (condition.left && condition.operator === "=") {
+                    if (
+                      typeof condition.left === "string" &&
+                      condition.left.includes("id")
+                    ) {
+                      idField = condition.left;
+                      idValue = condition.right;
+                    }
+                  }
+                }
+
+                // Update in mock data if table exists
+                if (mockRows[tableName] && idValue) {
+                  const index = mockRows[tableName].findIndex(
+                    (row) => row[idField] === idValue,
+                  );
+                  if (index !== -1) {
+                    mockRows[tableName][index] = {
+                      ...mockRows[tableName][index],
+                      ...data,
+                    };
+                    return Promise.resolve([mockRows[tableName][index]]);
+                  }
+                }
+
+                return Promise.resolve([
+                  { ...data, [idField]: idValue || `mock-id-${Date.now()}` },
+                ]);
               }) as Mock<any>,
               execute: (() => {
-                return Promise.resolve([{ ...data, id: "mock-id" }]);
+                return Promise.resolve([
+                  { ...data, id: `mock-id-${Date.now()}` },
+                ]);
               }) as Mock<any>,
             };
           }) as Mock<any>,
@@ -411,15 +502,58 @@ if (!useRealDatabase) {
       }) as Mock<any>,
 
       delete: ((table: any) => {
-        const tableName = typeof table === "string" ? table : table.name;
-        console.log(`Mock DB Delete from: ${tableName || "unknown"} table`);
+        const tableName =
+          typeof table === "string" ? table : table.name || "unknown";
+        console.log(`Mock DB Delete from: ${tableName} table`);
 
         return {
-          where: (() => {
-            return Promise.resolve([{ id: "mock-id" }]);
+          where: ((condition: any) => {
+            console.log(
+              `Mock DB Delete where condition: ${JSON.stringify(condition).substring(0, 50)}...`,
+            );
+
+            // Try to extract ID from condition
+            let idField = "id";
+            let idValue = null;
+
+            if (condition && typeof condition === "object") {
+              // Handle common ID fields
+              if (condition.userId) idValue = condition.userId;
+              else if (condition.issuerId) idValue = condition.issuerId;
+              else if (condition.badgeId) idValue = condition.badgeId;
+              else if (condition.assertionId) idValue = condition.assertionId;
+              else if (condition.keyId) idValue = condition.keyId;
+
+              // Try to extract from eq operator
+              if (condition.left && condition.operator === "=") {
+                if (
+                  typeof condition.left === "string" &&
+                  condition.left.includes("id")
+                ) {
+                  idField = condition.left;
+                  idValue = condition.right;
+                }
+              }
+            }
+
+            // Remove from mock data if table exists
+            if (mockRows[tableName] && idValue) {
+              const index = mockRows[tableName].findIndex(
+                (row) => row[idField] === idValue,
+              );
+              if (index !== -1) {
+                const deleted = mockRows[tableName][index];
+                mockRows[tableName].splice(index, 1);
+                return Promise.resolve([deleted]);
+              }
+            }
+
+            return Promise.resolve([
+              { [idField]: idValue || `mock-id-${Date.now()}` },
+            ]);
           }) as Mock<any>,
           execute: (() => {
-            return Promise.resolve([{ id: "mock-id" }]);
+            return Promise.resolve([{ id: `mock-id-${Date.now()}` }]);
           }) as Mock<any>,
         };
       }) as Mock<any>,
@@ -867,3 +1001,83 @@ try {
 }
 
 console.log("✅ Test setup complete");
+
+// Add test mock data for common database operations
+const TEST_MOCK_DATA: Record<string, any[]> = {
+  users: [
+    {
+      userId: "test-user-id",
+      email: "test@example.com",
+      name: "Test User",
+      role: "ADMIN",
+      created_at: new Date().toISOString(),
+    },
+  ],
+  issuer_profiles: [
+    {
+      issuerId: "test-issuer-id",
+      name: "Test Issuer",
+      description: "Test issuer description",
+      url: "https://example.com",
+      email: "issuer@example.com",
+      image: "https://example.com/image.png",
+      ownerUserId: "test-user-id",
+      created_at: new Date().toISOString(),
+    },
+  ],
+  badge_classes: [
+    {
+      badgeId: "test-badge-id",
+      name: "Test Badge",
+      description: "Test badge description",
+      image: "https://example.com/badge.png",
+      criteria: JSON.stringify({ narrative: "Test criteria" }),
+      issuerId: "test-issuer-id",
+      created_at: new Date().toISOString(),
+    },
+  ],
+  badge_assertions: [
+    {
+      assertionId: "test-assertion-id",
+      badgeId: "test-badge-id",
+      issuerId: "test-issuer-id",
+      recipientIdentifier: "test-recipient@example.com",
+      recipientType: "email",
+      recipientHashed: false,
+      revoked: false,
+      revocationReason: null,
+      created_at: new Date().toISOString(),
+    },
+  ],
+  signing_keys: [
+    {
+      keyId: "test-key-id",
+      issuerId: "test-issuer-id",
+      publicKeyMultibase: "z6MkrJ6q4Mu4KQkWLvqkYJPPJxhqhcQ84ZpeCEcP4SCj5g7c",
+      privateKeyMultibase:
+        "z3u2enxX9jgidTMPzVLcgJRabHUJ9aF5DgSb1qcRyEMyN9wRW8G",
+      type: "Ed25519VerificationKey2020",
+      created_at: new Date().toISOString(),
+    },
+  ],
+  oauth_clients: [
+    {
+      clientId: "test-client-id",
+      clientSecret: "test-client-secret",
+      redirectUri: "https://example.com/callback",
+      userId: "test-user-id",
+      created_at: new Date().toISOString(),
+    },
+  ],
+  oauth_access_tokens: [
+    {
+      tokenId: "test-token-id",
+      clientId: "test-client-id",
+      userId: "test-user-id",
+      token: "test-access-token",
+      expiresAt: new Date(Date.now() + 3600000).toISOString(),
+      revoked: false,
+      created_at: new Date().toISOString(),
+    },
+  ],
+};
