@@ -52,7 +52,6 @@ export async function seedTestData() {
         email: `test-${nanoid(6)}@example.com`,
         name: `Test User ${nanoid(6)}`,
         passwordHash: "not-a-real-hash",
-        role: "admin",
       })
       .returning();
 
@@ -343,12 +342,18 @@ export async function updateAssertionJson(
   // First check if this is a mocked environment
   if (IS_TEST_ENV) {
     try {
-      // Try the OB2 update helper
-      const result = await updateOB2AssertionJson(assertionId, updates);
+      // Try the OB2 update helper - use type assertion for TypeScript
+      const result = await updateOB2AssertionJson(
+        assertionId,
+        updates as Partial<OB2BadgeAssertion>,
+      );
       if (result) return;
 
-      // Try the OB3 update helper
-      const result2 = await updateOB3CredentialJson(assertionId, updates);
+      // Try the OB3 update helper - use type assertion for TypeScript
+      const result2 = await updateOB3CredentialJson(
+        assertionId,
+        updates as Partial<OpenBadgeCredential>,
+      );
       if (result2) return;
     } catch (e) {
       // Silently continue to DB update method if helper fails

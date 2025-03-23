@@ -249,10 +249,7 @@ export interface MockTokenPayload {
  * Mock JWT verification for testing
  * Returns predefined results for test tokens
  */
-export function mockVerifyToken(
-  token: string,
-  type: "access" | "refresh" = "access",
-): MockTokenPayload {
+export function mockVerifyToken(token: string): MockTokenPayload {
   // Test cases for different tokens
   switch (token) {
     case "test-valid-token":

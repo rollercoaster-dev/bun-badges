@@ -27,7 +27,6 @@ export async function createTestAssertionData() {
     email: `test-${nanoid(6)}@example.com`,
     name: `Test User ${nanoid(6)}`,
     passwordHash: "not-a-real-hash",
-    role: "admin",
   });
 
   // Then create a test issuer
@@ -187,9 +186,8 @@ export function mockCryptoForTests() {
             .map((b) => b.toString(16).padStart(2, "0"))
             .join(""),
         hexToBytes: (hex: string) => new Uint8Array(hex.length / 2),
-        sha512Sync: (...messages: Uint8Array[]) => new Uint8Array(64).fill(9),
-        sha512Async: async (...messages: Uint8Array[]) =>
-          new Uint8Array(64).fill(9),
+        sha512Sync: (..._: Uint8Array[]) => new Uint8Array(64).fill(9),
+        sha512Async: async (..._: Uint8Array[]) => new Uint8Array(64).fill(9),
         randomBytes: (len = 32) => new Uint8Array(len).fill(10),
       },
     };

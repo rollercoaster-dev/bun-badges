@@ -52,7 +52,7 @@ function mockJwtModule() {
   const users = createTestUsers();
 
   return {
-    verify: mock((token: string, secret: string) => {
+    verify: mock((token: string, _: string) => {
       if (token === "invalid-token") {
         throw new Error("Invalid token");
       }
@@ -112,7 +112,7 @@ function mockJwtModule() {
       }
       throw new Error("Invalid token");
     }),
-    sign: mock((payload: any, secret: string) => {
+    sign: mock((_: any, __: string) => {
       return "test-token";
     }),
   };
