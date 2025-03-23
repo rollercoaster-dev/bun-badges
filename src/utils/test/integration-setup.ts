@@ -36,6 +36,8 @@ function createDatabaseConnection() {
             connectionString: process.env.DATABASE_URL,
             max: 25,
             idleTimeoutMillis: 30000,
+            query_timeout: 10000, // Add timeout for queries
+            statement_timeout: 10000, // Add timeout for statements
           });
 
           // Test the connection
@@ -72,6 +74,8 @@ try {
     connectionString: process.env.DATABASE_URL,
     max: 25,
     idleTimeoutMillis: 30000,
+    query_timeout: 10000, // Add timeout for queries
+    statement_timeout: 10000, // Add timeout for statements
   });
 
   // Create the DB instance immediately
