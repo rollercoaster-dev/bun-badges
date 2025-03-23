@@ -253,7 +253,7 @@ if (!useRealDatabase) {
     };
 
     const mockPool = {
-      query: ((text: string, params?: any[]) => {
+      query: ((text: string, _params?: any[]) => {
         console.log(
           `Mock DB Query: ${text.substring(0, 50)}${text.length > 50 ? "..." : ""}`,
         );
@@ -356,7 +356,7 @@ if (!useRealDatabase) {
         };
       }) as Mock<any>,
 
-      select: ((fields: any) => {
+      select: ((_fields: any) => {
         return {
           from: ((table: any) => {
             const tableName = typeof table === "string" ? table : table.name;
@@ -365,7 +365,7 @@ if (!useRealDatabase) {
             return {
               where: (() => {
                 return {
-                  limit: ((limit: number) => {
+                  limit: ((_limit: number) => {
                     return Promise.resolve(
                       mockRows[tableName] || [{ id: "mock-id" }],
                     );
@@ -377,7 +377,7 @@ if (!useRealDatabase) {
                   }) as Mock<any>,
                 };
               }) as Mock<any>,
-              limit: ((limit: number) => {
+              limit: ((_limit: number) => {
                 return Promise.resolve(
                   mockRows[tableName] || [{ id: "mock-id" }],
                 );
