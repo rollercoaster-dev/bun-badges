@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { logger } from "hono/logger";
+import { logger as honoLogger } from "hono/logger";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import auth from "@routes/auth.routes";
@@ -14,6 +14,7 @@ import { errorHandler } from "@middleware/error-handler";
 import { createAuthMiddleware } from "@middleware/auth.middleware";
 import { DatabaseService } from "@services/db.service";
 import { createSwaggerUI } from "./swagger";
+import { logger } from "@utils/logger";
 
 // Create the Hono app instance
 const app = new Hono();
@@ -26,7 +27,7 @@ const oauthController = new OAuthController(db);
 const authMiddleware = createAuthMiddleware(db);
 
 // Middleware
-app.use("*", logger());
+app.use("*", honoLogger());
 app.use("*", cors());
 app.use("*", secureHeaders());
 app.use("*", errorHandler);
@@ -80,23 +81,24 @@ app.get("/", (c) => c.json({ message: "Bun Badges API" }));
 // Super simple health check endpoint with JSON
 app.get("/health", (c) => c.json({ status: "healthy" }));
 
-// Log server startup
+// Server startup configuration
 const port = parseInt(process.env.PORT || "7777", 10);
 const isDevEnv = process.env.NODE_ENV === "development";
-console.log(
+
+// Log server startup information
+logger.info(
   `Server starting on port ${port} in ${process.env.NODE_ENV || "development"} mode...`,
 );
 
+// Display development tips
 if (isDevEnv && !process.env.DOCKER_CONTAINER) {
-  console.log("\nDevelopment Tips:");
-  console.log(
+  logger.info("Development Tips:");
+  logger.info(
     '• For local database development, run: "bun run dev:docker" to use Docker Compose',
   );
-  console.log(
-    "• Access API documentation at: http://localhost:" + port + "/docs",
-  );
-  console.log(
-    '• Try the Open Badges 3.0 example: "bun run examples/ob3-workflow.ts"\n',
+  logger.info(`• Access API documentation at: http://localhost:${port}/docs`);
+  logger.info(
+    '• Try the Open Badges 3.0 example: "bun run examples/ob3-workflow.ts"',
   );
 }
 
@@ -116,14 +118,14 @@ const tlsConfig = useHttps
     }
   : {};
 
-// Log HTTPS status
+// Log HTTPS status information
 if (useHttps) {
-  console.log(`HTTPS enabled with certificate: ${process.env.TLS_CERT_FILE}`);
-  console.log(`Key file: ${process.env.TLS_KEY_FILE}`);
-  console.log(`Using port: ${port} for HTTPS server`);
+  logger.info(`HTTPS enabled with certificate: ${process.env.TLS_CERT_FILE}`);
+  logger.info(`Key file: ${process.env.TLS_KEY_FILE}`);
+  logger.info(`Using port: ${port} for HTTPS server`);
 } else {
-  console.log("HTTPS is disabled. Running in HTTP mode.");
-  console.log(`Using port: ${port} for HTTP server`);
+  logger.info("HTTPS is disabled. Running in HTTP mode.");
+  logger.info(`Using port: ${port} for HTTP server`);
 }
 
 // Export the app with optional TLS configuration

@@ -15,6 +15,10 @@ import {
   resetDatabase,
 } from "../../helpers/test-utils";
 import { dbPool } from "@/db/config";
+import { createTestLogger } from "../../helpers/test-logger";
+
+// Create a logger for this test file
+const logger = createTestLogger("database-e2e");
 
 /**
  * This test suite focuses on database interactions,
@@ -42,7 +46,7 @@ describe("Database Operations E2E Tests", () => {
       const userId = result.rows[0].id;
       return c.json({ id: userId, email: body.email }, 201);
     } catch (error) {
-      console.error("Error registering user:", error);
+      logger.error("Error registering user:", error);
       return c.json({ error: "Failed to register user" }, 500);
     }
   });
@@ -72,7 +76,7 @@ describe("Database Operations E2E Tests", () => {
         user: { id: userId, email: body.email },
       });
     } catch (error) {
-      console.error("Error logging in user:", error);
+      logger.error("Error logging in user:", error);
       return c.json({ error: "Failed to login" }, 500);
     }
   });
@@ -103,7 +107,7 @@ describe("Database Operations E2E Tests", () => {
 
       return c.json(result.rows[0], 201);
     } catch (error) {
-      console.error("Error creating badge:", error);
+      logger.error("Error creating badge:", error);
       return c.json({ error: "Failed to create badge" }, 500);
     }
   });
@@ -122,7 +126,7 @@ describe("Database Operations E2E Tests", () => {
 
       return c.json(result.rows[0]);
     } catch (error) {
-      console.error("Error fetching badge:", error);
+      logger.error("Error fetching badge:", error);
       return c.json({ error: "Failed to fetch badge" }, 500);
     }
   });
@@ -149,7 +153,7 @@ describe("Database Operations E2E Tests", () => {
 
       return c.json(result.rows[0]);
     } catch (error) {
-      console.error("Error updating badge:", error);
+      logger.error("Error updating badge:", error);
       return c.json({ error: "Failed to update badge" }, 500);
     }
   });
@@ -171,7 +175,7 @@ describe("Database Operations E2E Tests", () => {
 
       return c.json({ message: "Badge deleted successfully" });
     } catch (error) {
-      console.error("Error deleting badge:", error);
+      logger.error("Error deleting badge:", error);
       return c.json({ error: "Failed to delete badge" }, 500);
     }
   });
@@ -255,7 +259,7 @@ describe("Database Operations E2E Tests", () => {
         `);
       }
     } catch (error) {
-      console.error("Error ensuring test tables:", error);
+      logger.error("Error ensuring test tables:", error);
       throw error;
     }
   }
