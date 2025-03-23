@@ -89,6 +89,57 @@ const isE2ETest =
 // Track whether the pool has been closed
 let poolClosed = false;
 
+// Mock drizzle-orm/pg-core to fix jsonb export issue
+// This addresses the error: "Export named 'jsonb' not found in module 'drizzle-orm/pg-core'"
+// This is a known issue in drizzle-orm 0.41.0
+// See also: JSONB-NOTES.md for details on the jsonb handling approach
+mock.module("drizzle-orm/pg-core", () => {
+  // Define column types that have chainable methods
+  const createColumn = (type: string) => {
+    const column = (name: string, options?: any) => {
+      const columnObj = {
+        name,
+        dataType: type,
+        options,
+        primaryKey: () => columnObj,
+        notNull: () => columnObj,
+        defaultRandom: () => columnObj,
+        default: () => columnObj,
+        defaultNow: () => columnObj,
+        references: () => columnObj,
+        unique: () => columnObj,
+        array: () => columnObj,
+        // Add other methods as needed
+      };
+      return columnObj;
+    };
+    return column;
+  };
+
+  return {
+    pgTable: (name: string, columns: Record<string, unknown>) => ({
+      name,
+      columns,
+    }),
+    uuid: createColumn("uuid"),
+    varchar: createColumn("varchar"),
+    timestamp: createColumn("timestamp"),
+    jsonb: createColumn("jsonb"),
+    text: createColumn("text"),
+    boolean: createColumn("boolean"),
+    integer: createColumn("integer"),
+    serial: createColumn("serial"),
+    eq: (a: any, b: any) => ({ operator: "=", left: a, right: b }),
+    and: (...conditions: any[]) => ({ operator: "AND", conditions }),
+    or: (...conditions: any[]) => ({ operator: "OR", conditions }),
+    sql: (strings: TemplateStringsArray, ...values: any[]) => ({
+      type: "sql",
+      strings,
+      values,
+    }),
+  };
+});
+
 // Mock DB modules for unit tests
 if (!isIntegrationTest && !isE2ETest) {
   console.log("🔄 Running in unit test mode, mocking database dependencies");
@@ -377,38 +428,6 @@ if (needsDatabase) {
     process.exit(1);
   }
 }
-
-// Create a function that returns a chainable mock
-const createChainableMock = () => {
-  const handler = {
-    get: (_: object, prop: string | symbol) => {
-      if (prop === "array") {
-        return () => new Proxy({}, handler);
-      }
-      return () => new Proxy({}, handler);
-    },
-  };
-  return new Proxy({}, handler);
-};
-
-// Mock drizzle-orm/pg-core
-mock.module("drizzle-orm/pg-core", () => {
-  return {
-    pgTable: () => createChainableMock(),
-    serial: () => createChainableMock(),
-    text: () => createChainableMock(),
-    timestamp: () => createChainableMock(),
-    boolean: () => createChainableMock(),
-    json: () => createChainableMock(),
-    uuid: () => createChainableMock(),
-    integer: () => createChainableMock(),
-    varchar: () => createChainableMock(),
-    primaryKey: () => createChainableMock(),
-    foreignKey: () => createChainableMock(),
-    unique: () => createChainableMock(),
-    index: () => createChainableMock(),
-  };
-});
 
 // Mock the DatabaseService for tests that need database access
 mock.module("@/services/db.service", () => {
