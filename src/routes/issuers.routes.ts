@@ -53,7 +53,7 @@ async function getIssuerOwner(c: Context): Promise<string> {
 issuers.get("/", requireRole(Role.ISSUER_VIEWER), async (c) => {
   try {
     const response = await controller.listIssuers(c);
-    return response;
+    return c.json(response);
   } catch (error) {
     throw new Error(
       `Failed to list issuers: ${error instanceof Error ? error.message : String(error)}`,
@@ -65,7 +65,7 @@ issuers.get("/", requireRole(Role.ISSUER_VIEWER), async (c) => {
 issuers.get("/:id", requireRole(Role.ISSUER_VIEWER), async (c) => {
   try {
     const response = await controller.getIssuer(c);
-    return response;
+    return c.json(response);
   } catch (error) {
     throw new Error(
       `Failed to get issuer: ${error instanceof Error ? error.message : String(error)}`,
@@ -102,7 +102,7 @@ issuers.put(
       const data = await c.req.json<UpdateIssuerDto>();
       const hostUrl = new URL(c.req.url).origin;
       const response = await controller.updateIssuer(c, data, hostUrl);
-      return response;
+      return c.json(response);
     } catch (error) {
       throw new Error(
         `Failed to update issuer: ${error instanceof Error ? error.message : String(error)}`,

@@ -7,6 +7,7 @@
 
 import { db, dbPool } from "@/db/config";
 import { sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 /**
  * Execute a SQL query with proper type annotations
