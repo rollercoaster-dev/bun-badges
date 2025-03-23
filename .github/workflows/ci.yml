@@ -64,26 +64,22 @@ jobs:
         run: bun run test:unit
         
       - name: Run integration tests
+        env:
+          NODE_ENV: test
+          DATABASE_URL: "postgres://${{ vars.DB_USER || 'postgres' }}:${{ secrets.DB_PASSWORD || 'postgres' }}@localhost:5432/${{ vars.DB_NAME || 'bun_badges_test' }}"
+          FORCE_MOCK_DB: "false"
+          SKIP_DOCKER: "true"
+          INTEGRATION_TEST: "true"
         run: bun run test:integration
-        env:
-          CI: "true"
-          DB_USER: ${{ vars.DB_USER || 'postgres' }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD || 'postgres' }}
-          DB_HOST: "localhost"
-          DB_PORT: "5432"
-          DB_NAME: ${{ vars.DB_NAME || 'bun_badges_test' }}
-          DATABASE_URL: "postgres://${{ vars.DB_USER || 'postgres' }}:${{ secrets.DB_PASSWORD || 'postgres' }}@localhost:5432/${{ vars.DB_NAME || 'bun_badges_test' }}"
-          
+        
       - name: Run E2E tests
-        run: bun run test:e2e
         env:
-          CI: "true"
-          DB_USER: ${{ vars.DB_USER || 'postgres' }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD || 'postgres' }}
-          DB_HOST: "localhost"
-          DB_PORT: "5432"
-          DB_NAME: ${{ vars.DB_NAME || 'bun_badges_test' }}
+          NODE_ENV: test
           DATABASE_URL: "postgres://${{ vars.DB_USER || 'postgres' }}:${{ secrets.DB_PASSWORD || 'postgres' }}@localhost:5432/${{ vars.DB_NAME || 'bun_badges_test' }}"
+          FORCE_MOCK_DB: "false"
+          SKIP_DOCKER: "true"
+          E2E_TEST: "true"
+        run: bun run test:e2e
 
   build:
     needs: test
