@@ -90,10 +90,21 @@ const _createMockContext = (options: any = {}) => {
     url = "https://example.com/api/assertions",
   } = options;
 
+  // Create a function that also has properties for query
+  const queryFn = function (key?: string) {
+    if (key === undefined) {
+      return query;
+    }
+    return query[key];
+  };
+
+  // Add all properties from query to the function
+  Object.assign(queryFn, query);
+
   return {
     req: {
       param: (name: string) => params[name],
-      query: (name: string) => query[name],
+      query: queryFn,
       url: url,
       json: () => Promise.resolve(body),
     },

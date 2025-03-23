@@ -62,30 +62,22 @@ export function createMockContext({
   env?: Record<string, any>;
   user?: any;
 } = {}): HonoContext {
-  // Create a proxy for query that supports both function call and property access
-  const queryProxy = new Proxy(query, {
-    // Handle property access (e.g., query.page)
-    get: (target, prop) => {
-      if (typeof prop === "string") {
-        return target[prop];
-      }
-      return undefined;
-    },
-    // Handle function calls (e.g., query('page'))
-    apply: (target, _, args) => {
-      if (args.length === 0) {
-        return target; // Return the entire query object when called with no arguments
-      }
-      const key = args[0];
-      return target[key];
-    },
-  }) as QueryProxy;
+  // Create a function that also has properties
+  const queryFn = function (key?: string) {
+    if (key === undefined) {
+      return query;
+    }
+    return query[key];
+  };
+
+  // Add all properties from query to the function
+  Object.assign(queryFn, query);
 
   // Create mock context object
   const context = {
     req: {
       param: (name: string) => params[name],
-      query: queryProxy,
+      query: queryFn,
       body,
       headers,
       url,

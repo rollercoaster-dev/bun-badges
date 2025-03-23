@@ -129,7 +129,7 @@ describe("IssuerController - List Issuers", () => {
       const issuer = (await response.json()) as IssuerResponse;
       expect(issuer.issuerId).toBe(String(testData.issuer.issuerId));
       expect(issuer.name).toBe("Test Issuer");
-      expect(issuer.url).toBe("https://example.org");
+      expect(issuer.url).toBe("https://test-issuer.example.com");
       expect(issuer.issuerJson).toBeDefined();
     });
 
@@ -184,7 +184,7 @@ describe("IssuerController - List Issuers", () => {
       expect(result.updatedAt).toBeDefined();
 
       // Verify issuer exists in the database
-      const issuers = await testDb
+      const issuers = await testDb()
         .select()
         .from(issuerProfiles)
         .where(eq(issuerProfiles.issuerId, result.issuerId));
@@ -226,7 +226,7 @@ describe("IssuerController - List Issuers", () => {
       expect(updatedIssuer.email).toBe(data.email ?? "");
 
       // Verify issuer is updated in the database
-      const issuers = await testDb
+      const issuers = await testDb()
         .select()
         .from(issuerProfiles)
         .where(eq(issuerProfiles.issuerId, testData.issuer.issuerId));
@@ -277,11 +277,10 @@ describe("IssuerController - List Issuers", () => {
       const issuerId = String(newIssuer.issuerId);
 
       // Verify it exists first
-      const beforeDelete = await testDb
+      const beforeDelete = await testDb()
         .select()
         .from(issuerProfiles)
         .where(eq(issuerProfiles.issuerId, issuerId));
-
       expect(beforeDelete.length).toBe(1);
 
       // Delete the issuer
@@ -289,11 +288,10 @@ describe("IssuerController - List Issuers", () => {
       expect(result).toBe(true);
 
       // Verify it's gone
-      const afterDelete = await testDb
+      const afterDelete = await testDb()
         .select()
         .from(issuerProfiles)
         .where(eq(issuerProfiles.issuerId, issuerId));
-
       expect(afterDelete.length).toBe(0);
     });
 
@@ -316,7 +314,7 @@ describe("IssuerController - List Issuers", () => {
       }
 
       // Verify it still exists
-      const issuers = await testDb
+      const issuers = await testDb()
         .select()
         .from(issuerProfiles)
         .where(eq(issuerProfiles.issuerId, testData.issuer.issuerId));

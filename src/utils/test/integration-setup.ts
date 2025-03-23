@@ -1,6 +1,6 @@
 import { config } from "dotenv";
 import * as path from "path";
-import { beforeAll, afterAll, afterEach, mock, beforeEach } from "bun:test";
+import { beforeAll, afterAll, afterEach, mock } from "bun:test";
 import { runMigrations } from "@/db/migrate";
 import { clearTestData } from "./db-helpers";
 import { sql } from "drizzle-orm";
@@ -14,6 +14,10 @@ console.log("🔧 Integration test setup loading...");
 
 // Log database connection info
 console.log(`Database URL: ${process.env.DATABASE_URL || "Not set"}`);
+
+// Database connection and instances
+let globalPool: Pool;
+let _testDb: ReturnType<typeof drizzle>;
 
 // Handle database connection with retries
 function createDatabaseConnection() {
@@ -61,9 +65,27 @@ function createDatabaseConnection() {
   };
 }
 
-// Create database connection
-let globalPool: Pool;
-let testDb: ReturnType<typeof drizzle>;
+// Synchronously set up a pool when the module loads
+// This is a workaround for the async nature of DB connections in a module context
+try {
+  globalPool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    max: 25,
+    idleTimeoutMillis: 30000,
+  });
+
+  // Create the DB instance immediately
+  _testDb = drizzle(globalPool);
+  console.log("✅ Initial database connection established");
+} catch (error) {
+  console.error("❌ Failed to create initial database connection:", error);
+  throw error;
+}
+
+// Export the testDb function
+function testDb(): ReturnType<typeof drizzle> {
+  return _testDb;
+}
 
 // Create test keys for deterministic cryptography
 const TEST_KEYS = {
@@ -162,18 +184,13 @@ mock.module("@scure/base", () => {
 // Run migrations before all tests
 beforeAll(async () => {
   try {
-    // Establish database connection with retries
-    const dbConnection = createDatabaseConnection();
-    globalPool = await dbConnection.connect();
-    testDb = drizzle(globalPool);
-
-    console.log("✅ Database connection established");
+    console.log("✅ Database connection confirmed in beforeAll");
 
     // Run migrations (if not already run by the script)
     try {
       console.log("Checking if migrations are needed...");
       // Simple check to see if tables exist
-      const result = await testDb.execute(sql`
+      const result = await testDb().execute(sql`
         SELECT EXISTS (
           SELECT FROM pg_tables 
           WHERE schemaname = 'public' 
@@ -191,7 +208,7 @@ beforeAll(async () => {
       }
 
       // Check if signing_keys table exists, if not create it
-      const signingKeysResult = await testDb.execute(sql`
+      const signingKeysResult = await testDb().execute(sql`
         SELECT EXISTS (
           SELECT FROM pg_tables 
           WHERE schemaname = 'public' 
@@ -202,7 +219,7 @@ beforeAll(async () => {
       const signingKeysExist = signingKeysResult.rows[0]?.exists;
       if (!signingKeysExist) {
         console.log("Creating signing_keys table...");
-        await testDb.execute(sql`
+        await testDb().execute(sql`
           CREATE TABLE "signing_keys" (
             "key_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
             "issuer_id" uuid NOT NULL,
@@ -219,7 +236,7 @@ beforeAll(async () => {
         `);
 
         // Add foreign key constraint
-        await testDb.execute(sql`
+        await testDb().execute(sql`
           ALTER TABLE "signing_keys" 
           ADD CONSTRAINT "signing_keys_issuer_id_issuer_profiles_issuer_id_fk" 
           FOREIGN KEY ("issuer_id") 
@@ -227,78 +244,51 @@ beforeAll(async () => {
           ON DELETE NO ACTION 
           ON UPDATE NO ACTION;
         `);
-
-        console.log("✅ signing_keys table created");
       }
 
-      // Ensure schema matches our model definitions
+      // Ensure public_key column exists in issuer_profiles
       await ensureSchemaMatch();
-      console.log("✅ Schema checked and updated if needed");
 
-      console.log("✅ Setup complete, tests are ready to run");
+      console.log("✅ Schema checked and updated if needed");
     } catch (error) {
-      console.error("❌ Error in migrations:", error);
+      console.error("❌ Error during migrations:", error);
       throw error;
     }
+
+    console.log("✅ Setup complete, tests are ready to run");
   } catch (error) {
-    console.error("❌ Fatal error in test setup:", error);
-    throw error; // Re-throw to fail tests if setup fails
+    console.error("❌ Error in beforeAll setup:", error);
+    throw error;
   }
 });
 
-// Global teardown - runs once after all tests that import this file
+// Clean up after all tests
 afterAll(async () => {
   console.log("🧹 Cleaning up integration test environment");
-  try {
-    if (testDb) {
-      // Clear all test data at the end
+
+  // Only attempt to clear data if tables exist
+  const tablesExist = await tableExists(testDb(), "users");
+
+  if (tablesExist) {
+    try {
+      // Use the clearTestData function directly
       await clearTestData();
+      console.log("✅ Test data cleared successfully");
+    } catch (cleanError) {
+      console.error("❌ Error clearing test data:", cleanError);
     }
-
-    // Don't close the pool here - it will be handled by the process.exit handler
-    // This prevents "Cannot use a pool after calling end" errors
-    console.log("✅ Test environment cleanup complete");
-  } catch (error) {
-    console.error("❌ Error cleaning up test environment:", error);
+  } else {
+    console.log("⚠️ Tables don't exist, skipping data clearing");
   }
+
+  console.log("✅ Test environment cleanup complete");
 });
 
-// Reset database state before each test
-beforeEach(async () => {
-  console.log("🔄 Setting up fresh test state...");
-  try {
-    // We only want to clear data if tables exist
-    // But we don't need to seed data before each test - tests should seed their own specific data if needed
-    const tablesExist = await tableExists(testDb, "users");
-
-    if (tablesExist) {
-      // Clear existing data using the standard clearTestData function
-      try {
-        console.log("Clearing test data...");
-        // Use our own clearTestData function directly, no external imports
-        await clearTestData();
-        console.log("✅ Test data cleared");
-      } catch (error) {
-        console.error("❌ Error clearing test data:", error);
-        // Don't throw here - let the test continue even if clearing fails
-        // Tests will fail naturally if they need a clean state and can't get it
-      }
-    } else {
-      console.log("⚠️ Tables don't exist yet, skipping data clearing");
-    }
-  } catch (error) {
-    console.error("❌ Error setting up test state:", error);
-    // Don't throw here - let the test continue even if clearing fails
-    // Tests will fail naturally if they need a clean state and can't get it
-  }
-});
-
-// Clear test data after each test
+// Clean up after each test
 afterEach(async () => {
-  console.log("🧹 Cleaning up after test...");
   try {
     // Only attempt to clear data if tables exist
-    const tablesExist = await tableExists(testDb, "users");
+    const tablesExist = await tableExists(testDb(), "users");
 
     if (tablesExist) {
       try {
@@ -358,7 +348,7 @@ export async function executeSql<T = any>(query: string): Promise<T[]> {
   try {
     // Fixed to use SQL tagged template approach instead of separate params argument
     // This ensures proper parameter binding without TypeScript errors
-    const result = await testDb.execute(sql.raw(query));
+    const result = await testDb().execute(sql.raw(query));
     return result.rows as T[];
   } catch (error) {
     console.error(`Error executing SQL query: ${query}`, error);
@@ -366,24 +356,13 @@ export async function executeSql<T = any>(query: string): Promise<T[]> {
   }
 }
 
-// Export singleton instance, functions and constants
-export {
-  testDb, // Export the global DB instance for most tests
-  globalPool, // Export the global pool for direct access
-  globalPool as pool, // Add alias for backward compatibility
-  createTestPool, // For tests that need isolation
-  createTestDb,
-  tableExists,
-  TEST_KEYS,
-};
-
 // Ensure the database schema includes all columns in our models
 async function ensureSchemaMatch() {
   try {
     console.log("Checking database schema...");
 
     // Check if issuer_profiles has public_key column
-    const publicKeyExists = await testDb.execute(sql`
+    const publicKeyExists = await testDb().execute(sql`
       SELECT column_name
       FROM information_schema.columns
       WHERE table_name = 'issuer_profiles'
@@ -393,7 +372,7 @@ async function ensureSchemaMatch() {
     // Add the column if it doesn't exist
     if (publicKeyExists.rows.length === 0) {
       console.log("Adding missing public_key column to issuer_profiles...");
-      await testDb.execute(sql`
+      await testDb().execute(sql`
         ALTER TABLE issuer_profiles
         ADD COLUMN IF NOT EXISTS public_key jsonb
       `);
@@ -420,3 +399,14 @@ process.on("exit", () => {
     }
   }
 });
+
+// Export the getter function for testDb, along with other test utilities
+export {
+  testDb, // Export the function to get the DB instance
+  globalPool, // Export the global pool for direct access
+  globalPool as pool, // Add alias for backward compatibility
+  createTestPool, // For tests that need isolation
+  createTestDb,
+  tableExists,
+  TEST_KEYS,
+};
