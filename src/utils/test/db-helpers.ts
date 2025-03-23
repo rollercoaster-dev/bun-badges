@@ -383,3 +383,7 @@ export async function updateAssertionJson(
     .set({ assertionJson: updatedJson })
     .where(eq(badgeAssertions.assertionId, assertionId));
 }
+
+// Re-export createMockContext for backwards compatibility
+import { createMockContext } from "./mock-context";
+export { createMockContext };
