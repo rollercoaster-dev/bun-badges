@@ -3,7 +3,78 @@ description: Testing Guidelines
 globs: 
 alwaysApply: false
 ---
- # Testing Guidelines
+# Testing Guidelines
+
+## Core Principles
+- Use Bun's built-in test runner
+- Maintain test isolation
+- Follow consistent naming patterns
+- Clean up after tests
+- Document test setup and data
+
+## Directory Structure
+```
+tests/
+├── unit/          # Unit tests
+├── integration/   # Integration tests
+└── e2e/          # End-to-end tests
+    ├── flows/     # Feature-specific flows
+    ├── helpers/   # Test utilities
+    ├── setup/     # Environment setup
+    └── fixtures/  # Test data
+```
+
+## Test Commands
+```bash
+# Basic commands
+bun test              # Run all tests
+bun test:watch        # Watch mode
+bun test:file <path>  # Single file
+
+# Test types
+bun test:unit         # Unit tests
+bun test:integration  # Integration tests
+bun test:e2e         # E2E tests
+```
+
+## File Naming
+- Use `.test.ts` extension
+- Include test type in name
+- Examples:
+  - `auth.test.ts`
+  - `badge.integration.test.ts`
+  - `issuer-flow.test.ts`
+
+## Environment Setup
+- `NODE_ENV=test` for integration/E2E
+- `E2E_TEST=true` for E2E only
+- Docker for test database
+- Automatic migrations
+- Data cleanup between runs
+
+## Common Patterns
+```typescript
+// Server setup
+const { server, request } = createTestServer(app);
+
+// Authentication
+const user = await registerAndLoginUser(request);
+await authenticatedRequest(request, 'get', '/path', token);
+
+// Database
+await resetDatabase();
+await seedTestData();
+```
+
+## Best Practices
+1. One assertion per test when possible
+2. Use descriptive test names
+3. Follow AAA pattern (Arrange, Act, Assert)
+4. Mock external dependencies
+5. Clean up resources
+6. Document complex setups
+7. Use shared utilities
+8. Keep tests focused
 
 ## Test Structure
 - `tests/unit/`: Unit tests for individual components
@@ -13,64 +84,6 @@ alwaysApply: false
   - `helpers/`: Test utilities and setup
   - `fixtures/`: Test data
   - `setup/`: Test environment configuration
-
-## E2E tests
-
-E2E tests should varify that the actuall app follows and iplements Open Badges 3.0 protocols
-
-## Test Commands
-
-### Basic Commands
-```bash
-# Run all tests
-bun test
-
-# Run tests in watch mode
-bun test:watch
-
-# Run specific test file
-bun test path/to/file.test.ts
-```
-
-### Test Types
-```bash
-# Unit tests
-bun test:unit
-
-# Integration tests
-bun test:integration
-
-# E2E tests
-bun test:e2e
-```
-
-## Test File Naming
-- Files must end in `.test.ts`
-- Names should be descriptive and indicate type
-- Examples:
-  - `user.service.test.ts`
-  - `auth.integration.test.ts`
-  - `badge-flow.test.ts`
-
-## Test Setup
-- Tests use Bun's built-in test runner
-- `tests/setup.ts` is preloaded for all tests
-- Environment variables:
-  - `NODE_ENV=test`: For integration/E2E tests
-  - `E2E_TEST=true`: For E2E tests only
-
-## Database Testing
-- Test database runs in Docker
-- Separate test database for isolation
-- Migrations run automatically
-- Data cleaned up between test runs
-
-## Best Practices
-1. **Isolation**: Each test should be independent
-2. **Cleanup**: Clean up resources after tests
-3. **Mocking**: Use mocks for external services
-4. **Coverage**: Aim for comprehensive coverage
-5. **Documentation**: Document test setup and data
 
 ## Helper Functions
 ```typescript
@@ -105,7 +118,4 @@ describe('Badge API', () => {
     expect(response.status).toBe(201);
   });
 });
-```
-```
-
-You can copy this content directly into `.cursor/rules/008_testing.mdc`. Would you like me to proceed with checking the status and creating a commit message for all our changes?
+``` 
