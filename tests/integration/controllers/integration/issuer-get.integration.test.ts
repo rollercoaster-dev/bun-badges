@@ -2,22 +2,35 @@ import { expect, test, describe, beforeEach, afterEach, mock } from "bun:test";
 import { IssuerController } from "@/controllers/issuer.controller";
 import { seedTestData, clearTestData } from "@/utils/test/db-helpers";
 import { createMockContext } from "@/utils/test/mock-context";
+import { Context } from "hono";
+
+interface SeedDataType {
+  issuer?: {
+    issuerId: string;
+    [key: string]: any;
+  };
+  [key: string]: any;
+}
 
 // Override the IssuerController for tests
 mock.module("@/controllers/issuer.controller", () => {
   return {
     IssuerController: class MockIssuerController {
-      async getIssuer(ctx) {
+      async getIssuer(ctx: Context) {
         const issuerId = ctx.req.param("id");
 
         // Test seed data should match this ID
-        if (issuerId === seedData?.issuer?.issuerId) {
+        if (
+          seedData &&
+          seedData.issuer &&
+          issuerId === seedData.issuer.issuerId
+        ) {
           return {
             status: 200,
             json: () =>
               Promise.resolve({
                 status: "success",
-                data: seedData.issuer,
+                data: seedData?.issuer,
               }),
           };
         } else {
@@ -28,7 +41,7 @@ mock.module("@/controllers/issuer.controller", () => {
   };
 });
 
-let seedData = null;
+let seedData: SeedDataType | null = null;
 
 describe("IssuerController - Get Issuer", () => {
   beforeEach(async () => {
@@ -51,7 +64,7 @@ describe("IssuerController - Get Issuer", () => {
       // Valid issuer ID from the seed data
       const mockContext = createMockContext({
         params: {
-          id: seedData.issuer.issuerId,
+          id: seedData?.issuer?.issuerId || "",
         },
       });
 
@@ -60,7 +73,7 @@ describe("IssuerController - Get Issuer", () => {
 
       const issuerData = (await response.json()) as any;
       expect(issuerData.status).toBe("success");
-      expect(issuerData.data.issuerId).toBe(seedData.issuer.issuerId);
+      expect(issuerData.data.issuerId).toBe(seedData?.issuer?.issuerId);
     });
 
     test("should throw error for non-existent issuer", async () => {

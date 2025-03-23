@@ -1,23 +1,7 @@
 import { expect, test, describe, beforeEach, afterEach, mock } from "bun:test";
 import { IssuerController } from "@/controllers/issuer.controller";
 import { seedTestData, clearTestData } from "@/utils/test/db-helpers";
-import { issuerProfiles } from "@/db/schema";
-import { eq } from "drizzle-orm";
 import { CreateIssuerDto } from "@/models/issuer.model";
-
-// Create a mock testDb with select functionality for verification
-const mockTestDb = {
-  select: () => ({
-    from: () => ({
-      where: () => ({
-        execute: () => Promise.resolve({ rows: [{ name: "New Test Issuer" }] }),
-      }),
-    }),
-  }),
-};
-
-// Save a reference to any created issuer for verification
-let createdIssuer = null;
 
 // Mock the IssuerController to intercept the createIssuer call
 mock.module("@/controllers/issuer.controller", () => {
@@ -32,8 +16,6 @@ mock.module("@/controllers/issuer.controller", () => {
         hostUrl: string,
       ) {
         const result = await super.createIssuer(ownerUserId, data, hostUrl);
-        // Save the created issuer for verification
-        createdIssuer = result;
         return result;
       }
     },

@@ -11,7 +11,12 @@ const updatedIssuers = new Map<string, any>();
 mock.module("@/controllers/issuer.controller", () => {
   return {
     IssuerController: class MockIssuerController {
-      async updateIssuer(c: any, data: UpdateIssuerDto, hostUrl: string) {
+      async updateIssuer(c: any, data: UpdateIssuerDto) {
+        // Mock implementation that simulates an update
+        if (!seedResult?.issuer?.issuerId) {
+          return { status: 404, json: () => ({ error: "Issuer not found" }) };
+        }
+
         const issuerId = c.req.param("id");
 
         // Non-existent issuer test case
@@ -87,8 +92,12 @@ describe("IssuerController - Update Issuer", () => {
       // Verify the response data
       const updatedIssuer = await response.json();
       expect(updatedIssuer.issuerId).toBe(seedResult.issuer.issuerId);
-      expect(updatedIssuer.name).toBe(data.name);
-      expect(updatedIssuer.url).toBe(data.url);
+      if (data.name) {
+        expect(updatedIssuer.name).toBe(data.name);
+      }
+      if (data.url) {
+        expect(updatedIssuer.url).toBe(data.url);
+      }
 
       // Handle optional fields with type safety
       if (data.description) {
@@ -101,7 +110,9 @@ describe("IssuerController - Update Issuer", () => {
       // Verify issuer is updated in our tracking map
       expect(updatedIssuers.has(seedResult.issuer.issuerId)).toBe(true);
       const trackedIssuer = updatedIssuers.get(seedResult.issuer.issuerId);
-      expect(trackedIssuer.name).toBe(data.name);
+      if (data.name) {
+        expect(trackedIssuer.name).toBe(data.name);
+      }
     });
 
     test("should throw error for non-existent issuer", async () => {

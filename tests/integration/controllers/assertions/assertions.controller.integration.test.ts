@@ -1,11 +1,8 @@
-import { expect, test, describe, beforeEach, afterEach } from "bun:test";
+import { expect, test, describe, beforeEach } from "bun:test";
 import { AssertionController } from "@/controllers/assertions.controller";
 import { VerificationController } from "@/controllers/verification.controller";
 import { createMockContext } from "@/utils/test/mock-context";
-import {
-  mockAssertionController,
-  createMockAssertionData,
-} from "@/utils/test/assertion-test-utils";
+import { mockAssertionController } from "@/utils/test/assertion-test-utils";
 
 describe("AssertionController - API Integration", () => {
   let assertionId: string;

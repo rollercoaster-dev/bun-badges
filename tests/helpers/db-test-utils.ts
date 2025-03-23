@@ -42,7 +42,7 @@ export async function testSelect(
       const result = await dbPool.query(query, params);
       return result?.rows || [];
     } else if (db && typeof db.execute === "function") {
-      const result = await db.execute(query, params);
+      const result = await db.execute(query);
       return result?.rows || [];
     } else {
       throw new Error("No database access method available");
@@ -93,7 +93,7 @@ export async function testInsert(
     }
     // Then try db.execute
     else if (db && typeof db.execute === "function") {
-      const result = await db.execute(typedQuery, values);
+      const result = await db.execute(typedQuery);
       return returning ? result.rows[0] : undefined;
     }
     // Fall back to db.insert if available
@@ -104,8 +104,8 @@ export async function testInsert(
         const schema = (db as any)?._schema;
         if (schema && schema[tableName]) {
           const result = await db.insert(schema[tableName]).values(data);
-          return returning && typeof result.returning === "function"
-            ? (await result.returning())[0]
+          return returning && typeof (result as any).returning === "function"
+            ? (await (result as any).returning())[0]
             : undefined;
         }
       } catch (e) {
@@ -177,7 +177,7 @@ export async function testUpdate(
     }
     // Then try db.execute
     else if (db && typeof db.execute === "function") {
-      const result = await db.execute(typedQuery, allValues);
+      const result = await db.execute(typedQuery);
       return returning ? result.rows[0] : undefined;
     }
     // Fall back to db.update if available
@@ -187,7 +187,11 @@ export async function testUpdate(
         const schema = (db as any)?._schema;
         if (schema && schema[tableName]) {
           // Create the condition
-          const eq = (col, val) => ({ operator: "=", left: col, right: val });
+          const eq = (col: any, val: any) => ({
+            operator: "=",
+            left: col,
+            right: val,
+          });
           const condition = eq(
             schema[tableName][conditionColumn],
             conditionValue,
@@ -197,9 +201,9 @@ export async function testUpdate(
           const result = await db
             .update(schema[tableName])
             .set(data)
-            .where(condition);
-          return returning && typeof result.returning === "function"
-            ? (await result.returning())[0]
+            .where(condition as any);
+          return returning && typeof (result as any).returning === "function"
+            ? (await (result as any).returning())[0]
             : undefined;
         }
       } catch (e) {
@@ -249,7 +253,7 @@ export async function testDelete(
     }
     // Then try db.execute
     else if (db && typeof db.execute === "function") {
-      await db.execute(query, params);
+      await db.execute(query);
       return;
     }
     // Fall back to db.delete if available
@@ -260,14 +264,18 @@ export async function testDelete(
         if (schema && schema[tableName]) {
           if (conditionColumn && conditionValue !== undefined) {
             // Create the condition
-            const eq = (col, val) => ({ operator: "=", left: col, right: val });
+            const eq = (col: any, val: any) => ({
+              operator: "=",
+              left: col,
+              right: val,
+            });
             const condition = eq(
               schema[tableName][conditionColumn],
               conditionValue,
             );
 
-            // Delete with condition
-            await db.delete(schema[tableName]).where(condition);
+            // Delete using ORM
+            await db.delete(schema[tableName]).where(condition as any);
           } else {
             // Delete all
             await db.delete(schema[tableName]);

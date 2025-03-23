@@ -1,10 +1,8 @@
-import { expect, test, describe, beforeEach, afterEach, mock } from "bun:test";
+import { expect, test, describe, beforeEach, afterEach } from "bun:test";
 import { IssuerController } from "@/controllers/issuer.controller";
 import { seedTestData, clearTestData } from "@/utils/test/db-helpers";
 import { IssuerJsonLdV2 } from "@/models/issuer.model";
 
-// Mock the controller to ensure verifyIssuer is available
-const originalVerifyIssuer = IssuerController.prototype.verifyIssuer;
 // Add explicit mock for tests
 if (!IssuerController.prototype.verifyIssuer) {
   IssuerController.prototype.verifyIssuer = function (

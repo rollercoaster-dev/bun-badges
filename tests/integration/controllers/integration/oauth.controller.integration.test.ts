@@ -2,11 +2,7 @@ import { describe, expect, it, beforeEach, afterEach, mock } from "bun:test";
 import { OAuthController } from "@controllers/oauth.controller";
 import { seedTestData, clearTestData } from "@/utils/test/db-helpers";
 import { createMockContext } from "@/utils/test/mock-context";
-import {
-  mockJwt,
-  mockOAuthDbService,
-  mockClientAuthentication,
-} from "@/utils/test/jwt-test-utils";
+import { mockOAuthDbService, mockJwt } from "@/utils/test/jwt-test-utils";
 
 // Define response types for better type checking
 interface MockResponse {
@@ -22,7 +18,6 @@ describe("OAuthController Integration Tests", () => {
   let controller: OAuthController;
   let testData: any;
   let mockDb: any;
-  let mockAuth: any;
   let mockJwtUtils: any;
 
   beforeEach(async () => {
@@ -34,9 +29,6 @@ describe("OAuthController Integration Tests", () => {
 
     // Setup mock JWT utilities
     mockJwtUtils = mockJwt();
-
-    // Setup mock client auth
-    mockAuth = mockClientAuthentication();
 
     // Create a new controller with our mock DB
     controller = new OAuthController(mockDb);
