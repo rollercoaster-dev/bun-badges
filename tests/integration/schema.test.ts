@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeAll, afterAll } from "bun:test";
-import { db, dbPool } from "../../src/db/config";
+import { dbPool } from "../../src/db/config";
 
 describe("Database Schema Integration", () => {
   beforeAll(async () => {

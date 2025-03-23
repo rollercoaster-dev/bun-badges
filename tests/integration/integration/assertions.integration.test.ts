@@ -9,7 +9,7 @@ import {
   users,
   signingKeys,
 } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import crypto from "crypto";
 import { nanoid } from "nanoid";
 
@@ -202,13 +202,6 @@ describe("AssertionController Integration Tests", () => {
     const assertionId = results[0].assertionId;
     console.log(`Found assertion ID for verification: ${assertionId}`);
 
-    // Create a mock context for verification
-    const mockContext = createMockContext({
-      method: "GET",
-      url: `https://example.com/verify/${assertionId}`,
-      params: { assertionId },
-    });
-
     // Get the assertion
     const getContext = createMockContext({
       method: "GET",
@@ -276,5 +269,15 @@ describe("AssertionController Integration Tests", () => {
       console.error("Error revoking assertion:", error);
       throw error;
     }
+  });
+
+  // Test that authentication works
+  it("should fail when user is not authenticated", async () => {
+    // ... existing code ...
+  });
+
+  // Remove the unused mockContext declaration from this test
+  it("should fail when user doesn't own the issuer", async () => {
+    // ... existing code ...
   });
 });

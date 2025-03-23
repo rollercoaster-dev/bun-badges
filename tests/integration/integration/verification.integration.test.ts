@@ -24,8 +24,6 @@ import {
   updateOB2AssertionJson,
   updateOB3CredentialJson,
 } from "../../helpers/test-utils";
-import { OB2BadgeAssertion } from "@/services/verification.service";
-import { OpenBadgeCredential } from "@/models/credential.model";
 import { eq, ilike } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 

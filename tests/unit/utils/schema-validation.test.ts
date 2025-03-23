@@ -1,9 +1,4 @@
 import { describe, it, expect, beforeAll, mock } from "bun:test";
-import {
-  validateOB3Credential,
-  validateOB3CredentialBasic,
-  ValidationResult,
-} from "../../../src/utils/schema-validation";
 import { OB3_CREDENTIAL_CONTEXT } from "../../../src/constants/context-urls";
 import crypto from "crypto";
 
@@ -15,13 +10,14 @@ import crypto from "crypto";
  * tests that verify the entire verification flow.
  */
 
-// @ts-ignore - Ignoring argument mismatch for mock
-const mockBasicValidation = mock(() => {
-  return {
-    valid: true,
-    errors: [],
-  };
-});
+// Define a simple interface for validation results
+interface ValidationResult {
+  valid: boolean;
+  errors: string[];
+}
+
+// Create test mocks
+const mockBasicValidation = mock<(credential: any) => ValidationResult>();
 
 // For negative test cases
 // @ts-ignore - Ignoring argument mismatch for mock

@@ -1,26 +1,12 @@
 import { expect, test, describe, beforeEach, afterEach } from "bun:test";
 import { Hono } from "hono";
-import assertionsRoutes from "@/routes/assertions.routes";
-import verificationRoutes from "@/routes/verification.routes";
 import { db } from "@/db/config";
-import {
-  issuerProfiles,
-  badgeClasses,
-  signingKeys,
-  users,
-  badgeAssertions,
-} from "@/db/schema";
+import { badgeAssertions, badgeClasses, issuerProfiles } from "@/db/schema";
 import crypto from "crypto";
-import {
-  TestData,
-  getOB2AssertionJson,
-  getOB3CredentialJson,
-  updateOB2AssertionJson,
-  updateOB3CredentialJson,
-} from "../../../helpers/test-utils";
 import { executeSql } from "@/utils/test/integration-setup";
 import { AssertionController } from "@/controllers/assertions.controller";
 import { VerificationController } from "@/controllers/verification.controller";
+import { TestData } from "../../../helpers/test-utils";
 
 // Define interfaces for the API responses
 interface ApiResponse<T> {

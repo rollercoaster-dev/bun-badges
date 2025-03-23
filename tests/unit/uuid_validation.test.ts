@@ -2,16 +2,6 @@ import { describe, it, expect } from "bun:test";
 import { Hono } from "hono";
 import assertions from "@/routes/assertions.routes";
 
-// Define the expected response structure
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-interface ApiErrorResponse {
-  status: string;
-  error: {
-    code: string;
-    message: string;
-  };
-}
-
 describe("UUID Validation Tests", () => {
   const app = new Hono();
   const apiBase = "/api";

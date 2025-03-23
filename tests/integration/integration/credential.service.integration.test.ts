@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { CredentialService } from "@/services/credential.service";
-import { badgeClasses, badgeAssertions } from "@/db/schema";
+import { badgeClasses } from "@/db/schema";
 import {
   testDb,
   tableExists as checkTableExists,
@@ -14,13 +14,8 @@ import {
 import { seedTestData, clearTestData } from "@/utils/test/db-helpers";
 import { OB3_CREDENTIAL_CONTEXT } from "@/constants/context-urls";
 import { SignableCredential } from "@/services/credential.service";
-import { sql, eq } from "drizzle-orm";
-import { QueryResult } from "pg";
-import {
-  toJsonb,
-  normalizeJsonb,
-  compareJsonbValues,
-} from "@/utils/db-helpers";
+import { sql } from "drizzle-orm";
+import { toJsonb, normalizeJsonb } from "@/utils/db-helpers";
 
 /**
  * Note on PostgreSQL & Drizzle-ORM (v0.41.0) Test Compatibility

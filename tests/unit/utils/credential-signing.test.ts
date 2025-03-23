@@ -1,6 +1,5 @@
-import { describe, it, expect, beforeAll, mock } from "bun:test";
+import { describe, it, expect, mock, beforeAll } from "bun:test";
 import * as crypto from "crypto";
-import { generateEd25519KeyPair } from "../../../src/utils/signing/key-generation";
 import {
   signCredential,
   verifyCredential,
@@ -21,10 +20,9 @@ const TEST_PRIV_KEY = "BDXd9DKXI5fCrw75_N9NTw1aD-TDwIcwMIEijt7Yevo";
 const TEST_PUB_KEY = "z6MkrXSQTybtqyMasfSxeRBksrz6CjHhWBMz1EKT1STM7hV3";
 
 // Mock the verifyCredential function for testing
-const originalVerifyCredential = verifyCredential;
 mock.module("../../../src/utils/signing/credential", () => {
   return {
-    verifyCredential: async (credential: TestCredential, publicKey: any) => {
+    verifyCredential: async (credential: TestCredential, _publicKey: any) => {
       // For credentials without proof
       if (!credential.proof) {
         return {
@@ -50,7 +48,7 @@ mock.module("../../../src/utils/signing/credential", () => {
       return { verified: true, results: { signatureVerification: true } };
     },
     // Use a mock implementation instead of the real one to avoid base64 issues
-    signCredential: async (credential: any, privateKey: any, options: any) => {
+    signCredential: async (credential: any, _privateKey: any, options: any) => {
       return {
         ...credential,
         proof: {

@@ -7,21 +7,22 @@ import {
   requireOwnership,
   combineMiddleware,
 } from "@/middleware/auth";
-import { UnauthorizedError } from "@/utils/errors";
 import type { AuthUser } from "@/middleware/auth";
 
 // Create a mock context directly in the test file to avoid import errors
-function createMockContext(options = {}) {
+function createMockContext(
+  options: { headers?: Record<string, string>; user?: any } = {},
+) {
   return {
     req: {
       raw: {
         headers: new Headers(),
       },
-      header: (name) => options?.headers?.[name],
+      header: (name: string) => options?.headers?.[name],
     },
-    json: (data, status = 200) => ({ status, data }),
-    get: mock((key) => options?.user || null),
-    set: mock((key, value) => {}),
+    json: (data: any, status = 200) => ({ status, data }),
+    get: mock((_key: string) => options?.user || null),
+    set: mock((_key: string, _value: any) => {}),
   } as unknown as Context;
 }
 
@@ -33,7 +34,7 @@ function createNextFunction() {
 // Setup JWT mock directly in the test file
 function setupJwtMock() {
   mock.module("hono/jwt", () => ({
-    verify: mock(async (token, secret) => {
+    verify: mock(async (token, _secret) => {
       if (token === "admin-token") {
         return {
           sub: "test-user",
@@ -63,12 +64,12 @@ describe("Auth Middleware", () => {
       const ctx = createMockContext() as Context;
 
       // Mock the header method
-      ctx.req.header = mock((name) => {
+      ctx.req.header = mock((name: string) => {
         if (name.toLowerCase() === "authorization") {
           return `Bearer ${mockToken}`;
         }
-        return null;
-      });
+        return undefined;
+      }) as any;
 
       // Setup the headers correctly
       const headers = new Headers();

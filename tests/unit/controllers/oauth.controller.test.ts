@@ -78,7 +78,7 @@ describe("OAuthController", () => {
           : Promise.resolve(null),
       ),
       deleteAuthorizationCode: mock(() => Promise.resolve()),
-      isTokenRevoked: mock((token: string) => Promise.resolve(false)),
+      isTokenRevoked: mock((_token: string) => Promise.resolve(false)),
       revokeToken: mock(() => Promise.resolve()),
     } as any;
 

@@ -6,7 +6,6 @@
  */
 
 import { pool as dbPool } from "@/utils/test/integration-setup";
-import { sql } from "drizzle-orm";
 
 /**
  * Execute a parameterized SQL query safely

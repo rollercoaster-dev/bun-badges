@@ -3,7 +3,7 @@ import { Context } from "hono";
 import { AuthController } from "@controllers/auth.controller";
 import { RateLimiter } from "@utils/auth/rateLimiter";
 import { AUTH_ROUTES } from "@routes/aliases";
-import * as jwtUtils from "@utils/auth/jwt";
+import * as jwtUtils from "@/utils/auth/jwt";
 import { DatabaseService } from "@services/db.service";
 
 // Keep track of generated tokens for tests
@@ -96,8 +96,8 @@ mock.module("@utils/auth/jwt", () => {
   };
 });
 
-// Destructure the mocked functions for use in tests
-const { verifyToken, getTokenExpirySeconds, generateToken } = jwtUtils;
+// Destructure only the needed functions from jwtUtils
+const { generateToken } = jwtUtils;
 
 type AuthResponse = {
   message?: string;
