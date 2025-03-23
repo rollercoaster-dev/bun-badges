@@ -12,6 +12,7 @@ import {
   badgeClasses,
   users,
   badgeAssertions,
+  signingKeys,
 } from "@/db/schema";
 import { VerificationController } from "@/controllers/verification.controller";
 import crypto from "crypto";
@@ -26,6 +27,7 @@ import {
 import { OB2BadgeAssertion } from "@/services/verification.service";
 import { OpenBadgeCredential } from "@/models/credential.model";
 import { eq, ilike } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 
 interface ApiResponse<T> {
   status: string;
@@ -57,8 +59,11 @@ describe("VerificationController Integration Tests", () => {
 
     // Clean up any existing test data
     try {
+      // Delete in the correct order to respect foreign key constraints
       await db.delete(badgeAssertions);
       await db.delete(badgeClasses);
+      // Delete signing_keys before issuer_profiles
+      await db.delete(signingKeys);
       await db.delete(issuerProfiles);
       await db
         .delete(users)
@@ -122,15 +127,24 @@ describe("VerificationController Integration Tests", () => {
   });
 
   afterAll(async () => {
-    // Clean up test data
+    // Clean up test data properly following foreign key constraints
     try {
       await db.delete(badgeAssertions);
       await db
         .delete(badgeClasses)
         .where(eq(badgeClasses.badgeId, testData.get("badgeId")));
+
+      // Make sure to delete signing_keys first, as it depends on issuer_profiles
+      await db.execute(sql`
+        DELETE FROM signing_keys 
+        WHERE issuer_id = ${testData.get("issuerId")}
+      `);
+
+      // Now safe to delete issuer_profiles
       await db
         .delete(issuerProfiles)
         .where(eq(issuerProfiles.issuerId, testData.get("issuerId")));
+
       await db
         .delete(users)
         .where(ilike(users.email, `%verification-test-${testRunId}%`));
@@ -172,13 +186,11 @@ describe("VerificationController Integration Tests", () => {
     const result = await controller.verifyAssertion(ctx);
     const data = (await result.json()) as ApiResponse<VerificationResponse>;
     expect(data.status).toBe("success");
-    // For now, we'll adjust the test expectations to match the implementation
-    // rather than fixing the implementation right away
-    expect(data.data.valid).toBeFalsy();
-    // Since validation is failing, we should not expect signature to be true
-    expect(data.data.checks.signature).toBeFalsy();
-    expect(data.data.checks.revocation).toBeFalsy(); // Changed to match actual implementation
-    expect(data.data.checks.structure).toBe(false); // Changed to match actual implementation
+    // Update expectations to match actual implementation behavior
+    expect(data.data.valid).toBe(true);
+    expect(data.data.checks.signature).toBe(true);
+    expect(data.data.checks.revocation).toBe(true);
+    expect(data.data.checks.structure).toBe(true);
   });
 
   test("should verify an OB3 credential", async () => {
@@ -205,13 +217,11 @@ describe("VerificationController Integration Tests", () => {
     const result = await controller.verifyAssertion(ctx);
     const data = (await result.json()) as ApiResponse<VerificationResponse>;
     expect(data.status).toBe("success");
-    // For now, we'll adjust the test expectations to match the implementation
-    // rather than fixing the implementation right away
-    expect(data.data.valid).toBeFalsy();
-    // Since validation is failing, we should not expect signature to be true
-    expect(data.data.checks.signature).toBeFalsy();
-    expect(data.data.checks.revocation).toBeFalsy(); // Changed to match actual implementation
-    expect(data.data.checks.structure).toBe(false); // Changed to match actual implementation
+    // Update expectations to match actual implementation behavior
+    expect(data.data.valid).toBe(true);
+    expect(data.data.checks.signature).toBe(true);
+    expect(data.data.checks.revocation).toBe(true);
+    expect(data.data.checks.structure).toBe(true);
   });
 
   test("should detect invalid OB2 assertion", async () => {

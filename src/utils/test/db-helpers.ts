@@ -184,6 +184,7 @@ export async function clearTestData() {
         // Delete data using Drizzle ORM in reverse dependency order
         await db.delete(badgeAssertions);
         await db.delete(badgeClasses);
+        // Delete signing_keys before issuer_profiles to avoid foreign key constraint violations
         await db.delete(signingKeys);
         await db.delete(issuerProfiles);
         await db.delete(verificationCodes);
@@ -228,6 +229,7 @@ export async function clearTestData() {
       // Delete data from each table in reverse dependency order
       await dbPool.query("DELETE FROM badge_assertions");
       await dbPool.query("DELETE FROM badge_classes");
+      // Delete signing_keys before issuer_profiles to avoid foreign key constraint violations
       await dbPool.query("DELETE FROM signing_keys");
       await dbPool.query("DELETE FROM issuer_profiles");
       await dbPool.query("DELETE FROM verification_codes");

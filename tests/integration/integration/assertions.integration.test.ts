@@ -7,8 +7,9 @@ import {
   badgeClasses,
   issuerProfiles,
   users,
+  signingKeys,
 } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import crypto from "crypto";
 import { nanoid } from "nanoid";
 
@@ -76,11 +77,18 @@ describe("AssertionController Integration Tests", () => {
   });
 
   afterAll(async () => {
-    // Clean up test data
-    await db.delete(badgeAssertions);
-    await db.delete(badgeClasses);
-    await db.delete(issuerProfiles);
-    await db.delete(users);
+    // Clean up test data in the correct order to respect foreign key constraints
+    try {
+      await db.delete(badgeAssertions);
+      await db.delete(badgeClasses);
+      // Delete signing_keys before issuer_profiles to avoid foreign key constraint violations
+      await db.delete(signingKeys);
+      await db.delete(issuerProfiles);
+      await db.delete(users);
+      console.log("✅ Test data cleaned up successfully");
+    } catch (error) {
+      console.error("❌ Error cleaning up test data:", error);
+    }
   });
 
   it("should create an OB2 assertion", async () => {
@@ -110,11 +118,10 @@ describe("AssertionController Integration Tests", () => {
     // Verify the assertion was created in the database
     const assertionId = data.data.assertionId;
 
-    // Use direct SQL query instead of ORM to verify
-    const results = await db.execute(
-      `SELECT * FROM badge_assertions WHERE assertion_id = $1 LIMIT 1`,
-      [assertionId],
-    );
+    // Use SQL tagged template instead of direct execute with parameters
+    const results = await db.execute(sql`
+      SELECT * FROM badge_assertions WHERE assertion_id = ${assertionId} LIMIT 1
+    `);
 
     // Check that we have a result
     expect(results.rows.length).toBe(1);
@@ -164,10 +171,10 @@ describe("AssertionController Integration Tests", () => {
 
   it("should verify an OB2 assertion", async () => {
     // Instead of querying the database, use the assertion we already created in the setup
-    // Create a direct SQL query to get the assertion ID
-    const results = await db.execute(
-      `SELECT assertion_id FROM badge_assertions LIMIT 1`,
-    );
+    // Create a direct SQL query to get the assertion ID using SQL tagged template
+    const results = await db.execute(sql`
+      SELECT assertion_id FROM badge_assertions LIMIT 1
+    `);
 
     if (!results.rows.length) {
       throw new Error(
@@ -205,10 +212,10 @@ describe("AssertionController Integration Tests", () => {
   });
 
   it("should revoke an assertion", async () => {
-    // Use direct SQL query to get an assertion
-    const results = await db.execute(
-      `SELECT assertion_id FROM badge_assertions LIMIT 1`,
-    );
+    // Use SQL tagged template for the query
+    const results = await db.execute(sql`
+      SELECT assertion_id FROM badge_assertions LIMIT 1
+    `);
 
     if (!results.rows.length) {
       throw new Error(
@@ -234,11 +241,11 @@ describe("AssertionController Integration Tests", () => {
       const response = await controller.revokeAssertion(mockContext);
       expect(response.status).toBe(200);
 
-      // Verify the assertion is revoked using direct SQL
-      const revokedResults = await db.execute(
-        `SELECT revoked, revocation_reason FROM badge_assertions WHERE assertion_id = $1 LIMIT 1`,
-        [assertionId],
-      );
+      // Verify the assertion is revoked using SQL tagged template
+      const revokedResults = await db.execute(sql`
+        SELECT revoked, revocation_reason FROM badge_assertions 
+        WHERE assertion_id = ${assertionId} LIMIT 1
+      `);
 
       expect(revokedResults.rows.length).toBe(1);
       expect(revokedResults.rows[0].revoked).toBe(true);
