@@ -44,20 +44,21 @@ export function createTestUserData(prefix = "e2e_user") {
 
 /**
  * Register and login a test user
- * @param request Supertest request object
+ * @param request Test request object
  * @param userData User credentials (uses random user if not provided)
  * @param authBasePath Base path for auth endpoints (defaults to '/auth')
  * @returns User data with auth token
  */
 export async function registerAndLoginUser(
-  request: ReturnType<typeof supertest>,
+  request: any,
   userData = createTestUserData(),
   authBasePath = "/auth",
 ) {
   // Register user
-  const registerResponse = await request
-    .post(`${authBasePath}/register`)
-    .send(userData);
+  const registerResponse = await request.post(
+    `${authBasePath}/register`,
+    userData,
+  );
 
   if (registerResponse.status !== 201) {
     throw new Error(
@@ -66,7 +67,7 @@ export async function registerAndLoginUser(
   }
 
   // Login user
-  const loginResponse = await request.post(`${authBasePath}/login`).send({
+  const loginResponse = await request.post(`${authBasePath}/login`, {
     email: userData.email,
     password: userData.password,
   });
@@ -153,27 +154,33 @@ export async function resetDatabase(tables?: string[]) {
 
 /**
  * Make an authenticated request
- * @param request Supertest request object
+ * @param request Test request object
  * @param method HTTP method
  * @param url URL to request
  * @param token Auth token
  * @param body Optional request body
- * @returns Supertest response
+ * @returns Response
  */
-export function authenticatedRequest(
-  request: ReturnType<typeof supertest>,
-  method: "get" | "post" | "put" | "delete" | "patch",
+export async function authenticatedRequest(
+  request: any,
+  method: "get" | "post" | "put" | "delete",
   url: string,
   token: string,
   body?: any,
 ) {
-  const req = request[method](url).set("Authorization", `Bearer ${token}`);
-
-  if (body && ["post", "put", "patch"].includes(method)) {
-    return req.send(body);
+  if (request.authRequest) {
+    // Use the built-in authRequest helper if available
+    return request.authRequest(method, url, token, body);
   }
 
-  return req;
+  // Fallback to using headers
+  const headers = { Authorization: `Bearer ${token}` };
+
+  if (method === "get" || method === "delete") {
+    return request[method](url, headers);
+  } else {
+    return request[method](url, body, headers);
+  }
 }
 
 /**
