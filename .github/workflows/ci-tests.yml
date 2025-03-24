@@ -63,7 +63,8 @@ jobs:
           echo "Database schema created successfully"
       - name: Wait for schema to be applied
         run: sleep 10
-
+      - name: Debug List database tables
+        run: bun run src/db/list-tables.ts
       - name: Run database connection test
         env:
           INTEGRATION_TEST: true
