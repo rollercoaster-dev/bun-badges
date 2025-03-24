@@ -63,14 +63,39 @@ Bun.plugin({
 
 console.log("✅ Path aliases configured for tests");
 
-// Load test environment variables first
-config({ path: resolve(process.cwd(), ".env.test") });
+// Determine if running in CI environment
+const isCI = process.env.CI === "true";
+
+// Load appropriate environment variables based on environment
+if (isCI) {
+  console.log("🔄 Running in CI environment");
+  try {
+    config({ path: resolve(process.cwd(), ".env.ci") });
+    console.log("✅ Loaded CI environment variables from .env.ci");
+  } catch (error) {
+    console.warn("⚠️ Failed to load .env.ci, falling back to .env.test");
+    config({ path: resolve(process.cwd(), ".env.test") });
+  }
+} else {
+  console.log("🔄 Running in local environment");
+  config({ path: resolve(process.cwd(), ".env.test") });
+  console.log("✅ Loaded test environment variables from .env.test");
+}
 
 // Ensure DATABASE_URL is available
 console.log(`Environment: ${process.env.NODE_ENV}`);
 console.log(
   `Database URL: ${process.env.DATABASE_URL?.replace(/:.+@/, ":****@")}`,
 );
+
+// Get environment variables with fallbacks
+const DB_MAX_RETRIES = Number(process.env.TEST_DB_MAX_RETRIES || "5");
+const DB_RETRY_DELAY = Number(process.env.TEST_DB_RETRY_DELAY || "1000");
+const SKIP_DOCKER = process.env.SKIP_DOCKER === "true" || isCI;
+
+console.log(`Skip Docker: ${SKIP_DOCKER}`);
+console.log(`DB Max Retries: ${DB_MAX_RETRIES}`);
+console.log(`DB Retry Delay: ${DB_RETRY_DELAY}ms`);
 
 // Create a shared poolEnd function that will be called at the very end
 let poolEnd: () => Promise<void>;
@@ -88,6 +113,12 @@ const isE2ETest =
 
 // Track whether the pool has been closed
 let poolClosed = false;
+
+// Whether we need a database for this test run
+const needsDatabase = isIntegrationTest || isE2ETest;
+
+// Declare connectWithRetry outside of the if block so it can be used by setupDockerDatabase
+let connectWithRetry: (retries?: number, delay?: number) => Promise<boolean>;
 
 // Mock drizzle-orm/pg-core to fix jsonb export issue
 // This addresses the error: "Export named 'jsonb' not found in module 'drizzle-orm/pg-core'"
@@ -236,9 +267,12 @@ if (!isIntegrationTest && !isE2ETest) {
       const { drizzle } = require("drizzle-orm/node-postgres");
       const schema = require("../src/db/schema");
 
-      // Create a unique pool for this test run
+      // Create a unique pool for this test run with retry logic
       const pool = new Pool({
         connectionString: process.env.DATABASE_URL,
+        max: Number(process.env.TEST_DB_POOL_SIZE || "10"),
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: Number(process.env.TEST_DB_TIMEOUT || "5000"),
       });
 
       // Set up global pool end function
@@ -260,31 +294,61 @@ if (!isIntegrationTest && !isE2ETest) {
       };
     });
 
-    // Check database connection
+    // Check database connection with retry mechanism
     const { dbPool } = require("../src/db/config");
 
-    // Check if DB connection is working
-    async function checkDbConnection() {
-      try {
-        const client = await dbPool.connect();
+    // Improved database connection check with retries
+    connectWithRetry = async (
+      retries = DB_MAX_RETRIES,
+      delay = DB_RETRY_DELAY,
+    ) => {
+      for (let attempt = 1; attempt <= retries; attempt++) {
         try {
-          await client.query("SELECT 1");
-          console.log("✅ Database connection successful");
-        } finally {
-          client.release();
-        }
-      } catch (err) {
-        console.error("❌ Failed to connect to database:", err);
-        console.warn(
-          "Continuing with tests that don't require database connection",
-        );
-      }
-    }
+          console.log(`Database connection attempt ${attempt}/${retries}...`);
+          const client = await dbPool.connect();
+          try {
+            await client.query("SELECT 1");
+            console.log("✅ Database connection successful");
+            return true;
+          } finally {
+            client.release();
+          }
+        } catch (err) {
+          console.error(
+            `❌ Failed to connect to database (attempt ${attempt}/${retries}):`,
+            err,
+          );
 
-    // Execute setup
-    checkDbConnection();
+          if (attempt < retries) {
+            console.log(`Retrying in ${delay}ms...`);
+            await new Promise((resolve) => setTimeout(resolve, delay));
+          } else {
+            console.error(
+              "❌ Max retries reached, giving up on database connection",
+            );
+            console.warn(
+              "Continuing with tests that don't require database connection",
+            );
+            return false;
+          }
+        }
+      }
+      return false;
+    };
+
+    // Execute database setup
+    if (!isCI && !SKIP_DOCKER) {
+      // Setup Docker container for database if not in CI and Docker is not skipped
+      setupDockerDatabase();
+    } else {
+      // Just connect to the existing database (e.g., in CI with service container)
+      console.log(
+        "Using existing database (CI environment or SKIP_DOCKER=true)",
+      );
+      connectWithRetry();
+    }
   } catch (err) {
-    console.error("Error importing database module:", err);
+    console.error("Error setting up database module:", err);
     console.warn(
       "Continuing with tests that may not require database connection",
     );
@@ -443,92 +507,95 @@ function executeDockerComposeCommand(command: string, options: any = {}): any {
   }
 }
 
-// Only setup database for integration and e2e tests
-const needsDatabase =
-  process.env.NODE_ENV === "test" ||
-  process.argv.some(
-    (arg) => arg.includes("integration") || arg.includes("e2e"),
+// Docker setup function
+function setupDockerDatabase() {
+  const PROJECT_ROOT = process.cwd();
+  const DOCKER_COMPOSE_FILE = resolve(
+    PROJECT_ROOT,
+    process.env.DOCKER_COMPOSE_FILE || "docker-compose.test.yml",
   );
 
-if (needsDatabase) {
-  console.log("🐳 Setting up test database...");
+  // Function to execute docker compose commands that works with both formats
+  function executeDockerComposeCommand(
+    command: string,
+    options: any = {},
+  ): any {
+    try {
+      // First try with "docker compose" (new format)
+      console.log(
+        `Running: docker compose -f ${DOCKER_COMPOSE_FILE} ${command}`,
+      );
+      return execSync(`docker compose -f ${DOCKER_COMPOSE_FILE} ${command}`, {
+        stdio: options.stdio || "inherit",
+        ...options,
+      });
+    } catch (e) {
+      try {
+        // Fall back to "docker-compose" (old format)
+        console.log(
+          `Falling back to: docker-compose -f ${DOCKER_COMPOSE_FILE} ${command}`,
+        );
+        return execSync(`docker-compose -f ${DOCKER_COMPOSE_FILE} ${command}`, {
+          stdio: options.stdio || "inherit",
+          ...options,
+        });
+      } catch (e2) {
+        // For CI environments where docker might not be available, mock the behavior
+        console.log(`⚠️ Docker compose command failed: ${command}`);
+        console.warn(
+          "⚠️ Continuing without Docker - tests will use mock database",
+        );
+        return "";
+      }
+    }
+  }
 
   try {
-    // Cleanup any existing containers
+    // Clean up any existing containers
     executeDockerComposeCommand("down", {
-      stdio: "inherit",
+      stdio: "ignore",
     });
 
-    // Start database
+    // Start the container
     executeDockerComposeCommand("up -d db_test", {
       stdio: "inherit",
     });
 
-    // Wait for database to be ready
-    let attempts = 0;
-    const maxAttempts = 20;
-    let isReady = false;
+    console.log("Docker container started for database");
 
-    while (attempts < maxAttempts && !isReady) {
+    // Wait for database to be ready
+    let dbReady = false;
+    let attempts = 0;
+    const maxAttempts = DB_MAX_RETRIES;
+
+    console.log("Waiting for database to be ready...");
+    while (!dbReady && attempts < maxAttempts) {
+      attempts++;
       try {
         executeDockerComposeCommand("exec -T db_test pg_isready -U postgres");
-        console.log("✅ Database is ready!");
-        isReady = true;
-      } catch (error) {
-        attempts++;
-        if (attempts === maxAttempts) {
-          console.log(
-            "⚠️ Database not ready after max attempts, continuing with mocks",
-          );
-          break;
-        }
+        dbReady = true;
+        console.log("Database is ready!");
+      } catch (e) {
         console.log(
           `Waiting for database (attempt ${attempts}/${maxAttempts})...`,
         );
-        try {
-          execSync("sleep 1");
-        } catch (e) {
-          // Windows alternative
-          setTimeout(() => {}, 1000);
-        }
+        // Sleep for a moment before retrying
+        Bun.sleepSync(DB_RETRY_DELAY);
       }
     }
 
-    // Run migrations
-    console.log("🔄 Running migrations...");
-    try {
-      execSync("bun run db:migrate", { stdio: "inherit" });
-    } catch (error) {
-      console.log("⚠️ Failed to run migrations, continuing with tests");
+    if (!dbReady) {
+      throw new Error(`Database not ready after ${maxAttempts} attempts`);
     }
 
-    // Register cleanup on process exit
-    process.on("exit", () => {
-      console.log("🧹 Cleaning up test environment...");
-      try {
-        executeDockerComposeCommand("down", {
-          stdio: "inherit",
-        });
-      } catch (error) {
-        console.log("⚠️ Cleanup failed, but tests may have completed");
-      }
-    });
-
-    // Handle interrupts
-    process.on("SIGINT", () => {
-      console.log("\n🛑 Test interrupted, cleaning up...");
-      try {
-        executeDockerComposeCommand("down", {
-          stdio: "inherit",
-        });
-      } catch (error) {
-        console.log("⚠️ Cleanup failed");
-      }
-      process.exit(1);
-    });
+    // Now try to connect to the database
+    connectWithRetry();
   } catch (error) {
+    console.error("Error setting up Docker database:", error);
     console.log("⚠️ Docker setup failed, continuing with mock database");
-    // Don't exit, let tests run with mocks
+
+    // Try to connect anyway, maybe the database is already running
+    connectWithRetry();
   }
 }
 

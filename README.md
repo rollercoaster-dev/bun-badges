@@ -219,6 +219,46 @@ Integration tests require Docker to run a PostgreSQL database container.
 
 For more details about testing, see [TESTING.md](docs/TESTING.md).
 
+### Test Environment Configuration
+
+The test setup automatically adapts to different environments:
+
+#### Local Development
+
+- Uses `.env.test` configuration
+- Starts a Docker container for the test database
+- Configures appropriate connection settings
+- Performs connection retry with configurable parameters
+
+#### CI Environment
+
+- Uses `.env.ci` configuration
+- Works with GitHub Actions PostgreSQL service container
+- Skips Docker setup when running in CI
+- Uses connection retry for improved reliability
+
+#### Available Environment Variables
+
+```
+# Database Configuration
+DATABASE_URL=postgres://postgres:postgres@localhost:5434/bun_badges_test
+TEST_DB_HOST=localhost
+TEST_DB_PORT=5434  # 5432 in CI
+TEST_DB_USER=postgres
+TEST_DB_PASSWORD=postgres
+TEST_DB_NAME=bun_badges_test
+TEST_DB_POOL_SIZE=10
+TEST_DB_TIMEOUT=5000
+TEST_DB_MAX_RETRIES=5
+TEST_DB_RETRY_DELAY=1000
+
+# Docker Configuration
+SKIP_DOCKER=false  # true in CI
+DOCKER_COMPOSE_FILE=docker-compose.test.yml
+```
+
+The test setup script (`tests/setup.ts`) will automatically detect the environment and configure tests appropriately. In CI environments, it will skip Docker container setup and connect directly to the PostgreSQL service container.
+
 ## Contributing
 
 1. Fork the repository
