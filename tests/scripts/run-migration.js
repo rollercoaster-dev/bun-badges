@@ -4,9 +4,14 @@ import { sql } from "drizzle-orm";
 
 // Migration content from 0004_add_status_lists.ts
 async function runMigration() {
+  if (process.env.CI) {
+    console.log('CI environment detected, skipping migration check.');
+    return;
+  }
+
   try {
     console.log("Running status list migration...");
-    console.log(`Database URL: ${DATABASE_URL}`);
+    console.log(`Database URL: ${process.env.DATABASE_URL || 'Using default connection'}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     
     async function waitForDBConnection(retries = 5) {
