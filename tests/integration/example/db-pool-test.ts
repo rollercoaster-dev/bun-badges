@@ -5,7 +5,7 @@ import {
 } from "@/utils/test/db-test-utils";
 
 // Create a managed database connection for this test file
-const { pool, db, cleanup, runMigrations } =
+const { pool, cleanup, runMigrations } =
   createTestDatabaseConnection("db-pool-test.ts");
 
 describe("Database Pool Management", () => {
