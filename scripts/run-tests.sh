@@ -14,13 +14,8 @@ if [ "$CI" = "true" ]; then
   # Disable TTY output for CI
   export BUN_DISABLE_TTY=true
   
-  # Load environment variables from .env.ci if it exists
-  if [ -f ".env.ci" ]; then
-    echo "📋 Loading CI environment variables from .env.ci"
-    export $(grep -v '^#' .env.ci | xargs)
-  else
-    echo "⚠️ .env.ci not found, using default environment variables"
-  fi
+  # In CI, we use environment variables directly instead of loading from file
+  echo "📋 Using CI environment variables set in workflow"
 else
   echo "💻 Running tests in local environment"
   
@@ -44,6 +39,8 @@ echo "📊 Test Configuration:"
 echo "  NODE_ENV: $NODE_ENV"
 echo "  SKIP_DOCKER: $SKIP_DOCKER"
 echo "  DATABASE_URL: ${DATABASE_URL//:.*@/:*****@}"
+echo "  TEST_DB_HOST: $TEST_DB_HOST"
+echo "  TEST_DB_PORT: $TEST_DB_PORT"
 echo "  LOG_LEVEL: $LOG_LEVEL"
 
 # Determine test type

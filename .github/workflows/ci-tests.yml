@@ -14,11 +14,12 @@ jobs:
     env:
       CI: true
       NODE_ENV: test
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/bun_badges_test
+      DATABASE_URL: postgres://postgres:${{ secrets.DB_PASSWORD || 'postgres' }}@localhost:5432/bun_badges_test
       PORT: 3001
-      JWT_SECRET: ci-test-jwt-secret-for-github-actions
+      JWT_SECRET: ${{ secrets.TEST_JWT_SECRET }}
       SKIP_DOCKER: true
       LOG_LEVEL: info
+      BUN_TEST_TIMEOUT: 30000
     
     # Service containers to run alongside the job
     services:
@@ -29,7 +30,7 @@ jobs:
         # Service container environment variables
         env:
           POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD || 'postgres' }}
           POSTGRES_DB: bun_badges_test
           # Optimize PostgreSQL for testing
           POSTGRES_INITDB_ARGS: "--nosync"
@@ -62,6 +63,8 @@ jobs:
           echo "Database schema created successfully"
 
       - name: Run database connection test
+        env:
+          INTEGRATION_TEST: true
         run: bun test tests/integration/controllers/issuer/integration/db-test.integration.test.ts
       
       - name: Run unit tests
