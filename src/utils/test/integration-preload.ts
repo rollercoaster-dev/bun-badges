@@ -95,6 +95,74 @@ mock.module("@scure/base", () => {
   };
 });
 
+/**
+ * Integration Test Pool Management
+ * This section handles proper cleanup of database pools for integration tests,
+ * especially in CI environments where we want to avoid "Cannot use a pool after calling end"
+ * errors that can occur when pools are closed prematurely.
+ */
+
+// Import only the type to avoid circular dependencies
+import type { Pool } from "pg";
+
+// Create a registry of all pools created during tests
+const pools: Set<Pool> = new Set();
+
+// Function to register a pool for cleanup
+export function registerPool(pool: Pool): void {
+  pools.add(pool);
+  console.log(`Pool registered for cleanup (pools tracked: ${pools.size})`);
+}
+
+// Function to unregister a pool (e.g., when it's manually closed)
+export function unregisterPool(pool: Pool): void {
+  pools.delete(pool);
+  console.log(`Pool unregistered (pools remaining: ${pools.size})`);
+}
+
+// Handle graceful cleanup on process exit
+process.on("exit", () => {
+  // Don't use async here as it won't work in exit handler
+  console.log(`Cleaning up ${pools.size} database pools on process exit`);
+  pools.forEach((pool) => {
+    try {
+      if (typeof pool.end === "function") {
+        // Note: We can't await in exit handlers, but that's OK for final cleanup
+        pool.end();
+      }
+    } catch (e) {
+      // Ignore errors during cleanup
+    }
+  });
+});
+
+// Also ensure we clean up on SIGINT (Ctrl+C)
+process.on("SIGINT", () => {
+  console.log(`Cleaning up ${pools.size} database pools on SIGINT`);
+
+  // Convert to array and use Promise.all for parallel cleanup
+  const cleanupPromises = Array.from(pools).map((pool) => {
+    try {
+      if (typeof pool.end === "function") {
+        return pool.end();
+      }
+    } catch (e) {
+      // Ignore errors during cleanup
+    }
+    return Promise.resolve();
+  });
+
+  Promise.all(cleanupPromises)
+    .then(() => {
+      console.log("All pools closed, exiting");
+      process.exit(0);
+    })
+    .catch((err) => {
+      console.error("Error closing pools:", err);
+      process.exit(1);
+    });
+});
+
 console.log(
   "✅ Integration test preload complete - using real database with crypto mocks",
 );

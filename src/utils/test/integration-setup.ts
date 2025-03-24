@@ -67,6 +67,9 @@ export function createDatabaseConnection() {
   };
 }
 
+// Import our pool registry from the preload file
+import { registerPool } from "./integration-preload";
+
 // Synchronously set up a pool when the module loads
 // This is a workaround for the async nature of DB connections in a module context
 try {
@@ -77,6 +80,9 @@ try {
     query_timeout: 10000, // Add timeout for queries
     statement_timeout: 10000, // Add timeout for statements
   });
+
+  // Register the pool for cleanup in our registry
+  registerPool(globalPool);
 
   // Create the DB instance immediately
   _testDb = drizzle(globalPool);
@@ -205,7 +211,11 @@ beforeAll(async () => {
       const tablesExist = result.rows[0]?.exists;
       if (!tablesExist) {
         console.log("Tables don't exist yet, running migrations...");
-        await runMigrations();
+
+        // Use our updated runMigrations function with closePool=false parameter
+        // to prevent the pool from being closed during tests
+        await runMigrations(false);
+
         console.log("Migrations completed");
       } else {
         console.log("Tables already exist, skipping migrations");
@@ -390,19 +400,12 @@ async function ensureSchemaMatch() {
   }
 }
 
-// Add a handler to close the pool when the process exits
-// This ensures we only close the pool once all tests are done
-process.on("exit", () => {
-  if (globalPool) {
-    try {
-      // Note: we can't use async here, but that's okay for final cleanup
-      console.log("Closing database pool on process exit");
-      globalPool.end();
-    } catch (error) {
-      console.error("Error closing pool:", error);
-    }
-  }
-});
+// We don't need to manually close the pool on exit
+// Our registerPool function in integration-preload.ts handles this for us
+// This prevents "Cannot use a pool after calling end" errors in CI
+
+// Keep this comment to explain why we removed the handler
+// The pool will be closed by our cleanup registry in integration-preload.ts
 
 // Export the getter function for testDb, along with other test utilities
 export {

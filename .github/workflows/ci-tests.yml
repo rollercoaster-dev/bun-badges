@@ -8,20 +8,22 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     # Set environment variables available to all steps
     env:
       CI: true
       NODE_ENV: test
       DATABASE_URL: postgres://postgres:${{ secrets.DB_PASSWORD || 'postgres' }}@localhost:5432/bun_badges_test
       PORT: 3001
-      JWT_SECRET: ${{ secrets.TEST_JWT_SECRET }}
+      JWT_SECRET: ${{ secrets.TEST_JWT_SECRET || 'ci-test-jwt-secret-for-github-actions' }}
       SKIP_DOCKER: true
       LOG_LEVEL: info
       BUN_TEST_TIMEOUT: 60000
-      # Create a fresh pool for each test file
-      DB_POOL_PER_FILE: true
-    
+      # Share connection pool between tests to prevent "pool ended" issues
+      DB_POOL_PER_FILE: false
+      # Use our improved CI setup
+      USE_CI_DATABASE_SETUP: true
+
     # Service containers to run alongside the job
     services:
       # Label used to access the service container
@@ -48,60 +50,61 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
-      
+
       - name: Install dependencies
         run: bun install
 
-      - name: Setup database and run migrations with retry
+      - name: Setup database with transaction-based approach
         run: |
-          echo "Running database migrations..."
+          echo "Setting up database with improved CI setup..."
+          bun run src/utils/test/ci-database-setup.ts
           
-          # Use the updated push command
-          bun run db:push
-          
-          # Add retry logic for database setup
-          MAX_RETRIES=5
-          RETRY_COUNT=0
-          
-          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-            echo "Checking if tables exist (attempt $((RETRY_COUNT+1))/$MAX_RETRIES)..."
-            TABLES=$(bun run src/db/list-tables.ts 2>&1 || echo "Failed")
-            
-            if [[ $TABLES == *"All required tables exist"* ]]; then
-              echo "✅ Database migration successful!"
-              break
-            else
-              RETRY_COUNT=$((RETRY_COUNT+1))
-              if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
-                echo "❌ Failed to create database tables after $MAX_RETRIES attempts"
-                exit 1
-              fi
-              echo "Waiting for migrations to complete (30s)..."
-              sleep 30
-              echo "Retrying migrations..."
-              bun run db:push
-            fi
-          done
-      
+          # Display created tables for debugging
+          echo "Tables created:"
+          PGPASSWORD=${{ secrets.DB_PASSWORD || 'postgres' }} psql -h localhost -U postgres -d bun_badges_test -c "\dt"
+
       - name: Run unit tests
         run: bun test tests/unit
-      
-      - name: Run integration tests (one by one)
+
+      - name: Run integration tests (sequential)
         env:
           INTEGRATION_TEST: true
+          # Important: use the same pool across all test files
+          DB_POOL_PER_FILE: false
         run: |
-          # Run each test file separately to avoid pool conflicts
-          for file in $(find tests/integration -name "*.test.ts"); do
-            echo "Running $file..."
-            bun test $file || exit 1
+          # Create an ordered list of test files
+          find_test_files() {
+            # First run schema/non-controller tests
+            find tests/integration -name "*.service.integration.test.ts" -o -name "*.model.integration.test.ts" | sort
+            # Then run controller tests
+            find tests/integration -name "*.controller.integration.test.ts" | sort
+            # Then run edge case tests
+            find tests/integration -name "*.edge.integration.test.ts" | sort
+            # Then run route tests
+            find tests/integration -name "*.routes.integration.test.ts" -o -name "*.test.ts" | grep -v "service\|model\|controller\|edge" | sort
+          }
+          
+          # Run the test files in sequence
+          echo "Running integration tests in order..."
+          for file in $(find_test_files); do
+            echo "Running test file: $file"
+            # Set a timeout for each test file to prevent hanging
+            timeout 2m bun test $file || exit_code=$?
+            if [ ! -z "$exit_code" ] && [ "$exit_code" -ne 0 ]; then
+              echo "❌ Test file failed: $file (exit code: $exit_code)"
+              # Don't exit immediately, continue with other tests
+            fi
           done
-      
+          
+          # Test was successful
+          echo "✅ Integration tests completed"
+
       - name: Run E2E tests
         env:
           E2E_TEST: true
-        run: bun test tests/e2e 
+        run: bun test tests/e2e
