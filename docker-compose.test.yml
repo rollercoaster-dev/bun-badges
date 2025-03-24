@@ -5,22 +5,22 @@ services:
   db_test:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
-      POSTGRES_DB: ${DB_NAME:-bun_badges_test}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: bun_badges_test
       # Optimize Postgres for testing
       POSTGRES_INITDB_ARGS: "--nosync"
       PGDATA: /var/lib/postgresql/data/pgdata
     command: postgres -c fsync=off -c synchronous_commit=off -c full_page_writes=off -c random_page_cost=1.0
     ports:
-      - "${DB_PORT:-5434}:5432"
+      - "5434:5432"
     volumes:
       - postgres_test_data:/var/lib/postgresql/data
       - ./scripts/init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql
       # Add schema files for initialization
       - ./scripts/test-db:/docker-entrypoint-initdb.d/schema
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -36,10 +36,10 @@ services:
       - NODE_ENV=test
       - E2E_TEST=true
       - INTEGRATION_TEST=true
-      - DATABASE_URL=postgres://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db_test:5432/${DB_NAME:-bun_badges_test}
-      - JWT_SECRET=${TEST_JWT_SECRET:-test-jwt-secret-for-e2e-tests}
+      - DATABASE_URL=postgres://postgres:postgres@db_test:5432/bun_badges_test
+      - JWT_SECRET=test-jwt-secret-for-e2e-tests
       - AUTH_TOKEN_EXPIRY=1d
-      - LOG_LEVEL=${LOG_LEVEL:-error}
+      - LOG_LEVEL=error
       - TEST_MODE=true
       - PORT=3000
       - HOST=0.0.0.0
@@ -64,10 +64,10 @@ services:
     environment:
       - NODE_ENV=test
       - E2E_TEST=true
-      - DATABASE_URL=postgres://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db_test:5432/${DB_NAME:-bun_badges_test}
-      - JWT_SECRET=${TEST_JWT_SECRET:-test-jwt-secret-for-e2e-tests}
+      - DATABASE_URL=postgres://postgres:postgres@db_test:5432/bun_badges_test
+      - JWT_SECRET=test-jwt-secret-for-e2e-tests
       - AUTH_TOKEN_EXPIRY=1d
-      - LOG_LEVEL=${LOG_LEVEL:-error}
+      - LOG_LEVEL=error
       - TEST_MODE=true
       - PORT=3001
       - HOST=0.0.0.0

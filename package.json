@@ -34,11 +34,8 @@
     "test:watch": "bun test --preload ./tests/setup.ts --watch",
     "test:unit": "bun test --preload ./tests/setup.ts tests/unit/**/*.test.ts",
     "test:integration": "NODE_ENV=test bun test --preload ./tests/setup.ts tests/integration/**/*.test.ts",
-    "test:integration:mock": "NODE_ENV=test FORCE_MOCK_DB=true SKIP_DOCKER=true bun test --preload ./tests/setup.ts tests/integration/**/*.test.ts",
     "test:file": "bun test --preload ./tests/setup.ts",
     "test:e2e": "NODE_ENV=test E2E_TEST=true BUN_DEBUG=1 bun test --preload ./tests/setup.ts ./tests/e2e/index.ts",
-    "test:e2e:mock": "NODE_ENV=test E2E_TEST=true FORCE_MOCK_DB=true SKIP_DOCKER=true bun test --preload ./tests/setup.ts ./tests/e2e/index.ts",
-    "test:all:mock": "bun test:unit && bun test:integration:mock && bun test:e2e:mock",
     "test:e2e:coverage": "NODE_ENV=test E2E_TEST=true bun test --preload ./tests/setup.ts ./tests/e2e/index.ts --coverage",
     "test:e2e:lifecycle": "NODE_ENV=test E2E_TEST=true bun test --preload ./tests/setup.ts ./tests/e2e/flows/badge-lifecycle/*.test.ts",
     "test:e2e:auth": "NODE_ENV=test E2E_TEST=true bun test --preload ./tests/setup.ts ./tests/e2e/flows/auth/*.test.ts",
@@ -49,11 +46,7 @@
     "test:e2e:docker": "TEST_RUN_ID=$(uuidgen) docker-compose -f docker-compose.test.yml up e2e_test_runner",
     "test:all:docker": "TEST_RUN_ID=$(uuidgen) docker-compose -f docker-compose.test.yml up",
     "prepare": "husky install",
-    "example:ob3": "bun run examples/run-ob3-example.js",
-    "ci:setup": "chmod +x tasks/ci-test-setup.sh && ./tasks/ci-test-setup.sh",
-    "ci:test": "bun run ci:setup && bun run test:all",
-    "ci:test:real-db": "bun run ci:setup && FORCE_MOCK_DB=false bun run test:all",
-    "ci:test:mock-db": "FORCE_MOCK_DB=true SKIP_DOCKER=true bun run ci:setup && bun run test:all"
+    "example:ob3": "bun run examples/run-ob3-example.js"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
