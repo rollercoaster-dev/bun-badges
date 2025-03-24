@@ -20,6 +20,8 @@ jobs:
       SKIP_DOCKER: true
       LOG_LEVEL: info
       BUN_TEST_TIMEOUT: 30000
+      # Add environment variable to control pool management
+      POOL_MANAGEMENT: PER_TEST_FILE
     
     # Service containers to run alongside the job
     services:
@@ -56,19 +58,15 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Create database schema
+      - name: Setup and verify database
         run: |
-          echo "Setting up database schema..."
+          echo "Initializing database..."
           bun run db:push
-          echo "Database schema created successfully"
-      - name: Wait for schema to be applied
-        run: sleep 10
-      - name: Debug List database tables
+          echo "Verifying database setup..."
+          bun run src/db/ci-setup.ts
+      
+      - name: List database tables
         run: bun run src/db/list-tables.ts
-      - name: Run database connection test
-        env:
-          INTEGRATION_TEST: true
-        run: bun test tests/integration/controllers/issuer/integration/db-test.integration.test.ts
       
       - name: Run unit tests
         run: bun test tests/unit
@@ -76,7 +74,9 @@ jobs:
       - name: Run integration tests
         env:
           INTEGRATION_TEST: true
-        run: bun test tests/integration
+        run: |
+          # Make sure each test suite gets a fresh database connection
+          bun test tests/integration
       
       - name: Run E2E tests
         env:
