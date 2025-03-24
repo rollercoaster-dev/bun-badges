@@ -59,7 +59,7 @@ jobs:
       - name: Create database schema
         run: |
           echo "Setting up database schema..."
-          bun run db:migrate
+          bun run db:push
           echo "Database schema created successfully"
 
       - name: Run database connection test
