@@ -693,3 +693,41 @@ try {
 }
 
 console.log("✅ Test setup complete");
+
+// Check if we should use our improved pool manager
+const usePoolManager = process.env.USE_POOL_MANAGER === "true";
+console.log(`Using pool manager: ${usePoolManager}`);
+
+// If we are using the pool manager, patch the database connection functions
+if (needsDatabase && usePoolManager) {
+  console.log(
+    "Patching database connections to use per-test-file pool management",
+  );
+
+  // Import our pool management utilities
+  // These will be used in each test file separately
+  try {
+    // This is just to verify the modules are available
+    require("../src/utils/test/pool-manager");
+    require("../src/utils/test/db-test-utils");
+    console.log("✅ Pool management modules loaded successfully");
+  } catch (error) {
+    console.error("❌ Failed to load pool management modules:", error);
+  }
+}
+
+// Simple patch for CI environment to ensure each test file gets a fresh pool
+const usePerFilePool = process.env.DB_POOL_PER_FILE === "true";
+if (usePerFilePool && isIntegrationTest) {
+  console.log("Using per-file pool management (simple mode)");
+
+  // When running in CI with integration tests, make sure we end the pool after each test file
+  // This ensures the next test file gets a fresh pool
+  process.on("beforeExit", () => {
+    if (poolEnd && !poolClosed) {
+      console.log("Auto-closing database pool at end of test file");
+      poolClosed = true;
+      poolEnd();
+    }
+  });
+}
