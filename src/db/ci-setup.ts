@@ -1,6 +1,4 @@
 import { dbPool } from "./config";
-import * as schema from "./schema/index";
-import { drizzle } from "drizzle-orm/node-postgres";
 
 // Constant for retry settings
 const MAX_RETRIES = 5;
@@ -16,8 +14,7 @@ async function setupCiDatabase() {
     `Using database URL: ${process.env.DATABASE_URL?.replace(/:.+@/, ":****@")}`,
   );
 
-  // Create a dedicated pool for this setup process
-  const db = drizzle(dbPool, { schema });
+  // No need to create a db instance here since we're using dbPool directly
 
   try {
     // 1. Check database connection
