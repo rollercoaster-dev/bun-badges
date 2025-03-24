@@ -3,6 +3,12 @@ import { config } from "dotenv";
 import { mock, type Mock } from "bun:test";
 import { execSync } from "child_process";
 import * as fs from "fs";
+import { Pool } from "pg";
+
+// TypeScript declaration for the global database pool
+declare global {
+  var __testDbPool: Pool | undefined;
+}
 
 console.log("Setting up test environment...");
 
@@ -302,6 +308,13 @@ mock.module("../src/db/config", () => {
         idleTimeoutMillis: 30000,
         connectionTimeoutMillis: Number(process.env.TEST_DB_TIMEOUT || "5000"),
       });
+
+      // Make the pool global for E2E tests to access
+      if (isE2ETest) {
+        // In E2E mode, expose the pool to the global scope to ensure E2E tests can access it
+        // This ensures it's available even when imported directly from @/db/config
+        global.__testDbPool = pool;
+      }
 
       // Set up global pool end function
       poolEnd = async () => {

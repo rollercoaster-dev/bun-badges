@@ -6,7 +6,8 @@
  */
 
 import { randomUUID } from "crypto";
-import { dbPool } from "@/db/config";
+// Import from our patched db config instead of the original
+import { dbPool } from "../utils/db-config-patch";
 
 // Generate a unique run ID for this test run
 export const testRunId = randomUUID();

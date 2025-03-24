@@ -5,7 +5,7 @@
  * with improved isolation between test runs.
  */
 
-import { dbPool } from "@/db/config";
+import { dbPool } from "./db-config-patch";
 
 /**
  * Resets the database to a clean state for testing
@@ -13,6 +13,8 @@ import { dbPool } from "@/db/config";
  * @param resetSequences Whether to reset sequences (defaults to true)
  */
 export async function resetDatabase(tables?: string[], resetSequences = true) {
+  let tablesToReset: string[] = [];
+
   // Get all tables if not specified
   if (!tables || tables.length === 0) {
     const result = await dbPool.query(`
@@ -20,7 +22,11 @@ export async function resetDatabase(tables?: string[], resetSequences = true) {
       FROM pg_tables
       WHERE schemaname = 'public'
     `);
-    tables = result.rows.map((row) => row.tablename);
+    tablesToReset = result.rows.map(
+      (row: { tablename: string }) => row.tablename,
+    );
+  } else {
+    tablesToReset = tables;
   }
 
   // Start a transaction
@@ -33,7 +39,7 @@ export async function resetDatabase(tables?: string[], resetSequences = true) {
     await client.query("SET session_replication_role = replica");
 
     // Truncate all specified tables
-    for (const table of tables) {
+    for (const table of tablesToReset) {
       await client.query(`TRUNCATE TABLE "${table}" CASCADE`);
     }
 
@@ -63,7 +69,7 @@ export async function resetDatabase(tables?: string[], resetSequences = true) {
     await client.query("COMMIT");
 
     return {
-      tablesReset: tables.length,
+      tablesReset: tablesToReset.length,
       sequencesReset: sequencesCount,
     };
   } catch (error) {

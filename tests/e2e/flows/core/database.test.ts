@@ -14,7 +14,7 @@ import {
   authenticatedRequest,
   resetDatabase,
 } from "../../helpers/test-utils";
-import { dbPool } from "@/db/config";
+import { dbPool } from "../../utils/db-config-patch";
 import { createTestLogger } from "../../helpers/test-logger";
 
 // Create a logger for this test file

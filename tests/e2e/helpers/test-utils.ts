@@ -8,7 +8,7 @@
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import supertest from "supertest";
-import { dbPool } from "@/db/config";
+import { dbPool } from "../utils/db-config-patch";
 
 /**
  * Create a test server with the provided Hono app
