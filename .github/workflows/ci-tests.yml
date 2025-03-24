@@ -61,6 +61,8 @@ jobs:
           echo "Setting up database schema..."
           bun run db:push
           echo "Database schema created successfully"
+      - name: Wait for schema to be applied
+        run: sleep 10
 
       - name: Run database connection test
         env:
