@@ -63,10 +63,10 @@ export class VerificationController {
    * Verify a badge by parsing the provided JSON
    */
   async verifyBadgeJson(c: Context): Promise<Response> {
-    try {
-      const body = await c.req.json();
-      const format = c.req.query("format") || "default";
+    const body = await c.req.json();
+    const format = c.req.query("format") || "default";
 
+    try {
       if (!body.assertion && !body.credential) {
         return c.json(
           {

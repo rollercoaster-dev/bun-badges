@@ -3,7 +3,7 @@
     "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "types": ["bun-types"],
+    "types": ["bun-types", "./types/bun", "./types/paths"],
     "esModuleInterop": true,
     "strict": true,
     "strictNullChecks": true,
@@ -20,19 +20,19 @@
     "forceConsistentCasingInFileNames": true,
     "lib": ["ESNext"],
     "outDir": "dist",
-    "rootDir": "src",
+    "rootDir": ".",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
+      "@/*": ["src/*", "tests/*"],
       "@routes/*": ["src/routes/*"],
       "@controllers/*": ["src/controllers/*"],
       "@utils/*": ["src/utils/*"],
       "@models/*": ["src/models/*"],
       "@services/*": ["src/services/*"],
       "@middleware/*": ["src/middleware/*"],
-      "@tests/*": ["src/__tests__/*"]
+      "@tests/*": ["tests/*"]
     }
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "tests/**/*", "types/**/*"],
   "exclude": ["node_modules", "dist"]
 }

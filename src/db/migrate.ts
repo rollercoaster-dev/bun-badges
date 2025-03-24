@@ -1,14 +1,18 @@
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { db, dbPool } from "./config";
+import { createLogger } from "../utils/logger";
+
+// Create a logger instance for migrations
+const logger = createLogger("migrations");
 
 // Run migrations
 async function runMigrations() {
   try {
-    console.log("Running migrations...");
+    logger.info("Running migrations...");
     await migrate(db, { migrationsFolder: "./drizzle" });
-    console.log("Migrations completed successfully");
+    logger.info("Migrations completed successfully");
   } catch (error) {
-    console.error("Migration failed:", error);
+    logger.error("Migration failed:", error);
     process.exit(1);
   } finally {
     await dbPool.end();

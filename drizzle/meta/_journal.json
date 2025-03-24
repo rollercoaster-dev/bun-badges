@@ -22,6 +22,20 @@
       "when": 1742150427898,
       "tag": "0002_tricky_wong",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1742602100000,
+      "tag": "0003_status_list_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1742602200000,
+      "tag": "0004_oauth_tables",
+      "breakpoints": true
     }
   ]
 }

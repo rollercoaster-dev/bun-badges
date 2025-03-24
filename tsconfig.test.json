@@ -3,11 +3,24 @@
   "compilerOptions": {
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "rootDir": ".",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*", "tests/*"],
+      "@routes/*": ["src/routes/*"],
+      "@controllers/*": ["src/controllers/*"],
+      "@utils/*": ["src/utils/*"],
+      "@models/*": ["src/models/*"],
+      "@services/*": ["src/services/*"],
+      "@middleware/*": ["src/middleware/*"],
+      "@tests/*": ["tests/*"]
+    }
   },
   "include": [
-    "src/**/*.test.ts",
-    "src/__tests__/**/*"
+    "tests/**/*.ts",
+    "src/**/*.ts",
+    "types/**/*.ts"
   ],
   "exclude": ["node_modules", "dist"]
 } 

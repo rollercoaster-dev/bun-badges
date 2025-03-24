@@ -9,6 +9,32 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    
+    # Add PostgreSQL service container
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: bun_badges_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    # Define environment variables for the test job
+    env:
+      CI: true
+      NODE_ENV: test
+      SKIP_DOCKER: true
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/bun_badges_test
+      JWT_SECRET: ci-test-jwt-secret-for-github-actions
+      LOG_LEVEL: info
+      
     steps:
       - uses: actions/checkout@v4
       
@@ -20,14 +46,57 @@ jobs:
       - name: Install dependencies
         run: bun install
         
+      - name: Create .env.ci file
+        run: |
+          cat > .env.ci << EOL
+          # CI environment configuration
+          DATABASE_URL=postgres://postgres:postgres@localhost:5432/bun_badges_test
+          JWT_SECRET=ci-test-jwt-secret-for-github-actions
+          PORT=3001
+          NODE_ENV=test
+          CI=true
+          LOG_LEVEL=info
+          SKIP_DOCKER=true
+          EOL
+          
+      - name: Initialize test database
+        run: |
+          # Check if database is ready
+          echo "Waiting for PostgreSQL to be ready..."
+          # Display environment for debugging
+          echo "CI environment: $CI"
+          echo "DATABASE_URL: $DATABASE_URL"
+          echo "NODE_ENV: $NODE_ENV"
+          
+          # Wait for PostgreSQL to be ready
+          for i in {1..10}; do
+            bun -e "fetch('http://localhost:5432').catch(e => console.error('Waiting for PostgreSQL...'))" && break
+            sleep 3
+          done
+          
+          # Run migrations
+          echo "Running database migrations..."
+          bun run db:migrate
+          
       - name: Type check
         run: bun run tsc
-        
-      - name: Run tests
-        run: bun test
-        
+
       - name: Run linter
         run: bun run lint
+        
+      - name: Run unit tests
+        run: bun run test:unit
+
+      - name: Run integration tests
+        run: bun run test:integration
+
+      - name: Run e2e tests
+        run: bun run test:e2e
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          echo "Cleaning up test environment..."
 
   build:
     needs: test

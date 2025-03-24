@@ -32,7 +32,7 @@ interface IssuerResponse {
   url: string;
   description?: string;
   email?: string;
-  issuerJson: Record<string, unknown>;
+  issuerJson: any; // Use any for the JSON data to avoid strict typing issues
   publicKey?: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
@@ -52,7 +52,8 @@ async function getIssuerOwner(c: Context): Promise<string> {
 // List issuers
 issuers.get("/", requireRole(Role.ISSUER_VIEWER), async (c) => {
   try {
-    return await controller.listIssuers(c);
+    const response = await controller.listIssuers(c);
+    return c.json(response);
   } catch (error) {
     throw new Error(
       `Failed to list issuers: ${error instanceof Error ? error.message : String(error)}`,
@@ -63,7 +64,8 @@ issuers.get("/", requireRole(Role.ISSUER_VIEWER), async (c) => {
 // Get issuer by ID
 issuers.get("/:id", requireRole(Role.ISSUER_VIEWER), async (c) => {
   try {
-    return await controller.getIssuer(c);
+    const response = await controller.getIssuer(c);
+    return c.json(response);
   } catch (error) {
     throw new Error(
       `Failed to get issuer: ${error instanceof Error ? error.message : String(error)}`,
@@ -99,7 +101,8 @@ issuers.put(
     try {
       const data = await c.req.json<UpdateIssuerDto>();
       const hostUrl = new URL(c.req.url).origin;
-      return await controller.updateIssuer(c, data, hostUrl);
+      const response = await controller.updateIssuer(c, data, hostUrl);
+      return c.json(response);
     } catch (error) {
       throw new Error(
         `Failed to update issuer: ${error instanceof Error ? error.message : String(error)}`,

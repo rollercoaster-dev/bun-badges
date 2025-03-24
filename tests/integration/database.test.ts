@@ -1,6 +1,5 @@
-import { describe, expect, test, beforeAll, afterAll } from "bun:test";
-import { db, dbPool } from "../../src/db/config";
-import { sql } from "drizzle-orm";
+import { describe, expect, test, beforeAll } from "bun:test";
+import { dbPool } from "../../src/db/config";
 
 describe("Database Integration", () => {
   // Setup - run before all tests

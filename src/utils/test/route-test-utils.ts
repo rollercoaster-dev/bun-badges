@@ -1,10 +1,14 @@
 import { Hono } from "hono";
 import { mock } from "bun:test";
 import { setupJwtMock } from "./auth-test-utils";
-import { type JSONValue } from "hono/utils/types";
 import type { Context } from "hono";
+import { createMockContext } from "./mock-context";
+import { db } from "../../db/config";
+import { users } from "../../db/schema";
+import { sql } from "drizzle-orm";
+import { Role, AuthUser } from "../../middleware/auth";
 
-// Export the Context type to make sure it's used
+// Export the Context type to make it available
 export type { Context };
 
 /**
@@ -149,7 +153,7 @@ export function mockIssuerController() {
         if (issuerId === "123") {
           return data.issuer;
         }
-        throw new Error("Issuer not found");
+        throw new Error("Failed to get issuer: Issuer not found");
       },
 
       // Create new issuer
@@ -182,10 +186,34 @@ export function mockIssuerController() {
       },
 
       // Verify issuer
-      verifyIssuer: () => ({
-        valid: true,
-        errors: [],
-      }),
+      verifyIssuer: (issuerJson: any, version: string) => {
+        // Actually validate the issuer JSON based on the version
+        const errors: string[] = [];
+
+        // Check required fields for both versions
+        if (!issuerJson.id) errors.push("Missing id property");
+        if (!issuerJson.name) errors.push("Missing name property");
+        if (!issuerJson.url) errors.push("Missing url property");
+
+        // Check type based on version
+        if (version === "2.0") {
+          if (issuerJson.type !== "Profile" && issuerJson.type !== "Issuer") {
+            errors.push("Invalid type - must be 'Profile' or 'Issuer'");
+          }
+        } else if (version === "3.0") {
+          if (
+            issuerJson.type !==
+            "https://purl.imsglobal.org/spec/vc/ob/vocab.html#Profile"
+          ) {
+            errors.push("Invalid type - must be OB 3.0 Profile type");
+          }
+        }
+
+        return {
+          valid: errors.length === 0,
+          errors: errors,
+        };
+      },
     };
 
     return {
@@ -306,32 +334,63 @@ export function createTestRequest(
   return request;
 }
 
-export interface TestContext {
-  get: (key: string) => any;
-  set: (key: string, value: any) => void;
-  status: (code: number) => void;
-  json: (data: JSONValue) => Response;
-  req: {
-    param: (key: string) => string | undefined;
-    query: (key?: string) => string | Record<string, string> | undefined;
-    header: (key: string) => string | undefined;
-  };
-}
-
-export function createMockContext(): TestContext {
-  return {
-    get: mock(() => undefined),
-    set: mock(() => {}),
-    status: mock(() => {}),
-    json: mock((data: JSONValue) => new Response(JSON.stringify(data))),
-    req: {
-      param: mock(() => undefined),
-      query: mock(() => undefined),
-      header: mock(() => undefined),
-    },
-  };
-}
-
 export function createNextFunction(): () => Promise<void> {
   return mock(async () => {});
 }
+
+/**
+ * Helper to create a mock context for testing routes
+ */
+export async function createRouteTestContext(options: {
+  method?: string;
+  url?: string;
+  headers?: Record<string, string>;
+  body?: unknown;
+  query?: Record<string, string>;
+  params?: Record<string, string>;
+  userId?: string;
+}) {
+  const ctx = createMockContext({
+    method: options.method || "GET",
+    url: options.url || "/",
+    headers: options.headers || {},
+    body: options.body,
+    query: options.query || {},
+    params: options.params || {},
+  });
+
+  // Add user to context if userId provided
+  if (options.userId) {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(sql`user_id = ${options.userId}`)
+      .limit(1);
+
+    if (user) {
+      // Convert DB user to AuthUser
+      const authUser: AuthUser = {
+        id: user.userId,
+        roles: [Role.ISSUER_VIEWER], // Default role, can be overridden
+      };
+      ctx.set("user", authUser);
+    }
+  }
+
+  return ctx;
+}
+
+/**
+ * Helper to run a middleware chain for testing
+ */
+export async function runMiddlewareChain(
+  ctx: Context,
+  middlewares: ((c: Context) => Promise<void>)[],
+) {
+  for (const middleware of middlewares) {
+    await middleware(ctx);
+  }
+}
+
+// Re-export the base mock context
+export { createMockContext };

@@ -54,13 +54,36 @@ security_audit_level = "high"
 
 [commands]
 bun = { execute = "bun" }
+start = { execute = "bun run src/index.ts" }
+dev = { execute = "bun --watch run src/index.ts" }
+dev_https = { execute = "USE_HTTPS=true bun --watch run src/index.ts" }
+dev_docker = { execute = "docker-compose -f docker-compose.dev.yml up" }
+dev_docker_build = { execute = "docker-compose -f docker-compose.dev.yml up --build" }
+dev_docker_down = { execute = "docker-compose -f docker-compose.dev.yml down" }
+dev_light = { execute = "docker-compose -f docker-compose.light.yml up" }
+dev_light_build = { execute = "docker-compose -f docker-compose.light.yml up --build" }
+dev_light_down = { execute = "docker-compose -f docker-compose.light.yml down" }
+gen_certs = { execute = "bash ./scripts/generate-certs.sh" }
+build = { execute = "bun build src/index.ts --outdir dist --target bun" }
+tsc = { execute = "tsc --noEmit" }
+tsc_src = { execute = "tsc --project tsconfig.src.json --noEmit" }
+tsc_test = { execute = "tsc --project tsconfig.test.json --noEmit" }
+format = { execute = "prettier --write \"src/**/*.{ts,tsx}\"" }
+lint = { execute = "eslint \"src/**/*.{ts,tsx}\" --fix" }
+lint_fix = { execute = "eslint \"src/**/*.{ts,tsx}\" --fix" }
+db_generate = { execute = "drizzle-kit generate:pg" }
+db_migrate = { execute = "bun run tests/scripts/run-migration.js" }
+db_migrate_status = { execute = "bun run tests/scripts/run-migration.js" }
+db_push = { execute = "drizzle-kit push:pg" }
+db_studio = { execute = "drizzle-kit studio" }
 test = { execute = "bun test --preload ./tests/setup.ts" }
-test_unit = { execute = "bun test 'src/__tests__/' 'tests/unit/' 'src/tests/' 'src/utils/**/__tests__/' 'src/services/__tests__/'" }
-test_integration = { execute = "DATABASE_URL=postgres://postgres:postgres@localhost:5434/bun_badges_test bun test --preload ./tests/setup.ts tests/integration 'src/**/*.integration.test.ts'" }
-test_all = { execute = "bash ./test-all.sh" }
-docker_test_up = { execute = "docker-compose -f docker-compose.test.yml up -d" }
-docker_test_down = { execute = "docker-compose -f docker-compose.test.yml down" }
-docker_test_restart = { execute = "docker-compose -f docker-compose.test.yml down && docker-compose -f docker-compose.test.yml up -d" }
+test_watch = { execute = "bun test --preload ./tests/setup.ts --watch" }
+test_unit = { execute = "bun test --preload ./tests/setup.ts tests/unit/**/*.test.ts" }
+test_integration = { execute = "NODE_ENV=test bun test --preload ./tests/setup.ts tests/integration/**/*.test.ts" }
+test_e2e = { execute = "NODE_ENV=test E2E_TEST=true bun test --preload ./tests/setup.ts tests/e2e/**/*.test.ts" }
+test_file = { execute = "bun test --preload ./tests/setup.ts" }
+prepare = { execute = "husky install" }
+example_ob3 = { execute = "bun run examples/run-ob3-example.js" }
 
 # Type Safety Commands
 type_check = { execute = "bun tsc --noEmit" }
@@ -70,7 +93,6 @@ find_assertions = { execute = "grep -r \"as \\|<.*>\" src/ --include=\"*.ts\" --
 # Database Commands
 db_check = { execute = "bun run src/db/scripts/check-schema.ts" }
 db_validate = { execute = "bun run src/db/scripts/validate-schema.ts" }
-db_migrate = { execute = "bun run src/db/scripts/migrate.ts" }
 
 # Documentation Commands
 docs_api = { execute = "bun run scripts/generate-api-docs.ts" }
@@ -80,17 +102,6 @@ docs_validate = { execute = "bun run scripts/validate-docs.ts" }
 # Security Commands
 security_audit = { execute = "bun run scripts/security-audit.ts" }
 key_rotate = { execute = "bun run scripts/rotate-keys.ts" }
-
-# Development Workflow
-dev = { execute = "bun run --watch src/index.ts" }
-dev_test = { execute = "bun test --watch" }
-lint = { execute = "bun run scripts/lint.ts" }
-format = { execute = "bun run scripts/format.ts" }
-
-# Build and Deploy
-build = { execute = "bun run scripts/build.ts" }
-build_docs = { execute = "bun run scripts/build-docs.ts" }
-deploy = { execute = "bun run scripts/deploy.ts" }
 
 # Quality Assurance
 qa_full = { execute = "bun run scripts/qa-check.ts" }

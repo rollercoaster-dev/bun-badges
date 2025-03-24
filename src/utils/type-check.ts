@@ -88,10 +88,11 @@ const testOB2Assertion: OB2BadgeAssertion = {
   issuedOn: "2023-01-01T00:00:00Z",
 };
 
-// Test type guards
-console.log("Is valid OB3 credential:", isOpenBadgeCredential(testCredential));
-console.log("Is valid OB2 assertion:", isOB2BadgeAssertion(testOB2Assertion));
+// Import console logger for tests
+import { logger } from "./logger";
 
-console.log(
-  "Type check complete. If you see this, the type imports are working.",
-);
+// Test type guards
+logger.info("Is valid OB3 credential:", isOpenBadgeCredential(testCredential));
+logger.info("Is valid OB2 assertion:", isOB2BadgeAssertion(testOB2Assertion));
+
+logger.info("Type check complete. The type imports are working.");

@@ -41,6 +41,21 @@ export const authorizationCodes = pgTable("authorization_codes", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Access tokens for OAuth
+export const oauthAccessTokens = pgTable("oauth_access_tokens", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  token: text("token").notNull().unique(),
+  clientId: uuid("client_id")
+    .references(() => oauthClients.id)
+    .notNull(),
+  userId: text("user_id").notNull(),
+  scope: text("scope").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  isRevoked: boolean("is_revoked").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Export types for use in services
 export type NewOAuthClient = typeof oauthClients.$inferInsert;
 export type NewAuthorizationCode = typeof authorizationCodes.$inferInsert;
+export type NewOAuthAccessToken = typeof oauthAccessTokens.$inferInsert;

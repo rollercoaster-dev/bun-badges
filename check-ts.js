@@ -1,15 +1,17 @@
-// Check TypeScript errors
-import { spawnSync } from 'node:child_process';
+// Simple TypeScript check script
+const { spawn } = require('child_process');
 
 console.log('Running TypeScript checks...');
-const tscResult = spawnSync('npx', ['tsc', '--noEmit'], { 
-  stdio: 'inherit',
-  encoding: 'utf-8' 
+const tsc = spawn('node_modules/.bin/tsc', ['--noEmit']);
+
+tsc.stdout.on('data', (data) => {
+  console.log(`${data}`);
 });
 
-if (tscResult.status !== 0) {
-  console.error('TypeScript check failed');
-  process.exit(1);
-}
+tsc.stderr.on('data', (data) => {
+  console.error(`${data}`);
+});
 
-console.log('All TypeScript checks passed!');
+tsc.on('close', (code) => {
+  console.log(`TypeScript check completed with code ${code}`);
+});

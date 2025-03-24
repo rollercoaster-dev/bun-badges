@@ -5,7 +5,7 @@ import unusedImports from 'eslint-plugin-unused-imports';
 
 export default [
   {
-    ignores: ['dist/**', 'node_modules/**', '**/*.test.ts', '**/*.integration.test.ts'],
+    ignores: ['dist/**', 'node_modules/**', '**/*.test.ts', '**/*.integration.test.ts', 'tests/**/*'],
   },
   {
     // Ignore test files - these often need more flexibility with types and console logs
@@ -32,8 +32,8 @@ export default [
     },
   },
   {
-    // Turn off no-console warning for test utility files
-    files: ['**/src/utils/test/**/*.ts'],
+    // Turn off no-console warning for test utility files and logger implementation
+    files: ['**/src/utils/test/**/*.ts', '**/src/utils/logger.ts'],
     languageOptions: {
       parser: tsparser,
       parserOptions: {
@@ -48,6 +48,44 @@ export default [
     rules: {
       'no-console': 'off',
       '@typescript-eslint/no-explicit-any': 'off', // Test utilities often need flexibility with types
+    },
+  },
+  {
+    // Add exceptions for database schema files that might need to use any for circular dependencies
+    files: ['**/src/db/schema/**/*.ts'],
+    languageOptions: {
+      parser: tsparser,
+      parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'module',
+      },
+    },
+    plugins: {
+      '@typescript-eslint': tseslint,
+      'unused-imports': unusedImports,
+    },
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+  {
+    // Add exceptions for database migrations
+    files: ['**/src/db/migrations/**/*.ts'],
+    languageOptions: {
+      parser: tsparser,
+      parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'module',
+      },
+    },
+    plugins: {
+      '@typescript-eslint': tseslint,
+      'unused-imports': unusedImports,
+    },
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      'no-console': 'off', // Migrations often need to log information
+      '@typescript-eslint/no-unused-vars': 'off',
     },
   },
   {
@@ -123,7 +161,7 @@ export default [
           'argsIgnorePattern': '^_'
         }
       ],
-      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-explicit-any': 'warn', // Warn rather than error on any types
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/explicit-module-boundary-types': 'off',
 

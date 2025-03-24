@@ -186,7 +186,7 @@ afterEach(async () => {
 });
 
 // Real DB query
-const results = await testDb.select().from(table).where(eq(table.id, id));
+const results = await testDb().select().from(table).where(eq(table.id, id));
 ```
 
 ## Addressing Common Issues

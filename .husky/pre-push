@@ -1,7 +1,9 @@
-# Run TypeScript check and tests before pushing
-echo "Running TypeScript checks and unit tests before pushing..."
-bash ./test-unit.sh
-# The integration tests require Docker and are run manually
-# To run integration tests: ./test-integration.sh
+# Run TypeScript check and all tests before pushing
+echo "Running TypeScript checks and all tests before pushing..."
+bun run tsc
+bun run test:unit
+bun run test:integration
+bun run test:e2e
+# This runs all tests, including unit, integration, and e2e tests
 # Allow push even if tests fail for now
 exit 0

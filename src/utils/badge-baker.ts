@@ -1,5 +1,4 @@
 import * as pngitxt from "png-itxt";
-import { Readable, Writable } from "stream";
 import { readTextFromBlob } from "@larswander/png-text";
 import {
   OpenBadgeCredential,
@@ -33,45 +32,19 @@ export async function bakePngBadge(
   imageBuffer: Buffer,
   assertion: BadgeAssertion,
 ): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    try {
-      // Create readable stream from buffer
-      const readableStream = Readable.from(imageBuffer);
+  try {
+    // Use pngitxt.set directly with the buffer
+    const pngWithMetadata = pngitxt.set(imageBuffer, {
+      openbadges: JSON.stringify(assertion),
+    });
 
-      // Create a buffer to store the output
-      const chunks: Buffer[] = [];
-      const writableStream = new Writable({
-        write(chunk, _, callback) {
-          chunks.push(Buffer.from(chunk));
-          callback();
-        },
-      });
-
-      // Pipe the image through png-itxt to add the assertion
-      readableStream
-        .pipe(
-          pngitxt.set({
-            keyword: "openbadges",
-            value: JSON.stringify(assertion),
-            language: "",
-            translated: "",
-            compressed: false,
-            compression_type: 0,
-          }),
-        )
-        .pipe(writableStream)
-        .on("finish", () => {
-          // Combine all chunks into a single buffer
-          const resultBuffer = Buffer.concat(chunks);
-          resolve(resultBuffer);
-        })
-        .on("error", (err: Error) => {
-          reject(err);
-        });
-    } catch (error) {
-      reject(error);
+    return pngWithMetadata;
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(`Failed to bake PNG badge: ${error.message}`);
     }
-  });
+    throw new Error("Failed to bake PNG badge: Unknown error");
+  }
 }
 
 /**

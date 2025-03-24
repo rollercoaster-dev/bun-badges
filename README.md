@@ -193,31 +193,57 @@ REFRESH_TOKEN_EXPIRY=7d
 
 ## Testing
 
-The project includes both unit tests and integration tests. Use these commands to run tests:
+### Test Environment Setup
+
+The project uses a comprehensive test suite including unit, integration, and end-to-end tests. To simplify running tests in different environments, we've implemented the following:
+
+1. **Environment Configuration**:
+   - `.env.test` - Local test environment configuration
+   - `.env.ci` - CI environment configuration
+
+2. **Test Setup Script**:
+   - Located at `scripts/run-tests.sh`
+   - Run specific test types: `scripts/run-tests.sh [unit|integration|e2e|database|all]`
+   - Automatically detects environment and sets appropriate variables
+
+3. **Docker Database Integration**:
+   - Tests use a dedicated PostgreSQL container defined in `docker-compose.test.yml`
+   - Set `SKIP_DOCKER=true` to use an existing database connection
+   - CI environments automatically use service containers instead of Docker
+
+4. **Database Connection**:
+   - Automatic fallback and retry mechanisms
+   - Connection pooling optimized for tests
+   - Default configuration uses port 5434 to avoid conflicts with development database
+
+### Running Tests
 
 ```bash
-# Run all tests (unit + integration)
-bun test:all
+# Run all tests
+bun test
 
-# Run unit tests only (fast)
-bun test:unit
+# Run specific test types using the helper script
+scripts/run-tests.sh unit       # Only unit tests
+scripts/run-tests.sh integration # Only integration tests
+scripts/run-tests.sh e2e        # Only end-to-end tests
+scripts/run-tests.sh database   # Database connection tests
 
-# Run integration tests only (requires Docker)
-bun test:integration
-
-# Run a specific test file (auto-detects test type)
-bun test:file path/to/test/file.ts
-
-# Run a specific unit test file
-bun test:unit:file path/to/unit/test.ts
-
-# Run a specific integration test file
-bun test:integration:file path/to/integration/test.ts
+# Manual test configuration
+SKIP_DOCKER=true bun test                  # Skip Docker setup, use existing database
+INTEGRATION_TEST=true bun test tests/integration # Only run integration tests
+E2E_TEST=true bun test tests/e2e           # Only run E2E tests
 ```
 
-Integration tests require Docker to run a PostgreSQL database container.
+### CI/CD Pipeline
 
-For more details about testing, see [TESTING.md](docs/TESTING.md).
+The CI/CD pipeline is configured to run tests in GitHub Actions:
+
+1. Sets up a PostgreSQL service container
+2. Creates and migrates the test database
+3. Runs unit, integration, and E2E tests separately
+4. Uses the CI-specific environment configuration
+
+See `.github/workflows/ci-tests.yml` for the complete configuration.
 
 ## Contributing
 
