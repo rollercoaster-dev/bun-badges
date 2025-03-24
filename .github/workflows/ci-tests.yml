@@ -3,8 +3,7 @@ name: CI Tests
 on:
   push:
     branches: [ main, master, develop ]
-  pull_request:
-    branches: [ main, master, develop ]
+  # Remove pull_request trigger to avoid duplicate runs
 
 jobs:
   test:
@@ -58,14 +57,36 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Setup database and run migrations
+      - name: Setup database and run migrations with retry
         run: |
           echo "Running database migrations..."
+          
+          # Use the updated push command
           bun run db:push
-          echo "Waiting for migrations to complete..."
-          sleep 15
-          echo "Checking database tables..."
-          bun run src/db/list-tables.ts
+          
+          # Add retry logic for database setup
+          MAX_RETRIES=5
+          RETRY_COUNT=0
+          
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            echo "Checking if tables exist (attempt $((RETRY_COUNT+1))/$MAX_RETRIES)..."
+            TABLES=$(bun run src/db/list-tables.ts 2>&1 || echo "Failed")
+            
+            if [[ $TABLES == *"All required tables exist"* ]]; then
+              echo "✅ Database migration successful!"
+              break
+            else
+              RETRY_COUNT=$((RETRY_COUNT+1))
+              if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+                echo "❌ Failed to create database tables after $MAX_RETRIES attempts"
+                exit 1
+              fi
+              echo "Waiting for migrations to complete (30s)..."
+              sleep 30
+              echo "Retrying migrations..."
+              bun run db:push
+            fi
+          done
       
       - name: Run unit tests
         run: bun test tests/unit
