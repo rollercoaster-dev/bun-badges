@@ -1,0 +1,16 @@
+# This workflow file will be deleted
+# Keeping minimal valid syntax until deletion to prevent GitHub Actions errors
+
+name: CI Tests (DEPRECATED)
+
+on:
+  # No triggers - this workflow is being removed
+  workflow_dispatch:
+    # Manual trigger only for debugging if needed
+
+jobs:
+  noop:
+    runs-on: ubuntu-latest
+    steps:
+      - name: No-op step
+        run: echo "This workflow is deprecated and will be removed"
