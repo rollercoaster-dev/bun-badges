@@ -8,6 +8,7 @@ import assertions from "@routes/assertions.routes";
 import issuers from "@routes/issuers.routes";
 import verification from "@routes/verification.routes";
 import status from "@routes/status.routes";
+import health from "@routes/health.routes";
 import { createOAuthRouter } from "@routes/oauth.routes";
 import { OAuthController } from "@controllers/oauth.controller";
 import { errorHandler } from "@middleware/error-handler";
@@ -79,7 +80,7 @@ app.route("/docs", createSwaggerUI());
 app.get("/", (c) => c.json({ message: "Bun Badges API" }));
 
 // Add comprehensive health check endpoint
-app.route("/health", healthRoutes);
+app.route("/health", health);
 
 // Server startup configuration
 const port = parseInt(process.env.PORT || "7777", 10);

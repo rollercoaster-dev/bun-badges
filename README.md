@@ -102,6 +102,76 @@ docker-compose logs -f
 docker-compose down
 ```
 
+### Using the Docker Image
+
+The project provides a ready-to-use Docker image that can be pulled from GitHub Container Registry or built locally.
+
+#### Pulling from GitHub Container Registry
+
+```bash
+# Pull the latest image
+docker pull ghcr.io/rollercoaster-dev/bun-badges:latest
+
+# Run the container
+docker run -p 3000:3000 --name bun-badges \
+  -e DATABASE_URL=postgres://postgres:postgres@host.docker.internal:5432/bun_badges \
+  -e NODE_ENV=production \
+  ghcr.io/rollercoaster-dev/bun-badges:latest
+```
+
+#### Building Locally
+
+```bash
+# Build the image
+docker build -t bun-badges:local .
+
+# Run the container
+docker run -p 3000:3000 --name bun-badges \
+  -e DATABASE_URL=postgres://postgres:postgres@host.docker.internal:5432/bun_badges \
+  bun-badges:local
+```
+
+#### Using with Docker Compose
+
+We provide a sample `docker-compose.example.yml` that you can use as a starting point:
+
+```bash
+# Copy the example file
+cp docker-compose.example.yml docker-compose.yml
+
+# Edit as needed
+# Then run
+docker-compose up -d
+```
+
+For more detailed instructions, configuration options, and best practices, see our [Docker Deployment Guide](docs/docker-deployment.md).
+
+#### Environment Variables
+
+When running the Docker image, you can configure it with the following environment variables:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `PORT` | The port the server listens on | `3000` |
+| `NODE_ENV` | Environment (production, development) | `production` |
+| `DATABASE_URL` | PostgreSQL connection string | Required |
+| `LOG_LEVEL` | Logging level (debug, info, warn, error) | `info` |
+| `HOST` | Host to bind to | `0.0.0.0` |
+
+#### Connecting to a Database
+
+The application requires a PostgreSQL database. In a production environment, we recommend:
+
+1. Using a managed PostgreSQL service
+2. Or running PostgreSQL in a separate container (as shown in `docker-compose.example.yml`)
+3. Properly securing your database connection with TLS and strong passwords
+
+Following our [PostgreSQL Guidelines](#postgresql-guidelines), the application:
+- Uses Drizzle ORM to interact with the database
+- Maintains migrations in the `/drizzle` directory
+- Uses JSONB columns for flexible Open Badges JSON structures
+- Indexes key fields for optimal performance
+
 ### Manual Deployment
 
 ```bash
@@ -319,3 +389,34 @@ The Docker configuration is already set up to mount the `./certs` directory into
 **Current limitations:**
 - Bun currently only supports HTTPS over HTTP/1.1
 - HTTP/2 is not yet supported
+
+## PostgreSQL Guidelines
+
+This project uses PostgreSQL as its database system, following these principles:
+
+### Core Database Approach
+
+- **Primary Storage:** PostgreSQL is used as the primary database for all badge data
+- **ORM Integration:** Drizzle ORM is used for database interactions, providing type safety and query building
+- **Migration Strategy:** Database migrations are versioned and maintained in the `/drizzle` directory
+- **Flexible Schema Design:** JSONB columns are used for storing dynamic Open Badges JSON structures
+- **Performance Optimization:** Key fields are indexed for optimal query performance
+
+### Database Setup
+
+The application requires a PostgreSQL database (version 13 or higher recommended). Connection is configured via the `DATABASE_URL` environment variable, which should be in the following format:
+
+```
+postgres://username:password@hostname:port/database
+```
+
+### Schema Structure
+
+The core schema includes tables for:
+- Issuers (issuer_profiles)
+- Badges (badge_classes)
+- Assertions (badge_assertions)
+- Keys and credentials (signing_keys)
+- Status lists for revocation
+
+Each table maintains both structured fields for querying and JSONB fields for the complete badge data.

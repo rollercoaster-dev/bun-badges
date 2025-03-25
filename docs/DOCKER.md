@@ -7,76 +7,88 @@ This document explains the Docker configuration for the Bun Badges server, inclu
 The project includes the following Docker-related files:
 
 - `Dockerfile` - Production container configuration with multi-stage build
-- `Dockerfile.dev` - Development container configuration with hot reloading
+- `Dockerfile.dev` - Development container configuration with hot reloading and native module support
 - `docker-compose.yml` - Production deployment configuration
 - `docker-compose.dev.yml` - Development deployment configuration
+- `docker-compose.test.yml` - Test environment configuration
 - `.dockerignore` - Files excluded from Docker context
 
 ## Dockerfile Structure
 
 ### Production Dockerfile
 
-The production Dockerfile uses a multi-stage build approach to optimize the final image size and build caching:
+The production Dockerfile uses a multi-stage build approach with Alpine Linux for a minimal footprint:
 
 ```dockerfile
-# Use the official Bun image
-FROM oven/bun:1 AS base
+FROM oven/bun:1.0-alpine as base
 WORKDIR /app
 
-# Install dependencies stage - improves caching
-FROM base AS install
+# Install needed system dependencies
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    openssl \
+    ca-certificates \
+    curl
+
+# Stage for installing dependencies
+FROM base as install
 RUN mkdir -p /temp/dev
-COPY package.json bun.lock* ./temp/dev/
-RUN cd /temp/dev && bun install --frozen-lockfile
+COPY package.json bun.lockb /temp/dev/
+RUN cd /temp/dev && bun install --production=false
 
-# Development dependencies - needed for builds
-RUN mkdir -p /temp/prod
-COPY package.json bun.lock* ./temp/prod/
-RUN cd /temp/prod && bun install --frozen-lockfile --production
-
-# Build stage - compile with all development dependencies
-FROM base AS build
+# Final build stage
+FROM base as final
 COPY --from=install /temp/dev/node_modules ./node_modules
 COPY . .
-RUN bun run build
-
-# Production stage - only include what's needed to run
-FROM base AS release
-COPY --from=install /temp/prod/node_modules ./node_modules
-COPY --from=build /app/dist ./dist
-COPY --from=build /app/drizzle ./drizzle
-COPY package.json .
-
-# Set production environment
-ENV NODE_ENV=production
-ENV PORT=7777
-
-# Expose the port the app will run on
-EXPOSE 7777
-
-# Run migrations and start the application
-CMD bun run db:migrate && bun run start
+CMD ["bun", "run", "src/index.ts"]
 ```
 
 Key stages:
-1. **Base** - Sets up the Bun runtime
-2. **Install** - Separate stages for dev and prod dependencies to optimize caching
-3. **Build** - Builds the application with development dependencies
-4. **Release** - Final stage with only production dependencies and build artifacts
+1. **Base** - Sets up the Bun runtime with Alpine Linux and system dependencies
+2. **Install** - Handles dependency installation with production flag
+3. **Final** - Creates the runtime environment with minimal layers
 
 ### Development Dockerfile
 
-The development Dockerfile is simpler, designed for hot reloading during development:
+The development Dockerfile is optimized for native modules and development tools:
 
 ```dockerfile
-# Use the official Bun image
-FROM oven/bun:1
+# Start with the Node 18 image which has better support for native modules
+FROM node:18-bullseye
 
 WORKDIR /app
 
+# Install Python and other dependencies needed for Canvas
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python-is-python3 \
+    build-essential \
+    libcairo2-dev \
+    libpango1.0-dev \
+    libjpeg-dev \
+    libgif-dev \
+    librsvg2-dev \
+    pkg-config \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Bun
+RUN curl -fsSL https://bun.sh/install | bash
+ENV PATH="/root/.bun/bin:${PATH}"
+
+# Install canvas globally first to help with dependency resolution
+RUN npm install -g canvas@2.11.2
+
 # Copy package.json and install dependencies
-COPY package.json bun.lock* ./
-RUN bun install
+COPY package.json ./
+
+# Pin canvas to a specific version
+RUN sed -i 's/"canvas": "^3.1.0"/"canvas": "2.11.2"/g' package.json
+
+# Install dependencies
+RUN bun install --no-cache
 
 # Copy the rest of the application code
 COPY . .
@@ -84,6 +96,7 @@ COPY . .
 # Set development environment
 ENV NODE_ENV=development
 ENV PORT=7777
+ENV DOCKER_CONTAINER=true
 
 # Expose the port the app will run on
 EXPOSE 7777
@@ -94,235 +107,137 @@ CMD ["bun", "run", "dev"]
 
 ## Docker Compose Configuration
 
-### Production
+### Test Environment
 
-The `docker-compose.yml` file defines:
-
-1. **API Service**:
-   - Built from the production Dockerfile
-   - Connects to the PostgreSQL database
-   - Configures environment variables
-   - Sets up health checks
-   - Maps ports
-
-2. **Database Service**:
-   - Uses PostgreSQL 15
-   - Configures credentials via environment variables
-   - Persists data via named volume
-   - Sets up health checks
+The `docker-compose.test.yml` file provides a complete test environment:
 
 ```yaml
 version: '3.8'
 
 services:
-  api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: bun-badges-api
-    restart: unless-stopped
-    depends_on:
-      - db
+  # Test database service
+  db_test:
+    image: postgres:16-alpine
     environment:
-      NODE_ENV: production
-      PORT: 7777
-      DATABASE_URL: postgres://${POSTGRES_USER:-badges_user}:${POSTGRES_PASSWORD:-badges_password}@db:5432/${POSTGRES_DB:-badges}
-      JWT_SECRET: ${JWT_SECRET:-your-secret-key}
-      JWT_EXPIRY: ${JWT_EXPIRY:-15m}
-      REFRESH_TOKEN_EXPIRY: ${REFRESH_TOKEN_EXPIRY:-7d}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: bun_badges_test
+      POSTGRES_INITDB_ARGS: "--nosync"
+      PGDATA: /var/lib/postgresql/data/pgdata
+    command: postgres -c fsync=off -c synchronous_commit=off -c full_page_writes=off -c random_page_cost=1.0
     ports:
-      - "${PORT:-7777}:7777"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:7777/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+      - "5434:5432"
     volumes:
-      - ./dist:/app/dist
-      - ./drizzle:/app/drizzle
-    networks:
-      - bun-badges-network
-
-  db:
-    image: postgres:15
-    container_name: bun-badges-db
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-badges}
-      POSTGRES_USER: ${POSTGRES_USER:-badges_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-badges_password}
-    ports:
-      - "${DB_PORT:-5432}:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_test_data:/var/lib/postgresql/data
+      - ./scripts/init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql
+      - ./scripts/test-db:/docker-entrypoint-initdb.d/schema
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-badges_user} -d ${POSTGRES_DB:-badges}"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 5
-    networks:
-      - bun-badges-network
 
-volumes:
-  postgres_data:
-
-networks:
-  bun-badges-network:
-    driver: bridge
-```
-
-### Development
-
-The `docker-compose.dev.yml` file is similar but configured for development:
-
-- Uses development Dockerfile
-- Mounts the source code directory for hot reloading
-- Uses a separate database volume
-- Sets NODE_ENV to development
-
-```yaml
-version: '3.8'
-
-services:
-  api:
+  # Test runner service
+  test_runner:
     build:
       context: .
       dockerfile: Dockerfile.dev
-    container_name: bun-badges-api-dev
-    restart: unless-stopped
-    depends_on:
-      - db
     environment:
-      NODE_ENV: development
-      PORT: 7777
-      DATABASE_URL: postgres://${POSTGRES_USER:-badges_user}:${POSTGRES_PASSWORD:-badges_password}@db:5432/${POSTGRES_DB:-badges}
-      JWT_SECRET: ${JWT_SECRET:-your-secret-key}
-      JWT_EXPIRY: ${JWT_EXPIRY:-15m}
-      REFRESH_TOKEN_EXPIRY: ${REFRESH_TOKEN_EXPIRY:-7d}
-    ports:
-      - "${PORT:-7777}:7777"
+      - NODE_ENV=test
+      - E2E_TEST=true
+      - DATABASE_URL=postgres://postgres:postgres@db_test:5432/bun_badges_test
+      - JWT_SECRET=test-jwt-secret-for-e2e-tests
     volumes:
       - .:/app
-      - /app/node_modules
-    command: bun run dev
-    networks:
-      - bun-badges-network-dev
-
-  db:
-    image: postgres:15
-    container_name: bun-badges-db-dev
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-badges}
-      POSTGRES_USER: ${POSTGRES_USER:-badges_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-badges_password}
-    ports:
-      - "${DB_PORT:-5432}:5432"
-    volumes:
-      - postgres_data_dev:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-badges_user} -d ${POSTGRES_DB:-badges}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    networks:
-      - bun-badges-network-dev
-
-volumes:
-  postgres_data_dev:
-
-networks:
-  bun-badges-network-dev:
-    driver: bridge
+      - node_modules:/app/node_modules
+      - ./test-results:/app/test-results
+    command: ["sh", "-c", "bun install && bun run db:migrate && bun test"]
 ```
 
-## .dockerignore
+## CI/CD Pipeline
 
-The `.dockerignore` file excludes unnecessary files from the Docker build context to reduce build time and image size:
+The project uses GitHub Actions for automated container builds and publishing:
 
-```
-# Node modules and logs
-node_modules
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+1. **Test Stage**:
+   - Runs all tests in isolated containers
+   - Uses `docker-compose.test.yml`
+   - Ensures database migrations work
 
-# Environment variables
-.env
-.env.*
-!.env.example
+2. **Security Scan**:
+   - Hadolint for Dockerfile best practices
+   - Trivy for vulnerability scanning
+   - Results uploaded to GitHub Security
 
-# Editors and OS
-.idea
-.vscode
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-# Docker files
-Dockerfile*
-docker-compose*
-.dockerignore
-
-# Git files
-.git
-.gitignore
-
-# Documentation
-README.md
-LICENSE
-docs/
-
-# Build directories
-dist/
-build/
-coverage/
-
-# Temporary files
-.tmp/
-temp/
-
-# Research and examples
-research/
-examples/
-
-# Cursor workspace
-.cursor/
-```
+3. **Build and Push**:
+   - Multi-platform builds (amd64, arm64)
+   - Automated versioning
+   - GitHub Container Registry publishing
 
 ## Best Practices
 
-1. **Environment Variables**:
-   - Never hardcode sensitive values
-   - Use environment variables with sensible defaults
-   - Document all required environment variables
+1. **Container Security**:
+   - Regular security scanning
+   - Minimal base images
+   - Proper permission management
 
-2. **Security**:
-   - Run containers as non-root when possible
-   - Use health checks for service availability monitoring
-   - Keep base images updated
+2. **Build Optimization**:
+   - Multi-stage builds
+   - Layer caching
+   - Platform-specific optimizations
 
-3. **Performance**:
-   - Use multi-stage builds to reduce image size
-   - Leverage build caching with proper layer ordering
-   - Minimize the number of RUN commands
+3. **Development Workflow**:
+   - Hot reloading support
+   - Native module compatibility
+   - Consistent environments
 
-4. **Development Workflow**:
-   - Use volume mounts for hot reloading during development
-   - Keep development and production configurations separate
+4. **Testing Strategy**:
+   - Isolated test environments
+   - Database optimizations for tests
+   - Comprehensive E2E testing
 
-5. **Database**:
-   - Use named volumes for database persistence
-   - Set up proper health checks for database availability
-   - Include backup procedures
+5. **CI/CD Integration**:
+   - Automated builds and tests
+   - Security scanning
+   - Multi-platform support
+
+## Environment Variables
+
+Key environment variables for different environments:
+
+### Production
+- `NODE_ENV`: Set to 'production'
+- `PORT`: Application port (default: 7777)
+- `DATABASE_URL`: PostgreSQL connection string
+- `JWT_SECRET`: JWT signing key
+
+### Development
+- `NODE_ENV`: Set to 'development'
+- `DOCKER_CONTAINER`: Set to 'true'
+- `PORT`: Application port (default: 7777)
+
+### Test
+- `NODE_ENV`: Set to 'test'
+- `E2E_TEST`: Set to 'true' for E2E tests
+- `DATABASE_URL`: Test database connection
+- `JWT_SECRET`: Test JWT signing key
 
 ## Customizing the Configuration
 
-To customize the Docker configuration:
+1. **Platform Support**:
+   - Add/remove platforms in GitHub Actions
+   - Modify base images for specific needs
 
-1. **Change ports**: Update the `PORT` environment variable in `.env` file
-2. **Modify resources**: Add resource limits to services (memory, CPU)
-3. **Add services**: Extend docker-compose files with additional services (Redis, etc.)
-4. **Custom networks**: Configure network settings for specific requirements 
+2. **Development Tools**:
+   - Add development dependencies
+   - Configure hot reloading
+   - Set up debugging tools
+
+3. **Test Environment**:
+   - Customize test database settings
+   - Add test-specific services
+   - Configure test runners
+
+4. **Security Settings**:
+   - Adjust security scan thresholds
+   - Configure vulnerability reporting
+   - Set up additional scanners 

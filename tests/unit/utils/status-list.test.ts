@@ -8,7 +8,7 @@ import {
   getIndexFromUuid,
   createStatusListCredential,
 } from "../../../src/utils/signing/status-list";
-import FastBitSet from "fast-bitset";
+import BitSet from "../../../src/utils/bitset";
 
 describe("Status List Utilities", () => {
   describe("Bitstring functions", () => {
@@ -19,18 +19,19 @@ describe("Status List Utilities", () => {
 
       // Decode it to verify it has the correct size
       const decoded = decodeBitString(bitstring);
-      expect(decoded).toBeInstanceOf(FastBitSet);
+      expect(decoded).toBeInstanceOf(BitSet);
 
-      // Use getCardinality to check the number of bits set to 1
-      // For a new bitstring, this should be 0 (all bits are 0)
-      expect(decoded.getCardinality()).toBe(0);
+      // Check if all bits are initially set to 0
+      for (let i = 0; i < 128; i++) {
+        expect(decoded.get(i)).toBe(false);
+      }
 
       // Check if we can access the expected bit indices
       expect(() => decoded.get(127)).not.toThrow();
     });
 
     it("should encode and decode a bitstring correctly", () => {
-      const bitset = new FastBitSet(128);
+      const bitset = new BitSet(128);
       bitset.set(10);
       bitset.set(42);
       bitset.set(100);

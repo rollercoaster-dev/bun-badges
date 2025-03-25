@@ -4,7 +4,7 @@
  */
 
 // For efficiently handling bit operations in status lists
-import FastBitSet from "fast-bitset";
+import BitSet from "../bitset";
 
 /**
  * Create a new bitstring for a status list credential
@@ -13,7 +13,7 @@ import FastBitSet from "fast-bitset";
  */
 export function createEncodedBitString(size: number = 16384): string {
   // Create a BitSet of the specified size with all bits set to 0 (not revoked)
-  const bitSet = new FastBitSet(size);
+  const bitSet = new BitSet(size);
   return encodeBitString(bitSet);
 }
 
@@ -22,8 +22,8 @@ export function createEncodedBitString(size: number = 16384): string {
  * @param bitSet BitSet representing status
  * @returns Base64 encoded bitstring
  */
-export function encodeBitString(bitSet: FastBitSet): string {
-  // FastBitSet.toString() returns a binary string representation
+export function encodeBitString(bitSet: BitSet): string {
+  // BitSet.toString() returns a binary string representation
   const bitString = bitSet.toString();
 
   // Convert binary string to a buffer
@@ -38,13 +38,13 @@ export function encodeBitString(bitSet: FastBitSet): string {
  * @param encoded Base64 encoded bitstring
  * @returns BitSet object
  */
-export function decodeBitString(encoded: string): FastBitSet {
+export function decodeBitString(encoded: string): BitSet {
   // Decode Base64 to get the binary representation
   const buffer = Buffer.from(encoded, "base64");
   const bitString = buffer.toString();
 
   // Create a new empty BitSet
-  const bitSet = new FastBitSet(bitString.length);
+  const bitSet = new BitSet(bitString.length);
 
   // Set bits based on the string
   for (let i = 0; i < bitString.length; i++) {
