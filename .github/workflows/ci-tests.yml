@@ -64,9 +64,17 @@ jobs:
           echo "Setting up database with improved CI setup..."
           bun run src/utils/test/ci-database-setup.ts
           
+          # Run evidence_url migration
+          echo "Running evidence_url column migration..."
+          bun run db:migrate:evidence-url
+
           # Display created tables for debugging
           echo "Tables created:"
           PGPASSWORD=${{ secrets.DB_PASSWORD || 'postgres' }} psql -h localhost -U postgres -d bun_badges_test -c "\dt"
+          
+          # Show badge_assertions table schema to confirm evidence_url column
+          echo "badge_assertions table schema:"
+          PGPASSWORD=${{ secrets.DB_PASSWORD || 'postgres' }} psql -h localhost -U postgres -d bun_badges_test -c "\d badge_assertions"
 
       - name: Run unit tests
         run: bun test tests/unit
@@ -88,7 +96,7 @@ jobs:
             # Then run route tests
             find tests/integration -name "*.routes.integration.test.ts" -o -name "*.test.ts" | grep -v "service\|model\|controller\|edge" | sort
           }
-          
+
           # Run the test files in sequence
           echo "Running integration tests in order..."
           for file in $(find_test_files); do
@@ -100,7 +108,7 @@ jobs:
               # Don't exit immediately, continue with other tests
             fi
           done
-          
+
           # Test was successful
           echo "✅ Integration tests completed"
 

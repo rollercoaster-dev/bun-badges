@@ -394,6 +394,26 @@ async function ensureSchemaMatch() {
     } else {
       console.log("✅ public_key column already exists");
     }
+
+    // Check if badge_assertions has evidence_url column
+    const evidenceUrlExists = await testDb().execute(sql`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_name = 'badge_assertions'
+      AND column_name = 'evidence_url'
+    `);
+
+    // Add the column if it doesn't exist
+    if (evidenceUrlExists.rows.length === 0) {
+      console.log("Adding missing evidence_url column to badge_assertions...");
+      await testDb().execute(sql`
+        ALTER TABLE badge_assertions
+        ADD COLUMN IF NOT EXISTS evidence_url text
+      `);
+      console.log("✅ evidence_url column added");
+    } else {
+      console.log("✅ evidence_url column already exists");
+    }
   } catch (error) {
     console.error("❌ Error checking/updating schema:", error);
     throw error;

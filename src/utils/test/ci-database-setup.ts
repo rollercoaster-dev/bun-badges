@@ -144,6 +144,7 @@ export async function setupDatabaseSchema(pool: Pool): Promise<void> {
         "recipient_salt" text,
         "issued_on" timestamp DEFAULT now() NOT NULL,
         "expires_on" timestamp,
+        "evidence_url" text,
         "revoked" boolean DEFAULT false NOT NULL,
         "revocation_reason" text,
         "assertion_json" jsonb,
