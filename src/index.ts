@@ -78,8 +78,8 @@ app.route("/docs", createSwaggerUI());
 // Root route
 app.get("/", (c) => c.json({ message: "Bun Badges API" }));
 
-// Super simple health check endpoint with JSON
-app.get("/health", (c) => c.json({ status: "healthy" }));
+// Add comprehensive health check endpoint
+app.route("/health", healthRoutes);
 
 // Server startup configuration
 const port = parseInt(process.env.PORT || "7777", 10);
