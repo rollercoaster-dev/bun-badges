@@ -29,7 +29,7 @@ jobs:
       # Run tests in container
       - name: Run tests
         run: |
-          docker compose -f docker-compose.test.yml up --build --exit-code-from test
+          docker compose -f docker-compose.test.yml up --build --exit-code-from test_runner
 
   scan:
     runs-on: ubuntu-latest
@@ -57,7 +57,7 @@ jobs:
 
       # Upload scan results
       - name: Upload Trivy scan results
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
           sarif_file: 'trivy-results.sarif'

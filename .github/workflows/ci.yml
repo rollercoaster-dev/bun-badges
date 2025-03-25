@@ -1,4 +1,4 @@
-name: CI/CD
+name: CI
 
 on:
   push:
@@ -36,7 +36,8 @@ jobs:
       LOG_LEVEL: info
       
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
       
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -63,16 +64,6 @@ jobs:
         run: |
           # Check if database is ready
           echo "Waiting for PostgreSQL to be ready..."
-          # Display environment for debugging
-          echo "CI environment: $CI"
-          echo "DATABASE_URL: $DATABASE_URL"
-          echo "NODE_ENV: $NODE_ENV"
-          
-          # Wait for PostgreSQL to be ready
-          for i in {1..10}; do
-            bun -e "fetch('http://localhost:5432').catch(e => console.error('Waiting for PostgreSQL...'))" && break
-            sleep 3
-          done
           
           # Run database setup first
           echo "Setting up database with CI database setup..."
@@ -98,17 +89,13 @@ jobs:
 
       - name: Run e2e tests
         run: bun run test:e2e
-      
-      - name: Cleanup
-        if: always()
-        run: |
-          echo "Cleaning up test environment..."
 
   build:
     needs: test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
       
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -121,8 +108,25 @@ jobs:
       - name: Build
         run: bun run build
         
+      - name: Verify build output
+        run: |
+          # Check if dist/index.js exists
+          if [ ! -f "dist/index.js" ]; then
+            echo "Error: dist/index.js not found. Build failed."
+            exit 1
+          fi
+          
+          # Check for utils modules
+          if [ ! -f "dist/utils/bitset.js" ]; then
+            echo "Error: dist/utils/bitset.js not found. Build failed."
+            exit 1
+          fi
+          
+          echo "✅ Build verification successful"
+        
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: dist
-          path: dist/ 
+          path: dist/
+          retention-days: 1 
