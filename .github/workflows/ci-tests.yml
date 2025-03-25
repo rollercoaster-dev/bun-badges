@@ -64,7 +64,7 @@ jobs:
           echo "Setting up database with improved CI setup..."
           bun run src/utils/test/ci-database-setup.ts
           
-          # Run evidence_url migration
+          # Then run evidence_url migration
           echo "Running evidence_url column migration..."
           bun run db:migrate:evidence-url
 

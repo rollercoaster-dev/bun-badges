@@ -7,7 +7,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     # Add PostgreSQL service container
     services:
       postgres:
@@ -23,7 +23,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-    
+
     # Define environment variables for the test job
     env:
       CI: true
@@ -32,7 +32,7 @@ jobs:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/bun_badges_test
       JWT_SECRET: ci-test-jwt-secret-for-github-actions
       LOG_LEVEL: info
-      
+
     steps:
       - uses: actions/checkout@v4
 
@@ -56,7 +56,37 @@ jobs:
           LOG_LEVEL=info
           SKIP_DOCKER=true
           EOL
+
+      - name: Initialize test database
+        run: |
+          # Check if database is ready
+          echo "Waiting for PostgreSQL to be ready..."
+          # Display environment for debugging
+          echo "CI environment: $CI"
+          echo "DATABASE_URL: $DATABASE_URL"
+          echo "NODE_ENV: $NODE_ENV"
+
+          # First run database setup
+          echo "Setting up database with improved CI setup..."
+          bun run src/utils/test/ci-database-setup.ts
           
+          # Then run evidence_url migration
+          echo "Running evidence_url column migration..."
+          bun run db:migrate:evidence-url
+
+      - name: Create .env.ci file
+        run: |
+          cat > .env.ci << EOL
+          # CI environment configuration
+          DATABASE_URL=postgres://postgres:postgres@localhost:5432/bun_badges_test
+          JWT_SECRET=ci-test-jwt-secret-for-github-actions
+          PORT=3001
+          NODE_ENV=test
+          CI=true
+          LOG_LEVEL=info
+          SKIP_DOCKER=true
+          EOL
+
       - name: Initialize test database
         run: |
           # Check if database is ready

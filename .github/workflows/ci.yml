@@ -74,7 +74,11 @@ jobs:
             sleep 3
           done
           
-          # Run migrations
+          # Run database setup first
+          echo "Setting up database with CI database setup..."
+          bun run src/utils/test/ci-database-setup.ts
+          
+          # Then run migrations
           echo "Running database migrations..."
           bun run db:migrate
           echo "Running evidence_url column migration..."

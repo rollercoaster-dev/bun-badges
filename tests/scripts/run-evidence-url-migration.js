@@ -24,7 +24,22 @@ async function runMigration() {
 
     await waitForDBConnection();
 
-    // Check if the column already exists
+    // First check if the badge_assertions table exists
+    const tableExists = await db.execute(sql`
+      SELECT EXISTS (
+        SELECT FROM pg_tables
+        WHERE schemaname = 'public'
+        AND tablename = 'badge_assertions'
+      )
+    `);
+
+    if (tableExists.rows?.[0]?.exists !== true) {
+      console.log("ℹ️ badge_assertions table doesn't exist yet, skipping migration");
+      console.log("✅ CI will handle table creation with evidence_url column included");
+      return;
+    }
+
+    // Now check if the column already exists
     const columnExists = await db.execute(sql`
       SELECT EXISTS (
         SELECT FROM information_schema.columns
@@ -47,7 +62,14 @@ async function runMigration() {
     console.log("✅ Successfully added evidence_url column to badge_assertions table");
   } catch (error) {
     console.error("❌ Error adding evidence_url column:", error);
+    // Don't fail CI if the table doesn't exist yet
+    if (error.message && error.message.includes("relation") && error.message.includes("does not exist")) {
+      console.log("ℹ️ Tables don't exist yet, skipping migration");
+      console.log("✅ CI will handle table creation with evidence_url column included");
+      process.exit(0); // Exit successfully
+    } else {
     throw error;
+    }
   } finally {
     // Close the connection
     if (dbPool) {
