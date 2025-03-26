@@ -28,6 +28,10 @@ A high-performance Open Badges server implementation using Bun and Hono, support
   - Docker containerization
   - Easy self-hosting
   - OpenAPI/Swagger documentation
+- **Developer Experience**:
+  - Semantic versioning
+  - Comprehensive documentation
+  - Automated releases and container builds
 
 ## Prerequisites
 
@@ -420,3 +424,17 @@ The core schema includes tables for:
 - Status lists for revocation
 
 Each table maintains both structured fields for querying and JSONB fields for the complete badge data.
+
+## Releasing New Versions
+
+This project follows [Semantic Versioning](https://semver.org/) for releases. For details on how to create and manage releases, see our [Versioning Guide](docs/VERSIONING.md).
+
+```bash
+# Create a new release (version determined from commit messages)
+bun run release
+
+# Push changes and tags to trigger a build
+git push --follow-tags origin main
+```
+
+Docker images are automatically built and published to GitHub Container Registry (ghcr.io) when new version tags are pushed.
