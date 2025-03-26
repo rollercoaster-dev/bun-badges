@@ -89,6 +89,51 @@ describe("OAuthController Integration Tests", () => {
         expect(error.message).toContain("Invalid request");
       }
     });
+
+    it("should register a headless client with client credentials grant", async () => {
+      // Mock the createOAuthClient to return a headless client
+      mockDb.createOAuthClient = mock(() =>
+        Promise.resolve({
+          id: "headless-client-id",
+          clientId: "headless-client-id",
+          clientSecret: "test-secret",
+          clientName: "Headless Client",
+          redirectUris: [],
+          scope: "badge:read badge:create",
+          grantTypes: ["client_credentials"],
+          tokenEndpointAuthMethod: "client_secret_basic",
+          isHeadless: true,
+        }),
+      );
+
+      const ctx = createMockContext({
+        method: "POST",
+        body: {
+          client_name: "Headless Client",
+          grant_types: ["client_credentials"],
+          scope: "badge:read badge:create",
+          token_endpoint_auth_method: "client_secret_basic",
+        },
+      });
+
+      const result = (await controller.registerClient(
+        ctx as any,
+      )) as unknown as MockResponse;
+
+      // Ensure json method exists before calling it
+      expect(result.json).toBeDefined();
+      const resultData = result.json ? await result.json() : result.data || {};
+
+      expect(result.status).toBe(201);
+      expect(resultData.client_id).toBeDefined();
+      expect(resultData.client_secret).toBeDefined();
+      expect(resultData.grant_types).toContain("client_credentials");
+      expect(mockDb.createOAuthClient.mock.calls.length).toBe(1);
+
+      // Verify we're passing the isHeadless flag
+      const createClientCall = mockDb.createOAuthClient.mock.calls[0][0];
+      expect(createClientCall.isHeadless).toBe(true);
+    });
   });
 
   describe("authorize", () => {
@@ -312,6 +357,38 @@ describe("OAuthController Integration Tests", () => {
       expect(response.status).toBe(200);
       expect(introspectData.active).toBe(true);
     });
+
+    it("should return inactive status for revoked token", async () => {
+      // Set the expected return value for verifyToken
+      mockJwtUtils.verifyToken.mock.returnValue = Promise.resolve({
+        sub: "test-user-id",
+        scope: "badge:read profile:read",
+        client_id: "test-client-id",
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      });
+
+      // Mock isTokenRevoked to return true
+      mockDb.isTokenRevoked = mock(() => Promise.resolve(true));
+
+      const introspectCtx = createMockContext({
+        method: "POST",
+        body: {
+          token: "revoked-token",
+          client_id: "test-client-id",
+          client_secret: "test-client-secret",
+        },
+        headers: {
+          Authorization: "Bearer test-client-id",
+        },
+      });
+
+      const response = await controller.introspect(introspectCtx as any);
+      const introspectData = (await response.json()) as any;
+
+      expect(response.status).toBe(200);
+      expect(introspectData.active).toBe(false);
+    });
   });
 
   describe("revoke", () => {
@@ -356,6 +433,120 @@ describe("OAuthController Integration Tests", () => {
       const response = await controller.revoke(revokeCtx as any);
 
       expect(response.status).toBe(200);
+    });
+
+    it("should handle already revoked token", async () => {
+      // Set the expected return value for verifyToken
+      mockJwtUtils.verifyToken.mock.returnValue = Promise.resolve({
+        sub: "test-client-id",
+        scope: "badge:read profile:read",
+        client_id: "test-client-id",
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      });
+
+      // Mock isTokenRevoked to return true for already revoked token
+      mockDb.isTokenRevoked = mock(() => Promise.resolve(true));
+
+      const revokeCtx = createMockContext({
+        method: "POST",
+        body: {
+          token: "revoked-token",
+          client_id: "test-client-id",
+          client_secret: "test-client-secret",
+        },
+        headers: {
+          Authorization: "Bearer test-client-id",
+        },
+      });
+
+      const response = await controller.revoke(revokeCtx as any);
+
+      // Should still return 200 OK per OAuth spec even for already revoked tokens
+      expect(response.status).toBe(200);
+    });
+  });
+
+  describe("token with client credentials", () => {
+    it("should support client credentials grant for headless clients", async () => {
+      // Set up client verification
+      mockDb.getOAuthClient = mock(() => {
+        return Promise.resolve({
+          id: "mock-client-uuid",
+          clientId: "test-client-id",
+          clientSecret: "test-client-secret",
+          redirectUris: [],
+          scope: "badge:read badge:create",
+          clientName: "Test Headless Client",
+          grantTypes: ["client_credentials"],
+          tokenEndpointAuthMethod: "client_secret_basic",
+          isActive: true,
+          isHeadless: true,
+        });
+      });
+
+      // Set the expected return value for generateToken
+      mockJwtUtils.generateToken.mock.returnValue =
+        Promise.resolve("test-token");
+
+      const tokenCtx = createMockContext({
+        method: "POST",
+        body: {
+          grant_type: "client_credentials",
+          client_id: "test-client-id",
+          client_secret: "test-client-secret",
+          scope: "badge:read badge:create",
+        },
+      });
+
+      const response = await controller.token(tokenCtx as any);
+      const responseData = (await response.json()) as any;
+
+      expect(response.status).toBe(200);
+      expect(responseData.access_token).toBe("test-token");
+      expect(responseData.token_type).toBe("Bearer");
+      expect(responseData.expires_in).toBe(3600);
+      // No refresh token for client credentials
+      expect(responseData.refresh_token).toBeUndefined();
+    });
+
+    it("should handle invalid grant type", async () => {
+      const tokenCtx = createMockContext({
+        method: "POST",
+        body: {
+          grant_type: "invalid_grant",
+          client_id: "test-client-id",
+          client_secret: "test-client-secret",
+        },
+      });
+
+      try {
+        await controller.token(tokenCtx as any);
+        expect(true).toBe(false); // Should not reach here
+      } catch (error: any) {
+        expect(error.message).toContain("Unsupported grant type");
+      }
+    });
+
+    it("should handle invalid client credentials", async () => {
+      // Mock client verification to return null for invalid client
+      mockDb.getOAuthClient = mock(() => Promise.resolve(null));
+
+      const tokenCtx = createMockContext({
+        method: "POST",
+        body: {
+          grant_type: "client_credentials",
+          client_id: "invalid-client",
+          client_secret: "wrong-secret",
+        },
+      });
+
+      try {
+        await controller.token(tokenCtx as any);
+        expect(true).toBe(false); // Should not reach here
+      } catch (error: any) {
+        expect(error.message).toContain("Invalid client authentication");
+      }
     });
   });
 });
