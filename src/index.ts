@@ -77,7 +77,9 @@ app.route("/api", api);
 app.route("/docs", createSwaggerUI());
 
 // Root route
-app.get("/", (c) => c.json({ message: "Bun Badges API" }));
+app.get("/", (c) =>
+  c.json({ message: "Bun Badges API - Hot Reload Working!" }),
+);
 
 // Add comprehensive health check endpoint
 app.route("/health", health);

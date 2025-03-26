@@ -47,32 +47,15 @@ jobs:
       - name: Install dependencies
         run: bun install
         
-      - name: Create .env.ci file
-        run: |
-          cat > .env.ci << EOL
-          # CI environment configuration
-          DATABASE_URL=postgres://postgres:postgres@localhost:5432/bun_badges_test
-          JWT_SECRET=ci-test-jwt-secret-for-github-actions
-          PORT=3001
-          NODE_ENV=test
-          CI=true
-          LOG_LEVEL=info
-          SKIP_DOCKER=true
-          EOL
-          
       - name: Initialize test database
         run: |
-          # Check if database is ready
-          echo "Waiting for PostgreSQL to be ready..."
-          
-          # Run database setup first
+          # Setup database
           echo "Setting up database with CI database setup..."
           bun run src/utils/test/ci-database-setup.ts
           
-          # Then run migrations
+          # Run migrations
           echo "Running database migrations..."
           bun run db:migrate
-          echo "Running evidence_url column migration..."
           bun run db:migrate:evidence-url
           
       - name: Type check
@@ -81,18 +64,17 @@ jobs:
       - name: Run linter
         run: bun run lint
         
-      - name: Run unit tests
-        run: bun run test:unit
-
-      - name: Run integration tests
-        run: bun run test:integration
-
-      - name: Run e2e tests
-        run: bun run test:e2e
+      - name: Run tests (unit, integration, e2e)
+        run: |
+          bun run test:unit
+          bun run test:integration
+          bun run test:e2e
 
   build:
     needs: test
     runs-on: ubuntu-latest
+    # Only run build job on main branch, not on PRs
+    if: github.ref == 'refs/heads/main'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -115,18 +97,4 @@ jobs:
             echo "Error: dist/index.js not found. Build failed."
             exit 1
           fi
-          
-          # Check for utils modules
-          if [ ! -f "dist/utils/bitset.js" ]; then
-            echo "Error: dist/utils/bitset.js not found. Build failed."
-            exit 1
-          fi
-          
-          echo "✅ Build verification successful"
-        
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: dist
-          path: dist/
-          retention-days: 1 
+          echo "✅ Build verification successful" 

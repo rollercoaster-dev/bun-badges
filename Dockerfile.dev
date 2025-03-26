@@ -17,17 +17,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpango1.0-dev \
     libjpeg-dev \
     libgif-dev \
+    ca-certificates \
+    gnupg \
     && apt-get install -y -t bookworm-backports librsvg2-dev \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list \
+    && apt-get update \
     && apt-get install -y nodejs \
     && npm install -g node-gyp \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-
-# Copy BitSet global preload script 
-RUN echo 'import BitSet from "fast-bitset"; globalThis.BitSet = BitSet;' > /app/global-bitset.js
 
 # Set environment variables
 ENV PORT=3000 \
@@ -37,29 +39,15 @@ ENV PORT=3000 \
 # Expose ports for development
 EXPOSE ${PORT}
 
-# We don't copy the code or install dependencies here
-# Instead, we'll mount the code volume at runtime and install deps then
-# This allows for live code changes without rebuilding the image
+# Create a directory for startup scripts that won't be affected by volume mounts
+RUN mkdir -p /docker-scripts
 
-# Create a startup script for development
-RUN echo '#!/bin/bash\n\
-if [ ! -f "package.json" ]; then\n\
-  echo "Error: package.json not found. Please make sure you mount your project to /app"\n\
-  exit 1\n\
-fi\n\
-\n\
-# Install dependencies if node_modules doesn't exist\n\
-if [ ! -d "node_modules" ]; then\n\
-  echo "Installing dependencies..."\n\
-  bun install\n\
-fi\n\
-\n\
-# Run the dev command\n\
-exec bun --preload /app/global-bitset.js "$@"\n\
-' > /app/start-dev.sh && chmod +x /app/start-dev.sh
+# Copy the scripts to a location that won't be overwritten by volume mounts
+COPY scripts/start-dev.sh /docker-scripts/start-dev.sh
+COPY scripts/preload-global-bitset.js /docker-scripts/preload-global-bitset.js
+RUN chmod +x /docker-scripts/start-dev.sh
 
 # Set the entrypoint to the startup script
-ENTRYPOINT ["/app/start-dev.sh"]
+ENTRYPOINT ["/docker-scripts/start-dev.sh"]
 
-# Default command is to start the development server
-CMD ["run", "dev"]
+# No need for CMD as the entrypoint script handles everything

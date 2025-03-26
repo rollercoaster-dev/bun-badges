@@ -85,6 +85,13 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/drizzle ./drizzle
 COPY --from=builder /app/package.json ./package.json
 
+# Create a directory for startup scripts that won't be affected by volume mounts
+RUN mkdir -p /docker-scripts
+
+# Copy the production startup script to the Docker scripts directory
+COPY --from=builder /app/scripts/start-prod.sh /docker-scripts/start-prod.sh
+RUN chmod +x /docker-scripts/start-prod.sh
+
 # Environment variables
 ARG PORT=3000
 ENV NODE_ENV=production \
@@ -102,5 +109,5 @@ EXPOSE ${PORT}
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:${PORT}/health || exit 1
 
-# Run the application
-CMD ["bun", "dist/index.js"]
+# Run the application using our startup script
+ENTRYPOINT ["/docker-scripts/start-prod.sh"]

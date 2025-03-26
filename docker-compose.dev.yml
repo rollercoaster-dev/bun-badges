@@ -22,10 +22,12 @@ services:
         condition: service_healthy
     volumes:
       - .:/app:delegated
-      - /app/node_modules
+      - node_modules:/app/node_modules
       - ./certs:/app/certs:delegated
+      # Startup scripts are in /docker-scripts directory which is outside the /app mount point
     networks:
       - bun-badges-network-dev
+    restart: unless-stopped
     # The Dockerfile.dev entrypoint will handle installation and startup
 
   db:
@@ -40,6 +42,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - bun-badges-network-dev
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 5s
@@ -48,6 +51,7 @@ services:
 
 volumes:
   postgres_data:
+  node_modules:
 
 networks:
   bun-badges-network-dev:
