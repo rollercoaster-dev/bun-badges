@@ -7,7 +7,43 @@ on:
     branches: [ "main" ]
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 'latest'
+          
+      - name: Install dependencies
+        run: bun install
+        
+      - name: Run linter
+        run: bun run lint
+
+  typecheck:
+    needs: [lint]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 'latest'
+          
+      - name: Install dependencies
+        run: bun install
+        
+      - name: Type check
+        run: bun run tsc
+
   test:
+    needs: [typecheck]
     runs-on: ubuntu-latest
     
     # Add PostgreSQL service container
@@ -57,12 +93,6 @@ jobs:
           echo "Running database migrations..."
           bun run db:migrate
           bun run db:migrate:evidence-url
-          
-      - name: Type check
-        run: bun run tsc
-
-      - name: Run linter
-        run: bun run lint
         
       - name: Run tests (unit, integration, e2e)
         run: |
@@ -71,7 +101,7 @@ jobs:
           bun run test:e2e
 
   build:
-    needs: test
+    needs: [test]
     runs-on: ubuntu-latest
     # Only run build job on main branch, not on PRs
     if: github.ref == 'refs/heads/main'

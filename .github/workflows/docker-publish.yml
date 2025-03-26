@@ -1,11 +1,16 @@
 name: Docker Build and Publish
 
 on:
+  # Run after CI workflow completes on main branch
+  workflow_run:
+    workflows: ["CI"]
+    branches: [main]
+    types:
+      - completed
+  # For tag releases (which will run their own tests)
   push:
-    branches: [ "main" ]
-    # Publish semver tags as releases
     tags: [ 'v*.*.*' ]
-  # Allow manual triggers
+  # Manual trigger for debugging
   workflow_dispatch:
 
 env:
@@ -15,10 +20,144 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  # For tags, we need to run each step in sequence
+  lint:
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 'latest'
+          
+      - name: Install dependencies
+        run: bun install
+        
+      - name: Run linter
+        run: bun run lint
+
+  typecheck:
+    needs: [lint]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 'latest'
+          
+      - name: Install dependencies
+        run: bun install
+        
+      - name: Type check
+        run: bun run tsc
+
+  test-tags:
+    needs: [typecheck]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push'
+    
+    # Add PostgreSQL service container
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: bun_badges_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    # Define environment variables for the test job
+    env:
+      CI: true
+      NODE_ENV: test
+      SKIP_DOCKER: true
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/bun_badges_test
+      JWT_SECRET: ci-test-jwt-secret-for-github-actions
+      LOG_LEVEL: info
+      
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 'latest'
+          
+      - name: Install dependencies
+        run: bun install
+        
+      - name: Initialize test database
+        run: |
+          # Setup database
+          echo "Setting up database with CI database setup..."
+          bun run src/utils/test/ci-database-setup.ts
+          
+          # Run migrations
+          echo "Running database migrations..."
+          bun run db:migrate
+          bun run db:migrate:evidence-url
+        
+      - name: Run tests
+        run: |
+          bun run test:unit
+          bun run test:integration
+          bun run test:e2e
+          
+  build-tags:
+    needs: [test-tags]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 'latest'
+          
+      - name: Install dependencies
+        run: bun install
+        
+      - name: Build
+        run: bun run build
+        
+      - name: Verify build output
+        run: |
+          # Check if dist/index.js exists
+          if [ ! -f "dist/index.js" ]; then
+            echo "Error: dist/index.js not found. Build failed."
+            exit 1
+          fi
+          echo "✅ Build verification successful"
+
   docker:
     runs-on: ubuntu-latest
-    # Only run after successful CI build on main branch or tag push
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    # Define job dependencies based on the trigger
+    needs: 
+      - build-tags
+    # Run this job only if:
+    # 1. The workflow_run event triggered and the previous workflow was successful
+    # 2. OR this is a manual workflow dispatch
+    # 3. OR this follows successful tag build 
+    if: |
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+      (github.event_name == 'workflow_dispatch') ||
+      (startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push')
     permissions:
       contents: read
       packages: write
@@ -29,11 +168,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Vulnerability scan
+      # Vulnerability scan for filesystem
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: '.'
+          scan-type: 'fs'
+          scan-ref: '.'
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
