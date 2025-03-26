@@ -1,6 +1,5 @@
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { createLogger } from "@/utils/logger";
-import { DatabaseService } from "@/services/db.service";
 import { createTestServer } from "../e2e/setup/server-setup";
 import { Hono } from "hono";
 
@@ -15,7 +14,6 @@ const testClient = {
 };
 
 describe("Headless OAuth Integration Tests", () => {
-  let db: DatabaseService;
   let request: any;
   let server: any;
   let clientId: string;
@@ -24,7 +22,6 @@ describe("Headless OAuth Integration Tests", () => {
 
   // Set up before all tests
   beforeAll(async () => {
-    db = new DatabaseService();
     logger.info("Starting headless OAuth integration tests");
 
     // Create a test app and server

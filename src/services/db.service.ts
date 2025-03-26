@@ -124,6 +124,7 @@ export class DatabaseService {
     scopes: string[];
     grantTypes: string[];
     tokenEndpointAuthMethod: string;
+    isHeadless?: boolean;
   }) {
     const clientId = nanoid(16);
     const clientSecret = nanoid(32);
@@ -141,6 +142,7 @@ export class DatabaseService {
       createdAt: new Date(),
       updatedAt: new Date(),
       isActive: true,
+      isHeadless: data.isHeadless || false,
     });
 
     return {
@@ -151,6 +153,7 @@ export class DatabaseService {
       scopes: data.scopes,
       grantTypes: data.grantTypes,
       tokenEndpointAuthMethod: data.tokenEndpointAuthMethod,
+      isHeadless: data.isHeadless || false,
     };
   }
 
@@ -159,6 +162,14 @@ export class DatabaseService {
       .select()
       .from(oauthClients)
       .where(eq(oauthClients.clientId, clientId));
+    return clients.length > 0 ? clients[0] : null;
+  }
+
+  async getOAuthClientById(id: string) {
+    const clients = await db
+      .select()
+      .from(oauthClients)
+      .where(eq(oauthClients.id, id));
     return clients.length > 0 ? clients[0] : null;
   }
 
@@ -212,5 +223,45 @@ export class DatabaseService {
     await db
       .delete(authorizationCodes)
       .where(lt(authorizationCodes.expiresAt, new Date()));
+  }
+
+  // OAuth Access Token Methods
+  async storeAccessToken(data: {
+    token: string;
+    clientId: string; // UUID from oauthClients
+    userId: string;
+    scope: string;
+    expiresAt: Date;
+  }) {
+    await db.insert(schema.oauthAccessTokens).values({
+      token: data.token,
+      clientId: data.clientId,
+      userId: data.userId,
+      scope: data.scope,
+      expiresAt: data.expiresAt,
+      isRevoked: false,
+      createdAt: new Date(),
+    });
+
+    return { success: true };
+  }
+
+  async getAccessToken(token: string) {
+    const [result] = await db
+      .select()
+      .from(schema.oauthAccessTokens)
+      .where(eq(schema.oauthAccessTokens.token, token))
+      .limit(1);
+
+    return result;
+  }
+
+  async revokeAccessToken(token: string) {
+    await db
+      .update(schema.oauthAccessTokens)
+      .set({ isRevoked: true })
+      .where(eq(schema.oauthAccessTokens.token, token));
+
+    return { success: true };
   }
 }

@@ -8,25 +8,54 @@ import { z } from "zod";
 import { verifyToken } from "../utils/auth/jwt";
 
 // Client registration request schema
-const clientRegistrationSchema = z.object({
-  client_name: z.string().min(1),
-  redirect_uris: z.array(z.string().url()).min(1),
-  client_uri: z.string().url().optional(),
-  logo_uri: z.string().url().optional(),
-  tos_uri: z.string().url().optional(),
-  policy_uri: z.string().url().optional(),
-  software_id: z.string().optional(),
-  software_version: z.string().optional(),
-  scope: z.string().optional(),
-  contacts: z.array(z.string().email()).optional(),
-  grant_types: z
-    .array(z.enum(["authorization_code", "refresh_token"]))
-    .optional(),
-  token_endpoint_auth_method: z
-    .enum(["client_secret_basic", "client_secret_post", "none"])
-    .optional(),
-  response_types: z.array(z.enum(["code"])).optional(),
-});
+const clientRegistrationSchema = z
+  .object({
+    client_name: z.string().min(1),
+    redirect_uris: z.array(z.string().url()).optional(),
+    client_uri: z.string().url().optional(),
+    logo_uri: z.string().url().optional(),
+    tos_uri: z.string().url().optional(),
+    policy_uri: z.string().url().optional(),
+    software_id: z.string().optional(),
+    software_version: z.string().optional(),
+    scope: z.string().optional(),
+    contacts: z.array(z.string().email()).optional(),
+    grant_types: z
+      .array(
+        z.enum(["authorization_code", "refresh_token", "client_credentials"]),
+      )
+      .optional(),
+    token_endpoint_auth_method: z
+      .enum(["client_secret_basic", "client_secret_post", "none"])
+      .optional(),
+    response_types: z.array(z.enum(["code"])).optional(),
+  })
+  .refine(
+    (data) => {
+      // If client credentials is the only grant type, redirect URIs are optional
+      const hasClientCredentials =
+        data.grant_types?.includes("client_credentials");
+      const hasAuthCode = data.grant_types?.includes("authorization_code");
+      const hasRedirectUris =
+        data.redirect_uris && data.redirect_uris.length > 0;
+
+      // Require redirect URIs for auth code flow
+      if (hasAuthCode && !hasRedirectUris) {
+        return false;
+      }
+
+      // For client credentials only, redirect URIs are optional
+      if (hasClientCredentials && !hasAuthCode) {
+        return true;
+      }
+
+      // Default case: require redirect URIs
+      return hasRedirectUris;
+    },
+    {
+      message: "redirect_uris are required for authorization_code grant type",
+    },
+  );
 
 export class OAuthController {
   private db: DatabaseService;
@@ -73,14 +102,20 @@ export class OAuthController {
 
       const data = validationResult.data;
 
+      // Check if client has client_credentials without redirect URIs (headless client)
+      const isHeadlessClient =
+        data.grant_types?.includes("client_credentials") &&
+        !data.grant_types?.includes("authorization_code");
+
       // Create client record
       const client = await this.db.createOAuthClient({
         name: data.client_name,
-        redirectUris: data.redirect_uris,
+        redirectUris: data.redirect_uris || [],
         scopes: data.scope?.split(" ") || [],
         grantTypes: data.grant_types || ["authorization_code"],
         tokenEndpointAuthMethod:
           data.token_endpoint_auth_method || "client_secret_basic",
+        isHeadless: isHeadlessClient,
       });
 
       // Generate registration access token
@@ -90,32 +125,23 @@ export class OAuthController {
         scope: "registration",
       });
 
-      // Return client information
-      return c.json(
-        {
-          client_id: client.id,
-          client_secret: client.secret,
-          client_id_issued_at: Math.floor(Date.now() / 1000),
-          client_secret_expires_at: 0, // Never expires
-          registration_access_token: registrationToken,
-          registration_client_uri: `${c.req.url}/${client.id}`,
-          redirect_uris: data.redirect_uris,
-          grant_types: data.grant_types || ["authorization_code"],
-          token_endpoint_auth_method:
-            data.token_endpoint_auth_method || "client_secret_basic",
-          response_types: data.response_types || ["code"],
-          client_name: data.client_name,
-          client_uri: data.client_uri,
-          logo_uri: data.logo_uri,
-          scope: data.scope,
-          contacts: data.contacts,
-          tos_uri: data.tos_uri,
-          policy_uri: data.policy_uri,
-          software_id: data.software_id,
-          software_version: data.software_version,
-        },
-        201,
-      );
+      // Return client information and credentials
+      return c.json({
+        client_id: client.id,
+        client_secret: client.secret,
+        client_id_issued_at: Math.floor(Date.now() / 1000),
+        client_secret_expires_at: 0, // Never expires
+        client_name: data.client_name,
+        client_uri: data.client_uri,
+        redirect_uris: data.redirect_uris,
+        grant_types: client.grantTypes,
+        token_endpoint_auth_method:
+          data.token_endpoint_auth_method || "client_secret_basic",
+        response_types: ["code"],
+        registration_access_token: registrationToken,
+        registration_client_uri: `${new URL(c.req.url).origin}/oauth/register/${client.id}`,
+        scope: client.scopes.join(" "),
+      });
     } catch (error) {
       if (error instanceof BadRequestError) {
         throw error;
@@ -537,6 +563,51 @@ export class OAuthController {
         } catch {
           throw new UnauthorizedError("Invalid refresh token");
         }
+      } else if (grant_type === "client_credentials") {
+        // Client Credentials Grant - for machine-to-machine auth
+        try {
+          // Validate scopes from the request
+          const requestedScopes = scope ? (scope as string).split(" ") : [];
+          const clientScopes = client.scope ? client.scope.split(" ") : [];
+          const validScopes = this.validateScopes(
+            requestedScopes,
+            clientScopes,
+          );
+
+          // If requested invalid scopes, return error
+          if (requestedScopes.length > 0 && validScopes.length === 0) {
+            throw new BadRequestError("Invalid scope requested");
+          }
+
+          // Generate access token directly (no refresh token for client credentials)
+          const accessToken = await generateToken({
+            sub: client.clientId,
+            scope: validScopes.join(" "),
+            type: "access",
+            client_id: client.clientId, // Add client_id to token for tracking
+          });
+
+          // Store token in database for introspection and revocation
+          await this.db.storeAccessToken({
+            token: accessToken,
+            clientId: client.id,
+            userId: "system", // No user involved in client credentials flow
+            scope: validScopes.join(" "),
+            expiresAt: new Date(Date.now() + 3600 * 1000), // 1 hour
+          });
+
+          // Return the token response
+          tokenResponse = {
+            access_token: accessToken,
+            token_type: "Bearer",
+            expires_in: 3600, // 1 hour
+            scope: validScopes.join(" "),
+          };
+        } catch (error) {
+          throw new BadRequestError(
+            `Failed to process client credentials grant: ${error}`,
+          );
+        }
       } else {
         throw new BadRequestError(`Unsupported grant type: ${grant_type}`);
       }
@@ -577,6 +648,33 @@ export class OAuthController {
         throw new UnauthorizedError("Invalid client");
       }
 
+      // First check DB-stored tokens (used for client credentials flow)
+      const dbToken = await this.db.getAccessToken(token as string);
+      if (dbToken) {
+        // Check if token is revoked or expired
+        if (dbToken.isRevoked || new Date() > dbToken.expiresAt) {
+          return c.json({ active: false });
+        }
+
+        // Get the client that owns this token
+        const tokenClient = await this.db.getOAuthClientById(dbToken.clientId);
+        if (!tokenClient) {
+          return c.json({ active: false });
+        }
+
+        // Return introspection response for DB token
+        return c.json({
+          active: true,
+          client_id: tokenClient.clientId,
+          scope: dbToken.scope,
+          token_type: "Bearer",
+          exp: Math.floor(dbToken.expiresAt.getTime() / 1000),
+          iat: Math.floor(dbToken.createdAt.getTime() / 1000),
+          sub: dbToken.userId,
+        });
+      }
+
+      // If not found in DB, try to verify JWT token
       try {
         // Check if the token has been revoked
         if (await this.db.isTokenRevoked(token as string)) {
@@ -642,6 +740,23 @@ export class OAuthController {
         throw new UnauthorizedError("Invalid client");
       }
 
+      // First check if it's a DB-stored token (client credentials)
+      const dbToken = await this.db.getAccessToken(token as string);
+      if (dbToken) {
+        // Get the client that owns this token
+        const tokenClient = await this.db.getOAuthClientById(dbToken.clientId);
+
+        // If token doesn't belong to this client, still return success per RFC 7009
+        if (tokenClient && tokenClient.clientId !== client.clientId) {
+          return c.json({}, 200);
+        }
+
+        // Mark token as revoked in database
+        await this.db.revokeAccessToken(token as string);
+        return c.json({}, 200);
+      }
+
+      // If not in DB, try to handle JWT token
       try {
         // Check if the token is already revoked
         if (await this.db.isTokenRevoked(token as string)) {

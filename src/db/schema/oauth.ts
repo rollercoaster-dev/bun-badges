@@ -22,6 +22,7 @@ export const oauthClients = pgTable("oauth_clients", {
     length: 50,
   }).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
+  isHeadless: boolean("is_headless").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
