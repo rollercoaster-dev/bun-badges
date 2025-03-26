@@ -81,6 +81,7 @@ export class MockDatabaseService implements RealDatabaseService {
     scopes: string[];
     grantTypes: string[];
     tokenEndpointAuthMethod: string;
+    isHeadless?: boolean;
   }) {
     return {
       id: "mock-client-id",
@@ -90,6 +91,7 @@ export class MockDatabaseService implements RealDatabaseService {
       scopes: data.scopes,
       grantTypes: data.grantTypes,
       tokenEndpointAuthMethod: data.tokenEndpointAuthMethod,
+      isHeadless: data.isHeadless || false,
     };
   }
 
@@ -108,6 +110,7 @@ export class MockDatabaseService implements RealDatabaseService {
       createdAt: new Date(),
       updatedAt: new Date(),
       isActive: true,
+      isHeadless: false,
     };
   }
 
@@ -142,6 +145,56 @@ export class MockDatabaseService implements RealDatabaseService {
 
   async cleanupExpiredAuthCodes(): Promise<void> {
     // No-op for mock
+  }
+
+  async getOAuthClientById(id: string) {
+    return {
+      id,
+      clientId: "mock-client-id",
+      clientSecret: "mock-client-secret",
+      clientName: "Mock Client",
+      clientUri: "https://example.com",
+      redirectUris: ["https://example.com/callback"],
+      scope: "openid profile",
+      grantTypes: ["authorization_code"],
+      responseTypes: ["code"],
+      tokenEndpointAuthMethod: "client_secret_basic",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      isActive: true,
+      isHeadless: false,
+    };
+  }
+
+  // OAuth Access Token Methods
+  async storeAccessToken(data: {
+    token: string;
+    clientId: string;
+    userId: string;
+    scope: string;
+    expiresAt: Date;
+  }) {
+    // Store token in revokedTokens map with false (not revoked)
+    revokedTokens.set(data.token, false);
+    return { success: true };
+  }
+
+  async getAccessToken(token: string) {
+    return {
+      id: "mock-token-id",
+      token,
+      clientId: "mock-client-id",
+      userId: "mock-user-id",
+      scope: "openid profile",
+      expiresAt: new Date(Date.now() + 3600000),
+      isRevoked: token === "revoked-token",
+      createdAt: new Date(),
+    };
+  }
+
+  async revokeAccessToken(token: string) {
+    revokedTokens.set(token, true);
+    return { success: true };
   }
 }
 
