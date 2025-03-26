@@ -1,6 +1,6 @@
 {
   "name": "bun-badges",
-  "version": "0.0.1",
+  "version": "0.0.2-alpha.0",
   "description": "Open Badges server implementation using Bun and Hono",
   "type": "module",
   "scripts": {
