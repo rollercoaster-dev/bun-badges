@@ -74,7 +74,7 @@ api.route("/status", status);
 app.route("/api", api);
 
 // Mount Swagger UI
-app.route("/docs", createSwaggerUI());
+app.route("/docs", createSwaggerUI("/docs"));
 
 // Root route
 app.get("/", (c) =>
