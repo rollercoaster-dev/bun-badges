@@ -1,16 +1,10 @@
 name: Docker Build and Publish
 
 on:
-  # Run after CI workflow completes on main branch
-  workflow_run:
-    workflows: ["CI"]
-    branches: [main]
-    types:
-      - completed
-  # For tag releases (which will run their own tests)
+  # For tag releases
   push:
     tags: [ 'v*.*.*' ]
-  # Manual trigger for debugging
+  # Manual trigger for debugging or one-off builds
   workflow_dispatch:
 
 env:
@@ -102,7 +96,7 @@ jobs:
           fi
           echo "✅ Build verification successful"
 
-  # Docker build and push - split into two jobs based on trigger
+  # Docker build and push - for tags
   docker-tag:
     name: Docker Build (Tag)
     runs-on: ubuntu-latest
@@ -176,23 +170,15 @@ jobs:
           echo "::notice::Docker image published successfully to ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
           echo "Latest tag: ${{ steps.meta.outputs.tags }}"
 
-  docker-main:
-    name: Docker Build (Main)
+  # For manual triggers
+  docker-manual:
+    name: Docker Build (Manual)
     runs-on: ubuntu-latest
-    # This job only runs on workflow_run (if successful) or manual dispatch
-    if: (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        if: github.event_name == 'workflow_dispatch'
-        
-      # For workflow_run events, we need to checkout the specific SHA
-      - name: Checkout repository (workflow_run)
-        if: github.event_name == 'workflow_run'
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-
+      
       # Vulnerability scan for filesystem
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
@@ -231,9 +217,8 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=manual-${{ github.run_id }}
             type=ref,event=branch
-            type=sha
 
       - name: Build and push Docker image
         id: build-and-push
@@ -247,10 +232,3 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false
-
-      # Update deployment status
-      - name: Update deployment status
-        if: success()
-        run: |
-          echo "::notice::Docker image published successfully to ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
-          echo "Latest tag: ${{ steps.meta.outputs.tags }}"

@@ -22,5 +22,8 @@
       "filename": "package.json",
       "type": "json"
     }
-  ]
+  ],
+  "skip": {
+    "npm": true
+  }
 } 
