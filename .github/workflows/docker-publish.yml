@@ -94,21 +94,17 @@ jobs:
           fi
           echo "✅ Build verification successful"
 
-  # Docker build and push
-  docker:
+  # Docker build and push - split into two jobs based on trigger
+  docker-tag:
+    name: Docker Build (Tag)
     runs-on: ubuntu-latest
-    # Only need to specify needs for tag pushes
     needs: [validate-tag]
-    if: |
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') || 
-      github.event_name == 'workflow_dispatch' || 
-      startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push'
     permissions:
       contents: read
       packages: write
       security-events: write
       id-token: write
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -151,10 +147,92 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
-            type=ref,event=branch
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
+            type=sha
+
+      - name: Build and push Docker image
+        id: build-and-push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+      # Update deployment status
+      - name: Update deployment status
+        if: success()
+        run: |
+          echo "::notice::Docker image published successfully to ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+          echo "Latest tag: ${{ steps.meta.outputs.tags }}"
+
+  docker-main:
+    name: Docker Build (Main)
+    runs-on: ubuntu-latest
+    # This job only runs on workflow_run (if successful) or manual dispatch
+    if: (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        if: github.event_name == 'workflow_dispatch'
+        
+      # For workflow_run events, we need to checkout the specific SHA
+      - name: Checkout repository (workflow_run)
+        if: github.event_name == 'workflow_run'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      # Vulnerability scan for filesystem
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      # Upload scan results
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      # Setup for multi-platform builds
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log into registry ${{ env.REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=branch
             type=sha
 
       - name: Build and push Docker image
