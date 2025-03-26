@@ -36,8 +36,8 @@ The codebase already has a solid foundation for OAuth 2.0:
 ## Required Enhancements
 
 1. **OAuth-Auth System Integration**
-   - [ ] Integrate OAuth flows with the existing authentication system (`AuthController`)
-   - [ ] Link OAuth tokens to the JWT authentication system
+   - [x] Integrate OAuth flows with the existing authentication system (`AuthController`)
+   - [x] Link OAuth tokens to the JWT authentication system
    - [x] Implement client credentials grant for machine-to-machine authentication
 
 2. **API-First Authorization Flow**
@@ -66,9 +66,9 @@ The codebase already has a solid foundation for OAuth 2.0:
 
 ### 1. OAuth-Auth System Integration (4 hours)
 - [x] Implement client credentials grant for machine-to-machine authentication
-- [ ] Update the token endpoint to link with the JWT system
-- [ ] Ensure proper scope validation and enforcement
-- [ ] Create utility functions for programmatic authorization
+- [x] Update the token endpoint to link with the JWT system
+- [x] Ensure proper scope validation and enforcement
+- [x] Create utility functions for programmatic authorization
 
 ### 2. API-First Authorization Flow (6 hours)
 - [x] Design comprehensive REST API for authorization server operations
@@ -85,7 +85,7 @@ The codebase already has a solid foundation for OAuth 2.0:
 ### 4. Database Schema Updates (3 hours)
 - [x] Create/update migration files for new tables
 - [x] Update database services to use new schema
-- [ ] Create proper indexes for performance
+- [x] Create proper indexes for performance
 - [x] Implement token storage and management
 
 ### 5. Documentation and Testing (4 hours)
@@ -109,7 +109,7 @@ The codebase already has a solid foundation for OAuth 2.0:
 3. **Token Formats**:
    - [x] Continue using JWTs for access tokens
    - [x] Ensure proper audience, scope, and expiration claims
-   - [ ] Consider using structured tokens with claims for different resources
+   - [x] Consider using structured tokens with claims for different resources
 
 4. **Programmatic Authorization**:
    - [x] Design an API for programmatic authorization decisions
@@ -122,9 +122,14 @@ The codebase already has a solid foundation for OAuth 2.0:
 - Fixed several issues with the test environment setup
 - Implemented mock server for testing OAuth endpoints
 - Added documentation for headless OAuth implementation
+- Implemented OAuth-JWT bridge for token integration
+- Added token mapping tables and database utilities
+- Updated OAuth controller to use the JWT auth system
+- Ensured bidirectional token revocation between systems
+- Added comprehensive tests for the OAuth-JWT bridge integration
 
 ## Next Steps
-- Complete the PKCE implementation for public clients
+- Implement PKCE support for public clients
 - Add programmatic consent management
 - Create API examples and Postman collection
 - Add detailed error documentation
@@ -144,11 +149,14 @@ The codebase already has a solid foundation for OAuth 2.0:
 - `src/middleware/auth.ts`
 - `src/middleware/auth.middleware.ts`
 - `src/utils/auth/jwt.ts`
+- `src/utils/auth/oauth-jwt-bridge.ts`
+- `src/db/schema/oauth.ts`
+- `src/db/migrations/0008_add_token_mappings.ts`
 - `tests/integration/oauth-headless.test.ts`
 - `tests/e2e/flows/oauth/headless-oauth.test.ts`
 - `docs/headless-oauth.md`
 
 ## Estimated Time
 Total: 22 hours 
-Completed: ~8 hours
-Remaining: ~14 hours 
+Completed: ~16 hours
+Remaining: ~6 hours 

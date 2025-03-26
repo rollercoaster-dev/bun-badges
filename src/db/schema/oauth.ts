@@ -56,7 +56,17 @@ export const oauthAccessTokens = pgTable("oauth_access_tokens", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Token mappings between OAuth and JWT tokens
+export const tokenMappings = pgTable("token_mappings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  oauthToken: text("oauth_token").notNull().unique(),
+  jwtToken: text("jwt_token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Export types for use in services
 export type NewOAuthClient = typeof oauthClients.$inferInsert;
 export type NewAuthorizationCode = typeof authorizationCodes.$inferInsert;
 export type NewOAuthAccessToken = typeof oauthAccessTokens.$inferInsert;
+export type NewTokenMapping = typeof tokenMappings.$inferInsert;

@@ -7,6 +7,7 @@ const {
   revokedTokens,
   oauthClients,
   authorizationCodes,
+  tokenMappings,
   users,
 } = schema;
 
@@ -263,5 +264,84 @@ export class DatabaseService {
       .where(eq(schema.oauthAccessTokens.token, token));
 
     return { success: true };
+  }
+
+  // Token mapping methods
+
+  /**
+   * Store a mapping between OAuth token and JWT token
+   */
+  async storeTokenMapping(data: {
+    oauthToken: string;
+    jwtToken: string;
+    expiresAt: Date;
+  }) {
+    await db.insert(tokenMappings).values({
+      oauthToken: data.oauthToken,
+      jwtToken: data.jwtToken,
+      expiresAt: data.expiresAt,
+      createdAt: new Date(),
+    });
+
+    return { success: true };
+  }
+
+  /**
+   * Get a token mapping by OAuth token
+   */
+  async getTokenMappingByOAuth(oauthToken: string) {
+    const [result] = await db
+      .select()
+      .from(tokenMappings)
+      .where(
+        and(
+          eq(tokenMappings.oauthToken, oauthToken),
+          gt(tokenMappings.expiresAt, new Date()),
+        ),
+      )
+      .limit(1);
+    return result;
+  }
+
+  /**
+   * Get a token mapping by JWT token
+   */
+  async getTokenMappingByJWT(jwtToken: string) {
+    const [result] = await db
+      .select()
+      .from(tokenMappings)
+      .where(
+        and(
+          eq(tokenMappings.jwtToken, jwtToken),
+          gt(tokenMappings.expiresAt, new Date()),
+        ),
+      )
+      .limit(1);
+    return result;
+  }
+
+  /**
+   * Delete a token mapping by OAuth token
+   */
+  async deleteTokenMappingByOAuth(oauthToken: string) {
+    await db
+      .delete(tokenMappings)
+      .where(eq(tokenMappings.oauthToken, oauthToken));
+  }
+
+  /**
+   * Delete a token mapping by JWT token
+   */
+  async deleteTokenMappingByJWT(jwtToken: string) {
+    await db.delete(tokenMappings).where(eq(tokenMappings.jwtToken, jwtToken));
+  }
+
+  /**
+   * Clean up expired token mappings
+   */
+  async cleanupExpiredTokenMappings() {
+    await db
+      .delete(tokenMappings)
+      .where(lt(tokenMappings.expiresAt, new Date()));
   }
 }

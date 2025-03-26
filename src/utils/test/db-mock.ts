@@ -196,6 +196,47 @@ export class MockDatabaseService implements RealDatabaseService {
     revokedTokens.set(token, true);
     return { success: true };
   }
+
+  // Token mapping methods
+  async storeTokenMapping(_data: {
+    oauthToken: string;
+    jwtToken: string;
+    expiresAt: Date;
+  }) {
+    return { success: true };
+  }
+
+  async getTokenMappingByOAuth(oauthToken: string) {
+    return {
+      id: "mock-token-mapping-id",
+      oauthToken,
+      jwtToken: "mock-jwt-token",
+      expiresAt: new Date(Date.now() + 3600000),
+      createdAt: new Date(),
+    };
+  }
+
+  async getTokenMappingByJWT(jwtToken: string) {
+    return {
+      id: "mock-token-mapping-id",
+      oauthToken: "mock-oauth-token",
+      jwtToken,
+      expiresAt: new Date(Date.now() + 3600000),
+      createdAt: new Date(),
+    };
+  }
+
+  async deleteTokenMappingByOAuth(_oauthToken: string): Promise<void> {
+    // No-op for mock
+  }
+
+  async deleteTokenMappingByJWT(_jwtToken: string): Promise<void> {
+    // No-op for mock
+  }
+
+  async cleanupExpiredTokenMappings(): Promise<void> {
+    // No-op for mock
+  }
 }
 
 // Create and export a mock database instance

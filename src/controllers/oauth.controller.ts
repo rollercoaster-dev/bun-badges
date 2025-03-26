@@ -6,6 +6,7 @@ import { BadRequestError, UnauthorizedError } from "../utils/errors";
 import { OAUTH_SCOPES } from "../routes/oauth.routes";
 import { z } from "zod";
 import { verifyToken } from "../utils/auth/jwt";
+import { OAuthJWTBridge } from "../utils/auth/oauth-jwt-bridge";
 
 // Client registration request schema
 const clientRegistrationSchema = z
@@ -59,9 +60,11 @@ const clientRegistrationSchema = z
 
 export class OAuthController {
   private db: DatabaseService;
+  private oauthJwtBridge: OAuthJWTBridge;
 
   constructor(db: DatabaseService = new DatabaseService()) {
     this.db = db;
+    this.oauthJwtBridge = new OAuthJWTBridge(db);
   }
 
   // Utility method to validate scopes
@@ -405,214 +408,23 @@ export class OAuthController {
     `;
   }
 
-  // Handle token requests for authorization code and refresh token grants
+  // Modify the token method to use our new OAuth-JWT bridge
   async token(c: Context) {
     try {
-      const body = await c.req.json();
-      const {
-        grant_type,
-        code,
-        redirect_uri,
-        refresh_token,
-        client_id,
-        client_secret,
-        scope,
-      } = body;
+      const body = await c.req.parseBody();
+      const { grant_type } = body;
 
-      // Validate required parameters
-      if (!grant_type) {
-        throw new BadRequestError("Missing grant_type parameter");
+      // Different grant types
+      switch (grant_type) {
+        case "authorization_code":
+          return await this.handleAuthorizationCodeGrant(c, body);
+        case "refresh_token":
+          return await this.handleRefreshTokenGrant(c, body);
+        case "client_credentials":
+          return await this.handleClientCredentialsGrant(c, body);
+        default:
+          throw new BadRequestError(`Unsupported grant type: ${grant_type}`);
       }
-
-      // Validate client credentials
-      if (!client_id || !client_secret) {
-        throw new UnauthorizedError("Missing client credentials");
-      }
-
-      const client = await this.db.getOAuthClient(client_id as string);
-      if (!client || client.clientSecret !== client_secret) {
-        throw new UnauthorizedError("Invalid client credentials");
-      }
-
-      let tokenResponse;
-
-      if (grant_type === "authorization_code") {
-        // Validate required parameters for authorization code grant
-        if (!code || !redirect_uri) {
-          throw new BadRequestError(
-            "Missing required parameters for authorization code grant",
-          );
-        }
-
-        // Verify authorization code
-        const authCode = await this.db.getAuthorizationCode(code as string);
-        if (!authCode) {
-          throw new UnauthorizedError("Invalid authorization code");
-        }
-
-        // Verify the code belongs to this client and redirect URI
-        if (
-          authCode.clientId !== client.id ||
-          authCode.redirectUri !== redirect_uri
-        ) {
-          throw new UnauthorizedError(
-            "Invalid authorization code for this client or redirect URI",
-          );
-        }
-
-        // Check if the code has expired
-        if (new Date() > authCode.expiresAt) {
-          throw new UnauthorizedError("Authorization code has expired");
-        }
-
-        // Check if the code has already been used
-        if (authCode.isUsed) {
-          throw new UnauthorizedError(
-            "Authorization code has already been used",
-          );
-        }
-
-        // Validate scopes from the authorization code
-        const codeScopes = authCode.scope.split(" ");
-        const clientScopes = client.scope ? client.scope.split(" ") : [];
-        const validScopes = this.validateScopes(codeScopes, clientScopes);
-
-        // Generate tokens with validated scopes
-        const accessToken = await generateToken({
-          sub: client.clientId,
-          scope: validScopes.join(" "),
-          type: "access",
-        });
-
-        const refreshToken = await generateToken({
-          sub: client.clientId,
-          scope: validScopes.join(" "),
-          type: "refresh",
-        });
-
-        // Mark the code as used
-        await this.db.deleteAuthorizationCode(code as string);
-
-        // Return the token response
-        tokenResponse = {
-          access_token: accessToken,
-          token_type: "Bearer",
-          expires_in: 3600, // 1 hour
-          refresh_token: refreshToken,
-          scope: validScopes.join(" "),
-        };
-      } else if (grant_type === "refresh_token") {
-        // Validate required parameters for refresh token grant
-        if (!refresh_token) {
-          throw new BadRequestError("Missing refresh_token parameter");
-        }
-
-        try {
-          // Verify the refresh token
-          const payload = await verifyToken(refresh_token as string);
-
-          // Check if the token is a refresh token
-          if (payload.type !== "refresh") {
-            throw new UnauthorizedError("Invalid token type");
-          }
-
-          // Check if the token belongs to this client
-          if (payload.sub !== client.clientId) {
-            throw new UnauthorizedError("Token does not belong to this client");
-          }
-
-          // Check if the token has been revoked
-          if (await this.db.isTokenRevoked(refresh_token as string)) {
-            throw new UnauthorizedError("Token has been revoked");
-          }
-
-          // Get original scopes from the refresh token
-          const originalScopes = (payload.scope || "")
-            .split(" ")
-            .filter(Boolean);
-
-          // If scope parameter is provided, validate the requested scopes
-          let validScopes = originalScopes;
-          if (scope) {
-            const requestedScopes = (scope as string).split(" ");
-            // Ensure requested scopes are a subset of the original scopes
-            validScopes = requestedScopes.filter((s) =>
-              originalScopes.includes(s),
-            );
-
-            // If requested scopes are invalid, return an error
-            if (requestedScopes.length > 0 && validScopes.length === 0) {
-              throw new BadRequestError("Invalid scope requested");
-            }
-          }
-
-          // Generate a new access token with validated scopes
-          const accessToken = await generateToken({
-            sub: client.clientId,
-            scope: validScopes.join(" "),
-            type: "access",
-          });
-
-          // Return the token response
-          tokenResponse = {
-            access_token: accessToken,
-            token_type: "Bearer",
-            expires_in: 3600, // 1 hour
-            scope: validScopes.join(" "),
-          };
-        } catch {
-          throw new UnauthorizedError("Invalid refresh token");
-        }
-      } else if (grant_type === "client_credentials") {
-        // Client Credentials Grant - for machine-to-machine auth
-        try {
-          // Validate scopes from the request
-          const requestedScopes = scope ? (scope as string).split(" ") : [];
-          const clientScopes = client.scope ? client.scope.split(" ") : [];
-          const validScopes = this.validateScopes(
-            requestedScopes,
-            clientScopes,
-          );
-
-          // If requested invalid scopes, return error
-          if (requestedScopes.length > 0 && validScopes.length === 0) {
-            throw new BadRequestError("Invalid scope requested");
-          }
-
-          // Generate access token directly (no refresh token for client credentials)
-          const accessToken = await generateToken({
-            sub: client.clientId,
-            scope: validScopes.join(" "),
-            type: "access",
-            client_id: client.clientId, // Add client_id to token for tracking
-          });
-
-          // Store token in database for introspection and revocation
-          await this.db.storeAccessToken({
-            token: accessToken,
-            clientId: client.id,
-            userId: "system", // No user involved in client credentials flow
-            scope: validScopes.join(" "),
-            expiresAt: new Date(Date.now() + 3600 * 1000), // 1 hour
-          });
-
-          // Return the token response
-          tokenResponse = {
-            access_token: accessToken,
-            token_type: "Bearer",
-            expires_in: 3600, // 1 hour
-            scope: validScopes.join(" "),
-          };
-        } catch (error) {
-          throw new BadRequestError(
-            `Failed to process client credentials grant: ${error}`,
-          );
-        }
-      } else {
-        throw new BadRequestError(`Unsupported grant type: ${grant_type}`);
-      }
-
-      return c.json(tokenResponse);
     } catch (error) {
       if (
         error instanceof BadRequestError ||
@@ -621,180 +433,313 @@ export class OAuthController {
         throw error;
       }
       console.error("Token endpoint error:", error);
-      throw new BadRequestError("Failed to process token request");
+      throw new BadRequestError("Token request failed");
     }
   }
 
-  // Implements RFC 7662 - OAuth 2.0 Token Introspection
+  // Add the missing refresh token handler
+  private async handleRefreshTokenGrant(c: Context, body: any) {
+    const { refresh_token, client_id, client_secret, scope } = body;
+
+    if (!refresh_token || !client_id || !client_secret) {
+      throw new BadRequestError("Missing required parameters");
+    }
+
+    // Authenticate the client
+    const client = await this.db.getOAuthClient(client_id as string);
+    if (!client || client.clientSecret !== client_secret) {
+      throw new UnauthorizedError("Invalid client authentication");
+    }
+
+    try {
+      // Verify the refresh token
+      const payload = await verifyToken(refresh_token as string, "refresh");
+
+      // Check if the token has been revoked
+      if (await this.db.isTokenRevoked(refresh_token as string)) {
+        throw new UnauthorizedError("Token has been revoked");
+      }
+
+      // Get original scopes from the refresh token
+      const originalScopes = (payload.scope || "").split(" ").filter(Boolean);
+
+      // If scope parameter is provided, validate the requested scopes
+      let validScopes = originalScopes;
+      if (scope) {
+        const requestedScopes = (scope as string).split(" ");
+        // Ensure requested scopes are a subset of the original scopes
+        validScopes = requestedScopes.filter((s) => originalScopes.includes(s));
+
+        // If requested scopes are invalid, return an error
+        if (requestedScopes.length > 0 && validScopes.length === 0) {
+          throw new BadRequestError("Invalid scope requested");
+        }
+      }
+
+      // Generate new tokens
+      const accessToken = await generateToken({
+        sub: payload.sub,
+        type: "access",
+        scope: validScopes.join(" "),
+      });
+
+      const newRefreshToken = await generateToken({
+        sub: payload.sub,
+        type: "refresh",
+        scope: validScopes.join(" "),
+      });
+
+      // Store the access token
+      await this.db.storeAccessToken({
+        token: accessToken,
+        clientId: client.id,
+        userId: payload.sub,
+        scope: validScopes.join(" "),
+        expiresAt: new Date(Date.now() + 3600 * 1000), // 1 hour
+      });
+
+      // Create a JWT token using our bridge
+      await this.oauthJwtBridge.convertOAuthToJWT(
+        accessToken,
+        client.clientId,
+        payload.sub,
+        validScopes.join(" "),
+      );
+
+      // Revoke the old refresh token
+      await this.db.revokeToken({
+        token: refresh_token as string,
+        type: "refresh",
+        username: payload.sub,
+        expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), // 90 days
+      });
+
+      // Return the tokens
+      return c.json({
+        access_token: accessToken,
+        token_type: "Bearer",
+        refresh_token: newRefreshToken,
+        expires_in: 3600,
+        scope: validScopes.join(" "),
+      });
+    } catch (error) {
+      console.error("Refresh token error:", error);
+      throw new UnauthorizedError("Invalid refresh token");
+    }
+  }
+
+  // Update the client credentials grant to use our OAuth-JWT bridge
+  private async handleClientCredentialsGrant(c: Context, body: any) {
+    const { client_id, client_secret, scope } = body;
+
+    if (!client_id || !client_secret) {
+      throw new UnauthorizedError("Invalid client authentication");
+    }
+
+    // Authenticate the client
+    const client = await this.db.getOAuthClient(client_id);
+    if (!client || client.clientSecret !== client_secret) {
+      throw new UnauthorizedError("Invalid client authentication");
+    }
+
+    // Check that client is allowed to use this grant type
+    if (!client.grantTypes.includes("client_credentials")) {
+      throw new BadRequestError("Client not authorized for this grant type");
+    }
+
+    // Parse and validate requested scopes
+    const requestedScopes = scope ? scope.split(" ") : [];
+    const clientScopes = client.scope ? client.scope.split(" ") : [];
+    const validScopes = this.validateScopes(requestedScopes, clientScopes);
+
+    if (requestedScopes.length > 0 && validScopes.length === 0) {
+      throw new BadRequestError("Invalid scope");
+    }
+
+    // Generate tokens
+    const accessToken = await generateToken({
+      sub: client.clientId,
+      type: "access",
+      scope: validScopes.join(" "),
+    });
+
+    // Store the access token in the database
+    await this.db.storeAccessToken({
+      token: accessToken,
+      clientId: client.id,
+      userId: client.clientId, // Use client ID as user ID for client credentials
+      scope: validScopes.join(" "),
+      expiresAt: new Date(Date.now() + 3600 * 1000), // 1 hour
+    });
+
+    // Create a JWT token using our bridge for internal use
+    await this.oauthJwtBridge.createClientCredentialsJWT(
+      client.clientId,
+      validScopes,
+    );
+
+    // Return a standard OAuth2 token response
+    return c.json({
+      access_token: accessToken,
+      token_type: "Bearer",
+      expires_in: 3600,
+      scope: validScopes.join(" "),
+      // No refresh token for client credentials
+    });
+  }
+
+  // Update the authorization code grant to use our OAuth-JWT bridge
+  private async handleAuthorizationCodeGrant(c: Context, body: any) {
+    const { code, redirect_uri, client_id, client_secret } = body;
+
+    if (!code || !redirect_uri || !client_id) {
+      throw new BadRequestError("Missing required parameters");
+    }
+
+    // Authenticate the client
+    const client = await this.db.getOAuthClient(client_id);
+    if (!client) {
+      throw new UnauthorizedError("Invalid client");
+    }
+
+    // Verify client authentication based on token_endpoint_auth_method
+    if (client.tokenEndpointAuthMethod === "client_secret_basic") {
+      if (!client_secret || client.clientSecret !== client_secret) {
+        throw new UnauthorizedError("Invalid client authentication");
+      }
+    }
+
+    // Verify the authorization code
+    const authCode = await this.db.getAuthorizationCode(code);
+    if (!authCode || authCode.isUsed) {
+      throw new UnauthorizedError("Invalid authorization code");
+    }
+
+    // Verify the code hasn't expired
+    if (authCode.expiresAt < new Date()) {
+      throw new UnauthorizedError("Authorization code expired");
+    }
+
+    // Verify the redirect URI matches
+    if (authCode.redirectUri !== redirect_uri) {
+      throw new UnauthorizedError("Invalid redirect URI");
+    }
+
+    // Mark the code as used to prevent replay attacks
+    await this.db.deleteAuthorizationCode(code);
+
+    // Get the client to ensure we have the client UUID
+    const clientObj = await this.db.getOAuthClientById(authCode.clientId);
+    if (!clientObj) {
+      throw new BadRequestError("Client not found");
+    }
+
+    // Generate OAuth tokens
+    const accessToken = await generateToken({
+      sub: authCode.userId,
+      type: "access",
+      scope: authCode.scope,
+    });
+
+    const refreshToken = await generateToken({
+      sub: authCode.userId,
+      type: "refresh",
+      scope: authCode.scope,
+    });
+
+    // Store the access token
+    await this.db.storeAccessToken({
+      token: accessToken,
+      clientId: authCode.clientId,
+      userId: authCode.userId,
+      scope: authCode.scope,
+      expiresAt: new Date(Date.now() + 3600 * 1000), // 1 hour
+    });
+
+    // Create a JWT token using our bridge for internal use
+    await this.oauthJwtBridge.convertOAuthToJWT(
+      accessToken,
+      clientObj.clientId,
+      authCode.userId,
+      authCode.scope,
+    );
+
+    // Return the OAuth tokens
+    return c.json({
+      access_token: accessToken,
+      token_type: "Bearer",
+      refresh_token: refreshToken,
+      expires_in: 3600,
+      scope: authCode.scope,
+    });
+  }
+
+  // Update the introspect method to use our OAuth-JWT bridge
   async introspect(c: Context) {
     try {
-      const body = await c.req.json();
+      const body = await c.req.parseBody();
       const { token } = body;
-      const clientId = c.req.header("Authorization")?.split(" ")[1];
 
-      // Validate required parameters
       if (!token) {
-        throw new BadRequestError("Missing token parameter");
-      }
-
-      // Validate client authentication
-      if (!clientId) {
-        throw new UnauthorizedError("Client authentication required");
-      }
-
-      // Verify client
-      const client = await this.db.getOAuthClient(clientId);
-      if (!client) {
-        throw new UnauthorizedError("Invalid client");
-      }
-
-      // First check DB-stored tokens (used for client credentials flow)
-      const dbToken = await this.db.getAccessToken(token as string);
-      if (dbToken) {
-        // Check if token is revoked or expired
-        if (dbToken.isRevoked || new Date() > dbToken.expiresAt) {
-          return c.json({ active: false });
-        }
-
-        // Get the client that owns this token
-        const tokenClient = await this.db.getOAuthClientById(dbToken.clientId);
-        if (!tokenClient) {
-          return c.json({ active: false });
-        }
-
-        // Return introspection response for DB token
-        return c.json({
-          active: true,
-          client_id: tokenClient.clientId,
-          scope: dbToken.scope,
-          token_type: "Bearer",
-          exp: Math.floor(dbToken.expiresAt.getTime() / 1000),
-          iat: Math.floor(dbToken.createdAt.getTime() / 1000),
-          sub: dbToken.userId,
-        });
-      }
-
-      // If not found in DB, try to verify JWT token
-      try {
-        // Check if the token has been revoked
-        if (await this.db.isTokenRevoked(token as string)) {
-          return c.json({ active: false });
-        }
-
-        // Verify the token
-        const payload = await verifyToken(token as string);
-
-        // Check if the token has expired
-        const now = Math.floor(Date.now() / 1000);
-        if (payload.exp && payload.exp < now) {
-          return c.json({ active: false });
-        }
-
-        // Return the introspection response
-        return c.json({
-          active: true,
-          client_id: payload.sub,
-          scope: payload.scope,
-          token_type: payload.type === "access" ? "Bearer" : payload.type,
-          exp: payload.exp,
-          iat: payload.iat,
-          sub: payload.sub,
-          jti: payload.jti,
-        });
-      } catch {
-        // Token is inactive
         return c.json({ active: false });
       }
-    } catch (error) {
-      if (
-        error instanceof BadRequestError ||
-        error instanceof UnauthorizedError
-      ) {
-        throw error;
+
+      // Use our bridge to validate the token
+      const accessToken = await this.db.getAccessToken(token as string);
+
+      // If token not found or revoked
+      if (!accessToken || accessToken.isRevoked) {
+        return c.json({ active: false });
       }
+
+      // If token expired
+      if (accessToken.expiresAt < new Date()) {
+        return c.json({ active: false });
+      }
+
+      // Get client information
+      const client = await this.db.getOAuthClientById(accessToken.clientId);
+      if (!client) {
+        return c.json({ active: false });
+      }
+
+      // Token is valid, return full introspection response
+      return c.json({
+        active: true,
+        client_id: client.clientId,
+        username: accessToken.userId,
+        scope: accessToken.scope,
+        token_type: "Bearer",
+        exp: Math.floor(accessToken.expiresAt.getTime() / 1000),
+        iat: Math.floor(accessToken.createdAt.getTime() / 1000),
+        sub: accessToken.userId,
+        iss: new URL(c.req.url).origin,
+      });
+    } catch (error) {
       console.error("Token introspection error:", error);
-      throw new BadRequestError("Failed to process introspection request");
+      return c.json({ active: false });
     }
   }
 
-  // Implements RFC 7009 - OAuth 2.0 Token Revocation
+  // Update the revoke method to use our OAuth-JWT bridge
   async revoke(c: Context) {
     try {
-      const body = await c.req.json();
+      const body = await c.req.parseBody();
       const { token } = body;
-      const clientId = c.req.header("Authorization")?.split(" ")[1];
 
-      // Validate required parameters
       if (!token) {
-        throw new BadRequestError("Missing token parameter");
+        throw new BadRequestError("Token is required");
       }
 
-      // Validate client authentication
-      if (!clientId) {
-        throw new UnauthorizedError("Client authentication required");
-      }
+      // Use our bridge to revoke both the OAuth token and its JWT equivalent
+      await this.oauthJwtBridge.revokeOAuthAndJWT(token as string);
 
-      // Verify client
-      const client = await this.db.getOAuthClient(clientId);
-      if (!client) {
-        throw new UnauthorizedError("Invalid client");
-      }
-
-      // First check if it's a DB-stored token (client credentials)
-      const dbToken = await this.db.getAccessToken(token as string);
-      if (dbToken) {
-        // Get the client that owns this token
-        const tokenClient = await this.db.getOAuthClientById(dbToken.clientId);
-
-        // If token doesn't belong to this client, still return success per RFC 7009
-        if (tokenClient && tokenClient.clientId !== client.clientId) {
-          return c.json({}, 200);
-        }
-
-        // Mark token as revoked in database
-        await this.db.revokeAccessToken(token as string);
-        return c.json({}, 200);
-      }
-
-      // If not in DB, try to handle JWT token
-      try {
-        // Check if the token is already revoked
-        if (await this.db.isTokenRevoked(token as string)) {
-          // RFC 7009 requires 200 OK even if token is already revoked
-          return c.json({}, 200);
-        }
-
-        // Verify the token
-        const payload = await verifyToken(token as string);
-
-        // Check if the token belongs to this client
-        if (payload.sub !== client.clientId) {
-          // RFC 7009 requires 200 OK even if token doesn't belong to client
-          return c.json({}, 200);
-        }
-
-        // Revoke the token
-        await this.db.revokeToken({
-          token: token as string,
-          type: payload.type as string,
-          username: payload.sub,
-          expiresAt: new Date(payload.exp! * 1000),
-        });
-
-        return c.json({}, 200);
-      } catch {
-        // Return success even for invalid tokens (per RFC 7009)
-        return c.json({}, 200);
-      }
+      // RFC 7009 requires 200 OK for all revocation requests
+      return c.json({});
     } catch (error) {
-      if (
-        error instanceof BadRequestError ||
-        error instanceof UnauthorizedError
-      ) {
-        throw error;
-      }
       console.error("Token revocation error:", error);
-      throw new BadRequestError("Failed to process revocation request");
+      // Always return 200 OK per RFC 7009
+      return c.json({});
     }
   }
 }
