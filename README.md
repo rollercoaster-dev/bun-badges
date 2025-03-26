@@ -18,7 +18,7 @@ A high-performance Open Badges server implementation using Bun and Hono, support
 - **Authentication**:
   - Passwordless email authentication
   - WebAuthn support
-  - OAuth integration (coming soon)
+  - OAuth 2.0 with support for machine-to-machine authentication
 - **Modern Stack**:
   - Built with Bun and Hono for high performance
   - TypeScript with strict mode
@@ -209,6 +209,13 @@ src/
 - `POST /auth/email/verify` - Verify email authentication code
 - `POST /auth/webauthn/register` - Register WebAuthn credential
 - `POST /auth/webauthn/authenticate` - Authenticate with WebAuthn
+
+### OAuth
+- `POST /oauth/register` - Register a new OAuth client
+- `POST /oauth/token` - Request an access token
+- `POST /oauth/introspect` - Introspect a token
+- `POST /oauth/revoke` - Revoke a token
+- See [Headless OAuth Documentation](docs/headless-oauth.md) for machine-to-machine authentication
 
 ### Issuers
 - `GET /issuers` - List all issuers

@@ -80,6 +80,7 @@ describe("OAuthController", () => {
       deleteAuthorizationCode: mock(() => Promise.resolve()),
       isTokenRevoked: mock((_token: string) => Promise.resolve(false)),
       revokeToken: mock(() => Promise.resolve()),
+      storeAccessToken: mock(() => Promise.resolve({ success: true })),
     } as any;
 
     controller = new OAuthController(dbService);
@@ -254,14 +255,35 @@ describe("OAuthController", () => {
         method: "POST",
         body: {
           grant_type: "invalid_grant",
-          code: "test-auth-code",
-          redirect_uri: "https://example.com/callback",
           client_id: "test-client",
           client_secret: "test-secret",
         },
       });
 
       await expect(controller.token(ctx)).rejects.toThrow(BadRequestError);
+    });
+
+    test("should support client credentials grant for headless clients", async () => {
+      const ctx = createMockContext({
+        method: "POST",
+        body: {
+          grant_type: "client_credentials",
+          client_id: "test-client",
+          client_secret: "test-secret",
+          scope: `${OAUTH_SCOPES.BADGE_READ} ${OAUTH_SCOPES.PROFILE_READ}`,
+        },
+      });
+
+      const result = await controller.token(ctx);
+      const resultData = await result.json();
+
+      expect(result.status).toBe(200);
+      expect(resultData).toHaveProperty("access_token");
+      expect(resultData).toHaveProperty("token_type", "Bearer");
+      expect(resultData).toHaveProperty("expires_in", 3600);
+      expect(resultData).not.toHaveProperty("refresh_token");
+
+      expect(dbService.storeAccessToken).toHaveBeenCalled();
     });
   });
 
@@ -348,6 +370,50 @@ describe("OAuthController", () => {
 
       const result = await controller.revoke(ctx);
       expect(result.status).toBe(200);
+    });
+  });
+
+  describe("client registration for headless clients", () => {
+    test("should register a headless client with client credentials grant", async () => {
+      dbService.createOAuthClient = mock(() =>
+        Promise.resolve({
+          id: "headless-client",
+          secret: "test-secret",
+          name: "Headless Client",
+          redirectUris: [],
+          scopes: [
+            `${OAUTH_SCOPES.BADGE_READ}`,
+            `${OAUTH_SCOPES.BADGE_CREATE}`,
+          ],
+          grantTypes: ["client_credentials"],
+          tokenEndpointAuthMethod: "client_secret_basic",
+          isHeadless: true,
+        }),
+      );
+
+      const ctx = createMockContext({
+        method: "POST",
+        body: {
+          client_name: "Headless Client",
+          grant_types: ["client_credentials"],
+          scope: `${OAUTH_SCOPES.BADGE_READ} ${OAUTH_SCOPES.BADGE_CREATE}`,
+          token_endpoint_auth_method: "client_secret_basic",
+        },
+      });
+
+      const result = await controller.registerClient(ctx);
+      const resultData = await result.json();
+
+      expect(result.status).toBe(200);
+      expect(resultData).toHaveProperty("client_id", "headless-client");
+      expect(resultData).toHaveProperty("client_secret", "test-secret");
+      expect(resultData).toHaveProperty("grant_types", ["client_credentials"]);
+
+      expect(dbService.createOAuthClient).toHaveBeenCalledWith(
+        expect.objectContaining({
+          isHeadless: true,
+        }),
+      );
     });
   });
 });
