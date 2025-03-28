@@ -232,13 +232,13 @@ export const swaggerDefinition = {
   },
 };
 
-export const createSwaggerUI = () => {
+export const createSwaggerUI = (basePath: string) => {
   const app = new Hono();
+  app.basePath(basePath);
 
   app.get("/openapi.json", (c) => c.json(swaggerDefinition));
-  app.get("/", (c: Context) => c.redirect("/ui"));
-  app.get("/ui", (c: Context) => c.redirect("/ui/"));
-  app.use("/ui", swaggerUI({ url: "/openapi.json" }));
+  app.get("/", (c: Context) => c.redirect(`${basePath}/ui`));
+  app.use("/ui", swaggerUI({ url: `${basePath}/openapi.json` }));
 
   return app;
 };
