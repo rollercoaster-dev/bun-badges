@@ -1,15 +1,4 @@
-import { randomBytes, createHash } from "crypto";
-
-// Generates a secure random base64url-encoded string for OAuth authorization codes
-export function generateCode(length = 32): string {
-  return randomBytes(length)
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=/g, "");
-}
-
-// PKCE (Proof Key for Code Exchange) utilities
+import { createHash } from "crypto";
 
 /**
  * Verify a code verifier against the previously stored code challenge

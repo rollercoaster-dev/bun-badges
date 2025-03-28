@@ -1,0 +1,1 @@
+This PR defines the task for implementing a headless OAuth architecture with API-first design principles. It provides a clear implementation plan for machine-to-machine authentication and programmatic access without requiring UI components.
