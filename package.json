@@ -8,7 +8,7 @@
     "dev": "bun --watch run src/index.ts",
     "dev:db": "bun db:docker:up && bun dev",
     "dev:https": "USE_HTTPS=true bun --watch run src/index.ts",
-    "dev:docker": "docker-compose -f docker-compose.dev.yml up",
+    "dev:docker": "bun run scripts/start-dev.ts",
     "dev:docker:build": "docker-compose -f docker-compose.dev.yml up --build",
     "dev:docker:down": "docker-compose -f docker-compose.dev.yml down",
     "dev:light": "docker-compose -f docker-compose.light.yml up ",
