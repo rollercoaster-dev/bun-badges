@@ -1,5 +1,10 @@
 import * as jose from "jose";
 import type { VerificationService } from "@services/verification.service";
+// Import logger
+import { createLogger } from "@/utils/logger";
+
+// Create logger instance
+const logger = createLogger("JarUtils");
 
 // Define expected claims for JAR
 interface JarPayload extends jose.JWTPayload {
@@ -76,10 +81,12 @@ export async function verifyJar(
       );
     }
 
-    console.log("JAR Verified Successfully for client:", expectedClientId);
+    // Replace console.log with logger.info
+    logger.info("JAR Verified Successfully for client:", expectedClientId);
     return result;
   } catch (error: unknown) {
-    console.error(
+    // Replace console.error
+    logger.error(
       "JAR Verification Failed:",
       error instanceof Error ? error.message : String(error),
     );

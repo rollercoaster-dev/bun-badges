@@ -7,7 +7,7 @@ import { sql } from "drizzle-orm";
  * @param value - The object or array to convert to JSONB
  * @returns A properly formatted SQL expression for JSONB insertion
  */
-export function toJsonb(value: any) {
+export function toJsonb(value: unknown) {
   // When using drizzle-orm with SQL templates, we need to cast strings to jsonb
   return sql`${JSON.stringify(value)}::jsonb`;
 }
@@ -18,7 +18,7 @@ export function toJsonb(value: any) {
  * @param value - The value to check
  * @returns Whether the value is already a JSON string
  */
-export function isJsonString(value: any): boolean {
+export function isJsonString(value: unknown): boolean {
   if (typeof value !== "string") return false;
 
   try {
@@ -26,7 +26,7 @@ export function isJsonString(value: any): boolean {
     // Check if it's a simple string that happens to be valid JSON
     const parsed = JSON.parse(value);
     return typeof parsed === "object" || Array.isArray(parsed);
-  } catch (e) {
+  } catch {
     return false;
   }
 }
@@ -38,7 +38,7 @@ export function isJsonString(value: any): boolean {
  * @param value - JSON value from the database (may be string or object)
  * @returns The normalized object or array
  */
-export function normalizeJsonb(value: any): any {
+export function normalizeJsonb(value: unknown): unknown {
   if (value === null || value === undefined) return null;
 
   // If it's already an object or array, return it
@@ -61,7 +61,10 @@ export function normalizeJsonb(value: any): any {
  * @param expected - Expected JSON value to compare against
  * @returns Whether the values are equivalent
  */
-export function compareJsonbValues(actual: any, expected: any): boolean {
+export function compareJsonbValues(
+  actual: unknown,
+  expected: unknown,
+): boolean {
   const normalizedActual = normalizeJsonb(actual);
   const normalizedExpected = normalizeJsonb(expected);
 
@@ -76,7 +79,7 @@ export function compareJsonbValues(actual: any, expected: any): boolean {
  * @param b - Second object to compare
  * @returns Whether the objects are deeply equal
  */
-function deepCompareJson(a: any, b: any): boolean {
+function deepCompareJson(a: unknown, b: unknown): boolean {
   // Check if both are null/undefined
   if (a == null && b == null) return true;
 
@@ -114,5 +117,10 @@ function deepCompareJson(a: any, b: any): boolean {
   if (!keysA.every((key, i) => key === keysB[i])) return false;
 
   // Deep compare values for each key
-  return keysA.every((key) => deepCompareJson(a[key], b[key]));
+  return keysA.every((key) =>
+    deepCompareJson(
+      (a as Record<string, unknown>)[key],
+      (b as Record<string, unknown>)[key],
+    ),
+  );
 }

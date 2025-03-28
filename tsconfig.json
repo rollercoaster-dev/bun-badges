@@ -33,6 +33,6 @@
       "@tests/*": ["tests/*"]
     }
   },
-  "include": ["src/**/*", "tests/**/*", "types/**/*"],
+  "include": ["src/**/*", "tests/**/*", "types/**/*", "scripts/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

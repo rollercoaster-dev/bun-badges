@@ -76,10 +76,10 @@ interface ServerInfo {
 
 // Logger helper
 const log = {
-  info: (...args: any[]) => console.log("ℹ️", ...args),
-  error: (...args: any[]) => console.error("❌", ...args),
+  info: (...args: unknown[]) => console.log("ℹ️", ...args),
+  error: (...args: unknown[]) => console.error("❌", ...args),
   section: (title: string) => console.log("\n==", title, "=="),
-  compare: (key: string, dev: any, test: any) => {
+  compare: (key: string, dev: unknown, test: unknown) => {
     console.log(`${key}:`);
     console.log(`  Development: ${dev}`);
     console.log(`  Test:        ${test}`);

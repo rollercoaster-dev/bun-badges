@@ -1,11 +1,14 @@
 import { Context } from "hono";
 import { VerificationService } from "@/services/verification.service";
+import { createLogger, Logger } from "@/utils/logger";
 
 export class VerificationController {
   private verificationService: VerificationService;
+  private logger: Logger;
 
   constructor() {
     this.verificationService = new VerificationService();
+    this.logger = createLogger("VerificationController");
   }
 
   /**
@@ -42,7 +45,7 @@ export class VerificationController {
         },
       });
     } catch (error) {
-      console.error("Verification error:", error);
+      this.logger.error("Verification error:", error);
       return c.json(
         {
           status: "error",
@@ -129,7 +132,7 @@ export class VerificationController {
         },
       });
     } catch (error) {
-      console.error("Verification error:", error);
+      this.logger.error("Verification error:", error);
       return c.json(
         {
           status: "error",
@@ -162,7 +165,7 @@ export class VerificationController {
         },
       });
     } catch (error) {
-      console.error("Status list verification error:", error);
+      this.logger.error("Status list verification error:", error);
       return c.json(
         {
           status: "error",

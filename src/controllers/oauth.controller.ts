@@ -10,6 +10,23 @@ import { OAuthJWTBridge } from "../utils/auth/oauth-jwt-bridge";
 import { verifyPKCE } from "../utils/auth/pkce";
 import { verifyJar } from "../utils/auth/jar";
 import { VerificationService } from "../services/verification.service";
+import { createLogger, Logger } from "../utils/logger";
+
+// Basic JWK schema (can be expanded if more validation is needed)
+const jwkSchema = z
+  .object({
+    kty: z.string().optional(),
+    kid: z.string().optional(),
+    use: z.string().optional(),
+    alg: z.string().optional(),
+    // Add other common JWK properties as needed (e.g., n, e, crv, x, y)
+  })
+  .passthrough(); // Allow other properties not explicitly defined
+
+// JWKS schema based on RFC 7517
+const jwksSchema = z.object({
+  keys: z.array(jwkSchema),
+});
 
 // Client registration request schema
 const clientRegistrationSchema = z
@@ -34,7 +51,7 @@ const clientRegistrationSchema = z
       .optional(),
     response_types: z.array(z.enum(["code"])).optional(),
     // JAR (Request Object) related fields
-    jwks: z.any().optional(), // JWK Set object - validate further if needed
+    jwks: jwksSchema.optional(),
     jwks_uri: z.string().url().optional(),
     request_object_signing_alg: z.string().optional(), // Specific algs could be listed with z.enum()
   })
@@ -88,11 +105,13 @@ export class OAuthController {
   private db: DatabaseService;
   private oauthJwtBridge: OAuthJWTBridge;
   private verificationService: VerificationService;
+  private logger: Logger;
 
   constructor(db: DatabaseService = new DatabaseService()) {
     this.db = db;
     this.oauthJwtBridge = new OAuthJWTBridge(db);
     this.verificationService = new VerificationService();
+    this.logger = createLogger("OAuthController");
   }
 
   // Utility method to validate scopes
@@ -193,190 +212,227 @@ export class OAuthController {
       if (error instanceof BadRequestError) {
         throw error;
       }
-      console.error("Client registration error:", error);
+      this.logger.error("Client registration error:", error);
       throw new BadRequestError("Failed to register client");
     }
   }
 
   // Handle authorization code grant flow
   async authorize(c: Context): Promise<Response> {
-    // Check if this is a form submission (POST) or initial request (GET)
-    if (c.req.method === "POST") {
-      return this.handleAuthorizationDecision(c);
-    }
+    try {
+      const query = c.req.query();
+      let {
+        response_type,
+        client_id,
+        redirect_uri,
+        scope,
+        state,
+        code_challenge,
+        code_challenge_method,
+      } = query;
+      const requestJwt = query.request;
 
-    // Initial authorization request (GET)
-    let response_type = c.req.query("response_type");
-    let redirect_uri = c.req.query("redirect_uri");
-    let scope = c.req.query("scope");
-    let state = c.req.query("state");
-    let code_challenge = c.req.query("code_challenge");
-    let code_challenge_method = c.req.query("code_challenge_method");
-    const client_id = c.req.query("client_id");
-    const requestJwt = c.req.query("request");
+      // Validate required parameters
+      if (!response_type || !client_id) {
+        throw new BadRequestError("Missing required parameters");
+      }
 
-    // Validate client_id
-    if (!client_id) {
-      throw new BadRequestError("client_id is required");
-    }
+      // Only support 'code' response type for now
+      if (response_type !== "code") {
+        throw new BadRequestError("Unsupported response type");
+      }
 
-    let client: Awaited<ReturnType<typeof this.db.getOAuthClient>> | null =
-      null;
+      // Get client information
+      let client = await this.db.getOAuthClient(client_id);
+      if (!client) {
+        throw new BadRequestError("Invalid client");
+      }
 
-    client = await this.db.getOAuthClient(client_id);
-    if (!client) {
-      throw new UnauthorizedError("Invalid client");
-    }
+      // For public clients, require PKCE
+      if (client.tokenEndpointAuthMethod === "none" && !code_challenge) {
+        throw new BadRequestError("PKCE is required for public clients");
+      }
 
-    if (requestJwt) {
-      const issuerUrl = new URL(c.req.url).origin;
-      try {
-        // Pass client.clientId instead of client object
-        const jarResult = await verifyJar(
-          requestJwt,
-          client.clientId,
-          issuerUrl,
-          this.verificationService,
-        );
-        const jarPayload = jarResult.payload;
-
-        response_type = jarPayload.response_type;
-        redirect_uri = jarPayload.redirect_uri;
-        scope = jarPayload.scope ?? scope;
-        state = jarPayload.state ?? state;
-        code_challenge = jarPayload.code_challenge ?? code_challenge;
-        code_challenge_method =
-          jarPayload.code_challenge_method ?? code_challenge_method;
-
-        if (!redirect_uri) {
-          throw new BadRequestError("redirect_uri missing in request object");
+      // Validate PKCE parameters if provided
+      if (code_challenge) {
+        // Validate challenge method
+        if (
+          code_challenge_method &&
+          !["plain", "S256"].includes(code_challenge_method)
+        ) {
+          throw new BadRequestError("Unsupported code challenge method");
         }
-        if (!client.redirectUris.includes(redirect_uri)) {
-          throw new BadRequestError(
-            "Request object redirect_uri is not registered for this client",
+
+        // Validate challenge format
+        if (!/^[A-Za-z0-9-._~]{43,128}$/.test(code_challenge)) {
+          throw new BadRequestError("Invalid code challenge format");
+        }
+      }
+
+      // Check if this is a form submission (POST) or initial request (GET)
+      if (c.req.method === "POST") {
+        return this.handleAuthorizationDecision(c);
+      }
+
+      // Process JAR if present
+      if (requestJwt) {
+        const issuerUrl = new URL(c.req.url).origin;
+        try {
+          const jarResult = await verifyJar(
+            requestJwt,
+            client.clientId,
+            issuerUrl,
+            this.verificationService,
+          );
+          const jarPayload = jarResult.payload;
+
+          response_type = jarPayload.response_type as string;
+          redirect_uri = jarPayload.redirect_uri as string;
+          scope = jarPayload.scope ?? scope;
+          state = jarPayload.state ?? state;
+          code_challenge = jarPayload.code_challenge ?? code_challenge;
+          code_challenge_method =
+            jarPayload.code_challenge_method ?? code_challenge_method;
+
+          if (!redirect_uri) {
+            throw new BadRequestError("redirect_uri missing in request object");
+          }
+          if (!client.redirectUris.includes(redirect_uri)) {
+            throw new BadRequestError(
+              "Request object redirect_uri is not registered for this client",
+            );
+          }
+        } catch (error) {
+          this.logger.error("JAR verification failed:", error);
+          throw error;
+        }
+      }
+
+      if (!response_type || !redirect_uri) {
+        throw new BadRequestError(
+          "Missing required parameters (response_type, redirect_uri after potential JAR processing)",
+        );
+      }
+
+      if (!client.redirectUris.includes(redirect_uri)) {
+        let errorRedirect =
+          client.redirectUris.length > 0 ? client.redirectUris[0] : null;
+        if (errorRedirect) {
+          const errorUrl = new URL(errorRedirect);
+          errorUrl.searchParams.set("error", "invalid_request");
+          errorUrl.searchParams.set(
+            "error_description",
+            "Invalid redirect URI",
+          );
+          if (state) errorUrl.searchParams.set("state", state);
+          return c.redirect(errorUrl.toString());
+        } else {
+          throw new UnauthorizedError(
+            "Invalid redirect URI and no registered URI to redirect error",
           );
         }
-      } catch (error) {
-        console.error("JAR verification failed:", error);
-        throw error;
       }
-    }
 
-    if (!response_type || !redirect_uri) {
-      throw new BadRequestError(
-        "Missing required parameters (response_type, redirect_uri after potential JAR processing)",
-      );
-    }
+      if (
+        code_challenge &&
+        code_challenge_method &&
+        code_challenge_method !== "plain" &&
+        code_challenge_method !== "S256"
+      ) {
+        const redirectUrl = new URL(redirect_uri);
+        redirectUrl.searchParams.set("error", "invalid_request");
+        redirectUrl.searchParams.set(
+          "error_description",
+          "Unsupported code challenge method",
+        );
+        if (state) redirectUrl.searchParams.set("state", state);
+        return c.redirect(redirectUrl.toString());
+      }
 
-    if (!client.redirectUris.includes(redirect_uri)) {
-      let errorRedirect =
-        client.redirectUris.length > 0 ? client.redirectUris[0] : null;
-      if (errorRedirect) {
-        const errorUrl = new URL(errorRedirect);
-        errorUrl.searchParams.set("error", "invalid_request");
-        errorUrl.searchParams.set("error_description", "Invalid redirect URI");
-        if (state) errorUrl.searchParams.set("state", state);
-        return c.redirect(errorUrl.toString());
-      } else {
-        throw new UnauthorizedError(
-          "Invalid redirect URI and no registered URI to redirect error",
+      const requestedScopes = scope ? scope.split(" ") : [];
+      const clientScopes = client.scope ? client.scope.split(" ") : [];
+      const validScopes = this.validateScopes(requestedScopes, clientScopes);
+
+      if (requestedScopes.length > 0 && validScopes.length === 0) {
+        const redirectUrl = new URL(redirect_uri);
+        redirectUrl.searchParams.set("error", "invalid_scope");
+        redirectUrl.searchParams.set(
+          "error_description",
+          "The requested scope is invalid or unknown",
+        );
+        if (state) redirectUrl.searchParams.set("state", state);
+        return c.redirect(redirectUrl.toString());
+      }
+
+      const user = await this.getUserFromContext(c);
+      if (!user) {
+        const returnTo = new URL(c.req.url);
+        return c.redirect(
+          `/login?returnTo=${encodeURIComponent(returnTo.toString())}`,
         );
       }
-    }
 
-    if (
-      code_challenge &&
-      code_challenge_method &&
-      code_challenge_method !== "plain" &&
-      code_challenge_method !== "S256"
-    ) {
-      const redirectUrl = new URL(redirect_uri);
-      redirectUrl.searchParams.set("error", "invalid_request");
-      redirectUrl.searchParams.set(
-        "error_description",
-        "Unsupported code challenge method",
-      );
-      if (state) redirectUrl.searchParams.set("state", state);
-      return c.redirect(redirectUrl.toString());
-    }
-
-    const requestedScopes = scope ? scope.split(" ") : [];
-    const clientScopes = client.scope ? client.scope.split(" ") : [];
-    const validScopes = this.validateScopes(requestedScopes, clientScopes);
-
-    if (requestedScopes.length > 0 && validScopes.length === 0) {
-      const redirectUrl = new URL(redirect_uri);
-      redirectUrl.searchParams.set("error", "invalid_scope");
-      redirectUrl.searchParams.set(
-        "error_description",
-        "The requested scope is invalid or unknown",
-      );
-      if (state) redirectUrl.searchParams.set("state", state);
-      return c.redirect(redirectUrl.toString());
-    }
-
-    const user = await this.getUserFromContext(c);
-    if (!user) {
-      const returnTo = new URL(c.req.url);
-      return c.redirect(
-        `/login?returnTo=${encodeURIComponent(returnTo.toString())}`,
-      );
-    }
-
-    try {
-      const consentRecord = await this.db.getConsentRecord(user.id, client.id);
-
-      if (consentRecord) {
-        const consentedScopes = consentRecord.scope.split(" ");
-        const allScopesConsented = validScopes.every((scope) =>
-          consentedScopes.includes(scope),
+      try {
+        const consentRecord = await this.db.getConsentRecord(
+          user.id,
+          client.id,
         );
 
-        if (allScopesConsented) {
-          return this.issueAuthorizationCode(c, {
-            userId: user.id,
-            clientId: client.id,
+        if (consentRecord) {
+          const consentedScopes = consentRecord.scope.split(" ");
+          const allScopesConsented = validScopes.every((scope) =>
+            consentedScopes.includes(scope),
+          );
+
+          if (allScopesConsented) {
+            return this.issueAuthorizationCode(c, {
+              userId: user.id,
+              clientId: client.id,
+              redirectUri: redirect_uri,
+              scope: validScopes.join(" "),
+              state,
+              codeChallenge: code_challenge,
+              codeChallengeMethod: code_challenge_method,
+            });
+          }
+        }
+
+        // Show consent page using final parameter values
+        // Wrap the HTML string in c.html() to return a Response
+        return c.html(
+          this.renderConsentPage({
+            clientName: client.clientName,
+            clientUri: client.clientUri || "",
+            logoUri: client.logoUri || undefined,
+            scopes: validScopes,
             redirectUri: redirect_uri,
-            scope: validScopes.join(" "),
             state,
+            clientId: client_id,
+            responseType: response_type,
             codeChallenge: code_challenge,
             codeChallengeMethod: code_challenge_method,
-          });
-        }
-      }
-
-      // Show consent page using final parameter values
-      // Wrap the HTML string in c.html() to return a Response
-      return c.html(
-        this.renderConsentPage({
-          clientName: client.clientName,
-          clientUri: client.clientUri || "",
-          logoUri: client.logoUri || undefined,
-          scopes: validScopes,
-          redirectUri: redirect_uri,
-          state,
-          clientId: client_id,
-          responseType: response_type,
-          codeChallenge: code_challenge,
-          codeChallengeMethod: code_challenge_method,
-        }),
-      );
-    } catch (error) {
-      console.error("Error during consent check/rendering:", error);
-      if (client.redirectUris.includes(redirect_uri)) {
-        const errorUrl = new URL(redirect_uri);
-        errorUrl.searchParams.set("error", "server_error");
-        errorUrl.searchParams.set(
-          "error_description",
-          "Failed to process authorization request",
+          }),
         );
-        if (state) errorUrl.searchParams.set("state", state);
-        try {
-          return c.redirect(errorUrl.toString());
-        } catch (redirectError) {
-          console.error("Failed to redirect error:", redirectError);
+      } catch (error) {
+        this.logger.error("Error during consent check/rendering:", error);
+        if (client.redirectUris.includes(redirect_uri)) {
+          const errorUrl = new URL(redirect_uri);
+          errorUrl.searchParams.set("error", "server_error");
+          errorUrl.searchParams.set(
+            "error_description",
+            "Failed to process authorization request",
+          );
+          if (state) errorUrl.searchParams.set("state", state);
+          try {
+            return c.redirect(errorUrl.toString());
+          } catch (redirectError) {
+            this.logger.error("Failed to redirect error:", redirectError);
+          }
         }
+        throw new BadRequestError("Failed to process authorization request");
       }
+    } catch (error) {
+      this.logger.error("Error during authorization:", error);
       throw new BadRequestError("Failed to process authorization request");
     }
   }
@@ -460,7 +516,7 @@ export class OAuthController {
         codeChallengeMethod,
       });
     } catch (error) {
-      console.error("Error in authorization decision:", error);
+      this.logger.error("Error in authorization decision:", error);
       throw new BadRequestError("Failed to process authorization decision");
     }
   }
@@ -681,14 +737,21 @@ export class OAuthController {
       ) {
         throw error;
       }
-      console.error("Token endpoint error:", error);
+      this.logger.error("Token endpoint error:", error);
       throw new BadRequestError("Token request failed");
     }
   }
 
-  // Add the missing refresh token handler
-  private async handleRefreshTokenGrant(c: Context, body: any) {
-    const { refresh_token, client_id, client_secret, scope } = body;
+  private async handleRefreshTokenGrant(
+    c: Context,
+    body: Record<string, unknown>,
+  ) {
+    const { refresh_token, client_id, client_secret, scope } = body as {
+      refresh_token: string;
+      client_id: string;
+      client_secret?: string;
+      scope?: string;
+    };
 
     if (!refresh_token || !client_id || !client_secret) {
       throw new BadRequestError("Missing required parameters");
@@ -778,14 +841,20 @@ export class OAuthController {
         scope: validScopes.join(" "),
       });
     } catch (error) {
-      console.error("Refresh token error:", error);
+      this.logger.error("Refresh token error:", error);
       throw new UnauthorizedError("Invalid refresh token");
     }
   }
 
-  // Update the client credentials grant to use our OAuth-JWT bridge
-  private async handleClientCredentialsGrant(c: Context, body: any) {
-    const { client_id, client_secret, scope } = body;
+  private async handleClientCredentialsGrant(
+    c: Context,
+    body: Record<string, unknown>,
+  ) {
+    const { client_id, client_secret, scope } = body as {
+      client_id: string;
+      client_secret?: string;
+      scope?: string;
+    };
 
     if (!client_id || !client_secret) {
       throw new UnauthorizedError("Invalid client authentication");
@@ -843,15 +912,23 @@ export class OAuthController {
     });
   }
 
-  // Update the authorization code grant to use our OAuth-JWT bridge
-  private async handleAuthorizationCodeGrant(c: Context, body: any) {
+  private async handleAuthorizationCodeGrant(
+    c: Context,
+    body: Record<string, unknown>,
+  ) {
     const {
       code,
       redirect_uri,
       client_id,
       client_secret,
       code_verifier, // PKCE code verifier
-    } = body;
+    } = body as {
+      code: string;
+      redirect_uri: string;
+      client_id: string;
+      client_secret?: string;
+      code_verifier?: string;
+    };
 
     // Validate required parameters
     if (!code || !redirect_uri || !client_id) {
@@ -1006,7 +1083,7 @@ export class OAuthController {
         iss: new URL(c.req.url).origin,
       });
     } catch (error) {
-      console.error("Token introspection error:", error);
+      this.logger.error("Token introspection error:", error);
       return c.json({ active: false });
     }
   }
@@ -1027,7 +1104,7 @@ export class OAuthController {
       // RFC 7009 requires 200 OK for all revocation requests
       return c.json({});
     } catch (error) {
-      console.error("Token revocation error:", error);
+      this.logger.error("Token revocation error:", error);
       // Always return 200 OK per RFC 7009
       return c.json({});
     }
@@ -1059,7 +1136,7 @@ export class OAuthController {
         username: payload.sub,
       };
     } catch (error) {
-      console.error("Error getting user from context:", error);
+      this.logger.error("Error getting user from context:", error);
       return null;
     }
   }

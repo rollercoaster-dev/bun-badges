@@ -1,5 +1,4 @@
 import type { NewRevokedToken } from "@/db/schema/auth";
-import type { DatabaseService as RealDatabaseService } from "@services/db.service";
 
 // In-memory token revocation store for testing
 const revokedTokens = new Map<string, boolean>();
@@ -7,7 +6,7 @@ const revokedTokens = new Map<string, boolean>();
 const users = new Map<string, any>();
 
 // Create a mock database service for testing
-export class MockDatabaseService implements RealDatabaseService {
+export class MockDatabaseService {
   // Static db property
   static db = {} as Record<string, unknown>;
 
@@ -27,7 +26,7 @@ export class MockDatabaseService implements RealDatabaseService {
     return user;
   }
 
-  async getUserByEmail(email: string) {
+  async getUserByEmail(email: string): Promise<any> {
     return users.get(email) || null;
   }
 
@@ -84,7 +83,7 @@ export class MockDatabaseService implements RealDatabaseService {
     clientUri?: string;
     logoUri?: string;
     isHeadless?: boolean;
-    jwks?: any;
+    jwks?: unknown;
     jwksUri?: string;
     requestObjectSigningAlg?: string;
   }): Promise<{ id: string; secret: string }> {
@@ -409,6 +408,12 @@ export class MockDatabaseService implements RealDatabaseService {
       userId,
       clientId,
     );
+    // No-op for mock
+  }
+
+  // Add missing method to satisfy interface
+  async deleteOAuthClientById(id: string): Promise<void> {
+    console.log("Mock DB: Deleting OAuth client by ID", id);
     // No-op for mock
   }
 }

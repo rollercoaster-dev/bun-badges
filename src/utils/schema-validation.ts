@@ -3,7 +3,12 @@
  */
 import { OpenBadgeCredential } from "@/models/credential.model";
 import { OB3_CREDENTIAL_SCHEMA_URL } from "@/constants/context-urls";
-import Ajv from "ajv";
+import Ajv, { AnySchema } from "ajv";
+// Import logger
+import { createLogger } from "@/utils/logger";
+
+// Create logger instance
+const logger = createLogger("SchemaValidation");
 
 /**
  * Ajv schema validation result
@@ -16,14 +21,14 @@ export interface ValidationResult {
 /**
  * Loaded schemas cache to avoid fetching multiple times
  */
-const schemaCache = new Map<string, any>();
+const schemaCache = new Map<string, unknown>();
 
 /**
  * Fetch and parse a JSON schema from a URL
  * @param url The URL of the schema to fetch
  * @returns The parsed schema
  */
-async function fetchSchema(url: string): Promise<any> {
+async function fetchSchema(url: string): Promise<unknown> {
   try {
     // Check cache first
     if (schemaCache.has(url)) {
@@ -43,7 +48,8 @@ async function fetchSchema(url: string): Promise<any> {
 
     return schema;
   } catch (error) {
-    console.error(`Error fetching schema: ${error}`);
+    // Replace console.error
+    logger.error(`Error fetching schema: ${error}`);
     throw error;
   }
 }
@@ -68,7 +74,7 @@ export async function validateOB3Credential(
     const schema = await fetchSchema(schemaUrl);
 
     // Compile the schema
-    const validate = ajv.compile(schema);
+    const validate = ajv.compile(schema as AnySchema);
 
     // Validate the credential
     const valid = validate(credential);

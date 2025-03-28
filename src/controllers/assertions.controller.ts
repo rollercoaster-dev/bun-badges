@@ -7,14 +7,16 @@ import { isValidUuid } from "@/utils/validation";
 import { OB2BadgeAssertion } from "@/services/verification.service";
 import { OpenBadgeCredential } from "@/models/credential.model";
 import { toJsonb } from "@/utils/db-helpers";
+import { createLogger, Logger } from "@/utils/logger";
 
 type AssertionJson = OB2BadgeAssertion | OpenBadgeCredential;
 
 export class AssertionController {
   private credentialService: CredentialService;
-  // Initialize services
+  private logger: Logger;
   constructor() {
     this.credentialService = new CredentialService();
+    this.logger = createLogger("AssertionController");
   }
 
   /**
@@ -91,7 +93,7 @@ export class AssertionController {
         },
       });
     } catch (error) {
-      console.error("Failed to list assertions:", error);
+      this.logger.error("Failed to list assertions:", error);
       return c.json(
         {
           status: "error",
@@ -119,7 +121,7 @@ export class AssertionController {
         if (formatParam) {
           format = formatParam;
         }
-      } catch (e) {
+      } catch {
         // If accessing as function fails, leave the default
       }
 
@@ -185,7 +187,7 @@ export class AssertionController {
         },
       });
     } catch (error) {
-      console.error("Failed to get assertion:", error);
+      this.logger.error("Failed to get assertion:", error);
       return c.json(
         {
           status: "error",
@@ -212,9 +214,11 @@ export class AssertionController {
         // Try function style first
         const query = c.req.query();
         format = query.format || "ob2";
-      } catch (e) {
+      } catch {
         // Fall back to property style if function call fails
-        format = (c.req.query as any).format || "ob2";
+        format =
+          (c.req.query as unknown as Record<string, string | undefined>)
+            ?.format || "ob2";
       }
 
       // Validate required fields
@@ -356,7 +360,7 @@ export class AssertionController {
         },
       });
     } catch (error) {
-      console.error("Failed to create assertion:", error);
+      this.logger.error("Failed to create assertion:", error);
       return c.json(
         {
           status: "error",
@@ -385,7 +389,7 @@ export class AssertionController {
         if (formatParam) {
           format = formatParam;
         }
-      } catch (e) {
+      } catch {
         // If accessing as function fails, leave the default
       }
 
@@ -482,7 +486,7 @@ export class AssertionController {
         },
       });
     } catch (error) {
-      console.error("Failed to revoke assertion:", error);
+      this.logger.error("Failed to revoke assertion:", error);
       return c.json(
         {
           status: "error",

@@ -28,6 +28,7 @@ import {
   OB3_ACHIEVEMENT_CONTEXT,
   OB3_CREDENTIAL_SCHEMA_URL,
 } from "@/constants/context-urls";
+import { createLogger, Logger } from "@/utils/logger";
 
 /**
  * Interface for a signable credential document without proof
@@ -48,6 +49,12 @@ export interface SignableCredential {
  * Service for managing and processing Open Badge Credentials
  */
 export class CredentialService {
+  private logger: Logger;
+
+  constructor() {
+    this.logger = createLogger("CredentialService");
+  }
+
   /**
    * Create a new issuer key pair if one doesn't exist
    */
@@ -109,7 +116,7 @@ export class CredentialService {
         issuer: `${hostUrl}/issuers/${badge.issuerId}`,
       };
     } catch (error) {
-      console.error("Error creating achievement:", error);
+      this.logger.error("Error creating achievement:", error);
       throw error;
     }
   }
@@ -134,15 +141,15 @@ export class CredentialService {
         .where(eq(badgeAssertions.assertionId, assertionId));
 
       // Check if we got a valid result
-      let assertion: any;
+      let assertion: Record<string, unknown>;
 
       if (assertionResult && assertionResult.length > 0) {
         // Production path - we got a result from the database
         assertion = assertionResult[0];
-        console.log("Using assertion from database");
+        this.logger.info("Using assertion from database");
       } else {
         // Test environment fallback - create a mock assertion
-        console.log(
+        this.logger.info(
           "No assertion found in database, creating mock for testing",
         );
         const badgeId = crypto.randomUUID();
@@ -195,20 +202,26 @@ export class CredentialService {
           : null);
 
       if (!badgeId) {
-        console.error("Missing badgeId in assertion:", assertion);
+        this.logger.error("Missing badgeId in assertion:", assertion);
         throw new Error("Invalid assertion data: missing badgeId");
       }
 
       // Create the achievement
-      const achievement = await this.createAchievement(hostUrl, badgeId);
+      const achievement = await this.createAchievement(
+        hostUrl,
+        badgeId as string,
+      );
+
+      // Extract issuerId with assertion
+      const issuerIdString = assertion.issuerId as string;
 
       // Create the credential without proof
       const credential: SignableCredential = {
         "@context": OB3_CREDENTIAL_CONTEXT,
         id: `${hostUrl}/assertions/${assertionId}`,
         type: ["VerifiableCredential", "OpenBadgeCredential"],
-        issuer: `${hostUrl}/issuers/${assertion.issuerId}`,
-        issuanceDate: assertion.issuedOn.toISOString(),
+        issuer: `${hostUrl}/issuers/${issuerIdString}`,
+        issuanceDate: (assertion.issuedOn as Date).toISOString(),
         credentialSubject: {
           id: assertion.recipientHashed
             ? undefined
@@ -248,13 +261,13 @@ export class CredentialService {
 
       // Sign the credential
       const signedCredential = (await this.signCredential(
-        assertion.issuerId,
+        issuerIdString,
         credential,
       )) as unknown as OpenBadgeCredential;
 
       return signedCredential;
     } catch (error) {
-      console.error("Error creating credential:", error);
+      this.logger.error("Error creating credential:", error);
       throw error;
     }
   }
@@ -342,7 +355,7 @@ export class CredentialService {
       // Extract the verification method from the proof
       const verificationMethod = credential.proof.verificationMethod;
       if (!verificationMethod) {
-        console.error("No verification method found in proof");
+        this.logger.warn("No verification method found in proof");
         return false;
       }
 
@@ -365,14 +378,14 @@ export class CredentialService {
       }
 
       if (!issuerId) {
-        console.error("Could not extract issuer ID from credential");
+        this.logger.warn("Could not extract issuer ID from credential");
         return false;
       }
 
       // Get the issuer's signing key
       const signingKey = await getSigningKey(issuerId);
       if (!signingKey || !signingKey.publicKey) {
-        console.error("No signing key found for issuer:", issuerId);
+        this.logger.warn("No signing key found for issuer:", issuerId);
         return false;
       }
 
@@ -396,7 +409,7 @@ export class CredentialService {
       // Verify the signature
       return ed.verify(signature, dataToVerify, signingKey.publicKey);
     } catch (error) {
-      console.error("Signature verification error:", error);
+      this.logger.error("Signature verification error:", error);
       return false;
     }
   }

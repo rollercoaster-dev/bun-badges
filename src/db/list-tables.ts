@@ -47,10 +47,12 @@ async function listTables() {
 
       if (missingTables.length > 0) {
         logger.error(`Missing required tables: ${missingTables.join(", ")}`);
-        console.log(`Missing required tables: ${missingTables.join(", ")}`);
+        // Replace console.log with logger.error
+        // console.log(`Missing required tables: ${missingTables.join(", ")}`);
       } else {
         logger.info("All required tables exist");
-        console.log("All required tables exist");
+        // Replace console.log with logger.info
+        // console.log("All required tables exist");
       }
 
       // Return result for use in scripts
@@ -64,7 +66,8 @@ async function listTables() {
     }
   } catch (error) {
     logger.error("Error listing tables:", error);
-    console.error("Error:", error);
+    // Replace console.error with logger.error
+    // console.error("Error:", error);
     throw error;
   } finally {
     // Close pool if running as main script

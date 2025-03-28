@@ -92,7 +92,7 @@ export class OAuthJWTBridge {
       // Verify the JWT
       const payload = await verifyToken(mapping.jwtToken);
       return payload;
-    } catch (error) {
+    } catch {
       return null;
     }
   }

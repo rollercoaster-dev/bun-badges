@@ -109,6 +109,9 @@ class Logger {
   }
 }
 
+// Explicitly export the Logger class
+export { Logger };
+
 /**
  * Create a logger instance for a specific context
  * @param context The context for this logger (usually the class or file name)
@@ -119,10 +122,3 @@ export const createLogger = (context: string): Logger => {
 
 // Export a default logger for quick usage
 export const logger = createLogger("app");
-
-// Re-export for convenience
-export default {
-  createLogger,
-  logger,
-  LogLevel,
-};

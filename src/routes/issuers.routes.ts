@@ -32,7 +32,7 @@ interface IssuerResponse {
   url: string;
   description?: string;
   email?: string;
-  issuerJson: any; // Use any for the JSON data to avoid strict typing issues
+  issuerJson: unknown; // Use unknown for the JSON data
   publicKey?: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
@@ -138,7 +138,7 @@ issuers.get("/:id/verify", async (c) => {
   try {
     const response = await controller.getIssuer(c);
     const data = (await response.json()) as IssuerResponse;
-    return c.json(data.issuerJson);
+    return c.json(data.issuerJson as Record<string, unknown>);
   } catch (error) {
     throw new Error(
       `Failed to verify issuer: ${error instanceof Error ? error.message : String(error)}`,

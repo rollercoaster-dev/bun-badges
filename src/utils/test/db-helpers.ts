@@ -7,7 +7,7 @@ import {
   signingKeys,
   verificationCodes,
 } from "../../db/schema";
-import { eq } from "drizzle-orm";
+import { eq, type InferSelectModel } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { OB2BadgeAssertion } from "@/services/verification.service";
 import { OpenBadgeCredential } from "@/models/credential.model";
@@ -18,18 +18,25 @@ import {
   updateOB3CredentialJson,
 } from "../../../tests/helpers/test-utils";
 
+// Define types locally using InferSelectModel
+type User = InferSelectModel<typeof users>;
+type IssuerProfile = InferSelectModel<typeof issuerProfiles>;
+type BadgeClass = InferSelectModel<typeof badgeClasses>;
+type BadgeAssertion = InferSelectModel<typeof badgeAssertions>;
+type SigningKey = InferSelectModel<typeof signingKeys>;
+
 // Flag to detect if we're in a test environment with mocks
 const IS_TEST_ENV = process.env.NODE_ENV === "test" || !!process.env.BUN_TEST;
 
 /**
- * Test data interface
+ * Test data interface using inferred types
  */
 export interface TestData {
-  user: any;
-  issuer: any;
-  badge: any;
-  assertion: any;
-  signingKey: any;
+  user: User;
+  issuer: IssuerProfile;
+  badge: BadgeClass;
+  assertion: BadgeAssertion;
+  signingKey: SigningKey;
 }
 
 /**
@@ -192,21 +199,21 @@ export async function clearTestData() {
         // Try to delete from oauth tables if they exist
         try {
           await db.execute("DELETE FROM oauth_access_tokens");
-        } catch (e) {
+        } catch (_) {
           // Suppress error if table doesn't exist
           console.log("Note: oauth_access_tokens table might not exist yet");
         }
 
         try {
           await db.execute("DELETE FROM authorization_codes");
-        } catch (e) {
+        } catch (_) {
           // Suppress error if table doesn't exist
           console.log("Note: authorization_codes table might not exist yet");
         }
 
         try {
           await db.execute("DELETE FROM oauth_clients");
-        } catch (e) {
+        } catch (_) {
           // Suppress error if table doesn't exist
           console.log("Note: oauth_clients table might not exist yet");
         }
@@ -245,13 +252,13 @@ export async function clearTestData() {
           // Try to delete from oauth tables if they exist
           try {
             await client.query("DELETE FROM oauth_access_tokens");
-          } catch {}
+          } catch (_) {}
           try {
             await client.query("DELETE FROM authorization_codes");
-          } catch {}
+          } catch (_) {}
           try {
             await client.query("DELETE FROM oauth_clients");
-          } catch {}
+          } catch (_) {}
 
           await client.query("DELETE FROM users");
           await client.query("SET session_replication_role = 'origin'");
@@ -284,21 +291,21 @@ export async function clearTestData() {
       // Try to delete from oauth tables if they exist
       try {
         await dbPool.query("DELETE FROM oauth_access_tokens");
-      } catch (e) {
+      } catch (_) {
         // Suppress error if table doesn't exist
         console.log("Note: oauth_access_tokens table might not exist yet");
       }
 
       try {
         await dbPool.query("DELETE FROM authorization_codes");
-      } catch (e) {
+      } catch (_) {
         // Suppress error if table doesn't exist
         console.log("Note: authorization_codes table might not exist yet");
       }
 
       try {
         await dbPool.query("DELETE FROM oauth_clients");
-      } catch (e) {
+      } catch (_) {
         // Suppress error if table doesn't exist
         console.log("Note: oauth_clients table might not exist yet");
       }
@@ -365,7 +372,7 @@ export async function getAssertionJson(
       // Check for OB3 format
       const ob3Json = await getOB3CredentialJson(assertionId);
       if (ob3Json) return ob3Json;
-    } catch (e) {
+    } catch (_) {
       // Silently continue to DB query method if helper fails
     }
   }
@@ -406,7 +413,7 @@ export async function updateAssertionJson(
         updates as Partial<OpenBadgeCredential>,
       );
       if (result2) return;
-    } catch (e) {
+    } catch (_) {
       // Silently continue to DB update method if helper fails
     }
   }

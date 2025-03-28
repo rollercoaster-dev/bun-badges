@@ -122,7 +122,7 @@ export class VerificationService {
       if (typeof assertionJson === "string") {
         try {
           assertionJson = JSON.parse(assertionJson);
-        } catch (error) {
+        } catch {
           result.errors.push("Invalid JSON format");
           return result;
         }

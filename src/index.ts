@@ -16,6 +16,7 @@ import { createAuthMiddleware } from "@middleware/auth.middleware";
 import { DatabaseService } from "@services/db.service";
 import { createSwaggerUI } from "./swagger";
 import { logger } from "@utils/logger";
+import { findAvailablePort } from "@utils/network";
 
 // Create the Hono app instance
 const app = new Hono();
@@ -33,60 +34,35 @@ app.use("*", cors());
 app.use("*", secureHeaders());
 app.use("*", errorHandler);
 
-// Routes
+// Add the auth middleware to protected routes
+app.use("/api/*", authMiddleware);
+
+// Create the OAuth router
+const oauthRouter = createOAuthRouter(oauthController);
+
+// Add routes
 app.route("/auth", auth);
-app.route("/oauth", createOAuthRouter(oauthController));
-
-// API routes with selective auth middleware
-const api = new Hono();
-
-// Apply auth middleware only to mutation operations
-api.use("/badges", async (c, next) => {
-  if (["POST", "PUT", "DELETE"].includes(c.req.method)) {
-    return authMiddleware(c, next);
-  }
-  await next();
-  return;
-});
-
-api.use("/assertions", async (c, next) => {
-  if (["POST", "PUT", "DELETE"].includes(c.req.method)) {
-    return authMiddleware(c, next);
-  }
-  await next();
-  return;
-});
-
-api.use("/issuers", async (c, next) => {
-  if (["POST", "PUT", "DELETE"].includes(c.req.method)) {
-    return authMiddleware(c, next);
-  }
-  await next();
-  return;
-});
-
-// Mount the API routes
-api.route("/badges", badges);
-api.route("/assertions", assertions);
-api.route("/issuers", issuers);
-api.route("/verify", verification);
-api.route("/status", status);
-app.route("/api", api);
-
-// Mount Swagger UI
-app.route("/docs", createSwaggerUI("/docs"));
-
-// Root route
-app.get("/", (c) =>
-  c.json({ message: "Bun Badges API - Hot Reload Working!" }),
-);
-
-// Add comprehensive health check endpoint
+app.route("/api/badges", badges);
+app.route("/api/assertions", assertions);
+app.route("/api/issuers", issuers);
+app.route("/api/verify", verification);
+app.route("/status", status);
 app.route("/health", health);
+app.route("/oauth", oauthRouter);
+
+// Add Swagger UI in development
+if (process.env.NODE_ENV === "development") {
+  app.route("/docs", createSwaggerUI("/docs"));
+}
 
 // Server startup configuration
-const port = parseInt(process.env.PORT || "7777", 10);
 const isDevEnv = process.env.NODE_ENV === "development";
+
+// Get port configuration
+const requestedPort = parseInt(process.env.PORT || "7777", 10);
+
+// Find an available port starting from the requested port
+const port = await findAvailablePort(requestedPort);
 
 // Log server startup information
 logger.info(

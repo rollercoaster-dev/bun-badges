@@ -7,6 +7,7 @@ import {
   verifyToken,
 } from "@utils/auth/jwt";
 import { DatabaseService } from "@services/db.service";
+import { createLogger, Logger } from "@/utils/logger";
 // Use Bun's built-in password hashing instead of bcrypt
 
 type CodeRequestBody = {
@@ -41,6 +42,7 @@ type LoginBody = {
 export class AuthController {
   private rateLimiter: RateLimiter;
   private db: DatabaseService;
+  private logger: Logger;
 
   constructor(rateLimiter?: RateLimiter, db?: DatabaseService) {
     this.rateLimiter =
@@ -50,6 +52,7 @@ export class AuthController {
         windowMs: 3600000, // 1 hour
       });
     this.db = db || new DatabaseService();
+    this.logger = createLogger("AuthController");
   }
 
   async register(c: Context) {
@@ -103,7 +106,7 @@ export class AuthController {
         201,
       );
     } catch (error) {
-      console.error("Registration error:", error);
+      this.logger.error("Registration error:", error);
       return c.json({ error: "Failed to register user" }, 500);
     }
   }
@@ -168,7 +171,7 @@ export class AuthController {
         200,
       );
     } catch (error) {
-      console.error("Login error:", error);
+      this.logger.error("Login error:", error);
       return c.json({ error: "Failed to log in" }, 500);
     }
   }

@@ -1,4 +1,8 @@
 import { dbPool } from "./config";
+import { createLogger } from "@/utils/logger";
+
+// Create logger instance for this script
+const logger = createLogger("CiDbSetup");
 
 // Constant for retry settings
 const MAX_RETRIES = 5;
@@ -9,8 +13,8 @@ const RETRY_DELAY = 2000;
  * This ensures the database is properly initialized for CI tests
  */
 async function setupCiDatabase() {
-  console.log("Starting CI database setup...");
-  console.log(
+  logger.info("Starting CI database setup...");
+  logger.info(
     `Using database URL: ${process.env.DATABASE_URL?.replace(/:.+@/, ":****@")}`,
   );
 
@@ -24,20 +28,20 @@ async function setupCiDatabase() {
     const tables = await checkTables();
 
     if (tables.length === 0) {
-      console.log("No tables found, running migrations...");
+      logger.info("No tables found, running migrations...");
       await runMigrations();
     } else {
-      console.log(`Found ${tables.length} tables:`);
-      tables.forEach((table) => console.log(`- ${table}`));
+      logger.info(`Found ${tables.length} tables:`);
+      tables.forEach((table) => logger.info(`- ${table}`));
     }
 
     // 3. Verify required tables
     await verifyRequiredTables();
 
-    console.log("✅ CI database setup completed successfully");
+    logger.info("✅ CI database setup completed successfully");
     process.exit(0);
   } catch (err) {
-    console.error("❌ CI database setup failed:", err);
+    logger.error("❌ CI database setup failed:", err);
     process.exit(1);
   }
 }
@@ -51,22 +55,22 @@ async function checkConnection() {
   while (attempt < MAX_RETRIES) {
     try {
       attempt++;
-      console.log(`Database connection attempt ${attempt}/${MAX_RETRIES}...`);
+      logger.info(`Database connection attempt ${attempt}/${MAX_RETRIES}...`);
 
       // Try a simple query to test connection
       const result = await dbPool.query("SELECT 1 as test");
       if (result.rows[0].test === 1) {
-        console.log("✅ Database connection successful");
+        logger.info("✅ Database connection successful");
         return true;
       }
     } catch (err) {
-      console.error(
+      logger.error(
         `Database connection failed (attempt ${attempt}/${MAX_RETRIES}):`,
         err,
       );
 
       if (attempt < MAX_RETRIES) {
-        console.log(`Waiting ${RETRY_DELAY}ms before retry...`);
+        logger.info(`Waiting ${RETRY_DELAY}ms before retry...`);
         await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
       } else {
         throw new Error(
@@ -93,7 +97,7 @@ async function checkTables() {
 
     return result.rows.map((row) => row.table_name);
   } catch (err) {
-    console.error("Failed to check tables:", err);
+    logger.error("Failed to check tables:", err);
     return [];
   }
 }
@@ -103,7 +107,7 @@ async function checkTables() {
  */
 async function runMigrations() {
   try {
-    console.log("Running database migrations...");
+    logger.info("Running database migrations...");
 
     // Execute the db:push command
     // This is a simple approach - in a real scenario, you might want to
@@ -111,10 +115,10 @@ async function runMigrations() {
     const { execSync } = require("child_process");
     execSync("bun run db:push", { stdio: "inherit" });
 
-    console.log("Migrations completed successfully");
+    logger.info("Migrations completed successfully");
     return true;
   } catch (err) {
-    console.error("Migration failed:", err);
+    logger.error("Migration failed:", err);
     throw err;
   }
 }
@@ -139,12 +143,12 @@ async function verifyRequiredTables() {
     throw new Error(`Missing required tables: ${missingTables.join(", ")}`);
   }
 
-  console.log("✅ All required tables verified");
+  logger.info("✅ All required tables verified");
   return true;
 }
 
 // Run the setup
 setupCiDatabase().catch((err) => {
-  console.error("Unhandled error in CI database setup:", err);
+  logger.error("Unhandled error in CI database setup:", err);
   process.exit(1);
 });

@@ -5,13 +5,46 @@ import unusedImports from 'eslint-plugin-unused-imports';
 
 export default [
   {
-    ignores: ['dist/**', 'node_modules/**', '**/*.test.ts', '**/*.integration.test.ts', 'tests/**/*'],
+    ignores: ['dist/**', 'node_modules/**'],
   },
   {
-    // Ignore test files - these often need more flexibility with types and console logs
+    files: ['src/**/*.ts'],
+    languageOptions: {
+      parser: tsparser,
+      parserOptions: {
+        ecmaVersion: 'latest',
+         sourceType: 'module',
+      },
+    },
+    plugins: {
+      '@typescript-eslint': tseslint,
+      'unused-imports': unusedImports,
+    },
+    rules: {
+      'unused-imports/no-unused-imports': 'error',
+      'unused-imports/no-unused-vars': [
+        'warn',
+        {
+          'vars': 'all',
+          'varsIgnorePattern': '^_',
+          'args': 'after-used',
+          'argsIgnorePattern': '^_'
+        }
+      ],
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/explicit-function-return-type': 'off',
+      '@typescript-eslint/explicit-module-boundary-types': 'off',
+      'no-console': 'warn',
+      'no-debugger': 'warn',
+    },
+  },
+  {
     files: [
-      '**/*.test.ts', 
-      '**/*.integration.test.ts'
+      '**/*.test.ts',             // Unit test files
+      '**/*.integration.test.ts', // Integration test files
+      'tests/**/*',               // All files under the tests/ directory (helpers, setup, e2e)
+      '**/src/utils/test/**/*.ts', // Test utilities under src/utils/test
+      '**/src/utils/logger.ts'    // Logger implementation
     ],
     languageOptions: {
       parser: tsparser,
@@ -25,33 +58,13 @@ export default [
       'unused-imports': unusedImports,
     },
     rules: {
-      '@typescript-eslint/no-explicit-any': 'off',
-      'no-console': 'off',
+      'no-console': 'off', // Allow console logs in tests and logger
+      '@typescript-eslint/no-explicit-any': 'off', // Allow 'any' type in tests for flexibility
       'unused-imports/no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': 'off',
     },
   },
   {
-    // Turn off no-console warning for test utility files and logger implementation
-    files: ['**/src/utils/test/**/*.ts', '**/src/utils/logger.ts'],
-    languageOptions: {
-      parser: tsparser,
-      parserOptions: {
-        ecmaVersion: 'latest',
-        sourceType: 'module',
-      },
-    },
-    plugins: {
-      '@typescript-eslint': tseslint,
-      'unused-imports': unusedImports,
-    },
-    rules: {
-      'no-console': 'off',
-      '@typescript-eslint/no-explicit-any': 'off', // Test utilities often need flexibility with types
-    },
-  },
-  {
-    // Add exceptions for database schema files that might need to use any for circular dependencies
     files: ['**/src/db/schema/**/*.ts'],
     languageOptions: {
       parser: tsparser,
@@ -69,7 +82,6 @@ export default [
     },
   },
   {
-    // Add exceptions for database migrations
     files: ['**/src/db/migrations/**/*.ts'],
     languageOptions: {
       parser: tsparser,
@@ -86,88 +98,6 @@ export default [
       '@typescript-eslint/no-explicit-any': 'off',
       'no-console': 'off', // Migrations often need to log information
       '@typescript-eslint/no-unused-vars': 'off',
-    },
-  },
-  {
-    // Only apply strict no-any rule to our modified files
-    files: ['**/src/utils/test/db-mock.ts', '**/src/utils/test/setup.ts', '**/src/utils/signing/credentials.ts', '**/src/middleware/auth.middleware.ts'],
-    languageOptions: {
-      parser: tsparser,
-      parserOptions: {
-        ecmaVersion: 'latest',
-        sourceType: 'module',
-      },
-    },
-    plugins: {
-      '@typescript-eslint': tseslint,
-      'unused-imports': unusedImports,
-    },
-    rules: {
-      // TypeScript specific rules
-      '@typescript-eslint/no-unused-vars': ['error', {
-        'vars': 'all',
-        'varsIgnorePattern': '^_',
-        'args': 'all',
-        'argsIgnorePattern': '^_',
-        'destructuredArrayIgnorePattern': '^_',
-        'caughtErrors': 'all',
-        'caughtErrorsIgnorePattern': '^_',
-        'ignoreRestSiblings': true
-      }],
-      // Error on unused imports
-      'unused-imports/no-unused-imports': 'error',
-      'unused-imports/no-unused-vars': [
-        'warn',
-        {
-          'vars': 'all',
-          'varsIgnorePattern': '^_',
-          'args': 'after-used',
-          'argsIgnorePattern': '^_'
-        }
-      ],
-      '@typescript-eslint/no-explicit-any': 'error',
-      '@typescript-eslint/explicit-function-return-type': 'off',
-      '@typescript-eslint/explicit-module-boundary-types': 'off',
-
-      // General rules
-      'no-console': 'warn',
-      'no-debugger': 'warn',
-    },
-  },
-  {
-    files: ['**/*.ts', '**/*.tsx'],
-    languageOptions: {
-      parser: tsparser,
-      parserOptions: {
-        ecmaVersion: 'latest',
-        sourceType: 'module',
-      },
-    },
-    plugins: {
-      '@typescript-eslint': tseslint,
-      'unused-imports': unusedImports,
-    },
-    rules: {
-      // TypeScript specific rules
-      '@typescript-eslint/no-unused-vars': 'off', // Turned off in favor of unused-imports
-      // Error on unused imports, but warn on unused variables
-      'unused-imports/no-unused-imports': 'error',
-      'unused-imports/no-unused-vars': [
-        'warn',
-        {
-          'vars': 'all',
-          'varsIgnorePattern': '^_',
-          'args': 'after-used',
-          'argsIgnorePattern': '^_'
-        }
-      ],
-      '@typescript-eslint/no-explicit-any': 'warn', // Warn rather than error on any types
-      '@typescript-eslint/explicit-function-return-type': 'off',
-      '@typescript-eslint/explicit-module-boundary-types': 'off',
-
-      // General rules
-      'no-console': 'warn',
-      'no-debugger': 'warn',
     },
   },
   eslintConfigPrettier,

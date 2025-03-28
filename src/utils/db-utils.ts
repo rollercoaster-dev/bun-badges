@@ -8,6 +8,10 @@
 import { db, dbPool } from "@/db/config";
 import { sql } from "drizzle-orm";
 import { eq } from "drizzle-orm";
+import { createLogger } from "@/utils/logger";
+
+// Create logger instance
+const logger = createLogger("DbUtils");
 
 /**
  * Execute a SQL query with proper type annotations
@@ -20,9 +24,9 @@ import { eq } from "drizzle-orm";
  */
 export async function executeTypedQuery(
   sqlQuery: string,
-  params: any[],
+  params: unknown[],
   types: string[] = [],
-): Promise<any> {
+): Promise<unknown> {
   // Build a modified query with type annotations if needed
   let typedSql = sqlQuery;
 
@@ -57,7 +61,7 @@ export async function executeTypedQuery(
       throw new Error("No database execution method available");
     }
   } catch (error) {
-    console.error("Error executing typed query:", error);
+    logger.error("Error executing typed query:", error);
     throw error;
   }
 }
@@ -72,7 +76,7 @@ export async function executeTypedQuery(
 export async function safeDelete(
   tableName: string,
   condition?: string,
-  params: any[] = [],
+  params: unknown[] = [],
 ): Promise<void> {
   try {
     // Try direct SQL approach first since it's most reliable
@@ -85,7 +89,7 @@ export async function safeDelete(
       await executeTypedQuery(`DELETE FROM ${tableName}`, []);
     }
   } catch (error) {
-    console.error(`Failed to delete from ${tableName} with SQL:`, error);
+    logger.error(`Failed to delete from ${tableName} with SQL:`, error);
 
     // Try to use ORM approach as fallback
     try {
@@ -94,6 +98,8 @@ export async function safeDelete(
       }
 
       // Try to find the table in the schema
+      // HACK: Accessing private _schema property as there's no known public API
+      // to get a table object by name dynamically. Brittle if Drizzle internals change.
       const schema = (db as any)?.["_schema"] || {};
       const table = schema[tableName];
 
@@ -103,7 +109,7 @@ export async function safeDelete(
         throw new Error(`Table ${tableName} not found in schema`);
       }
     } catch (ormError) {
-      console.error(`Failed to delete from ${tableName} with ORM:`, ormError);
+      logger.error(`Failed to delete from ${tableName} with ORM:`, ormError);
       throw error; // Throw the original error
     }
   }
@@ -122,10 +128,10 @@ export async function safeDelete(
 export async function safeInsert(
   tableName: string,
   columns: string[],
-  values: any[],
+  values: unknown[],
   types: string[] = [],
   returning: boolean = false,
-): Promise<any> {
+): Promise<unknown> {
   try {
     // Build a parameterized query
     const placeholders = values.map((_, i) => `$${i + 1}`).join(", ");
@@ -134,17 +140,19 @@ export async function safeInsert(
     // Try SQL approach first
     return await executeTypedQuery(sqlQuery, values, types);
   } catch (error) {
-    console.error(`Failed to insert into ${tableName} with SQL:`, error);
+    logger.error(`Failed to insert into ${tableName} with SQL:`, error);
 
     // Try ORM approach as fallback
     try {
       // Try to find the table in the schema
+      // HACK: Accessing private _schema property as there's no known public API
+      // to get a table object by name dynamically. Brittle if Drizzle internals change.
       const schema = (db as any)?.["_schema"] || {};
       const table = schema[tableName];
 
       if (table) {
         // Convert columns and values to an object
-        const data: Record<string, any> = {};
+        const data: Record<string, unknown> = {};
         columns.forEach((col, i) => {
           data[col] = values[i];
         });
@@ -161,7 +169,7 @@ export async function safeInsert(
         throw new Error(`Table ${tableName} not found in schema`);
       }
     } catch (ormError) {
-      console.error(`Failed to insert into ${tableName} with ORM:`, ormError);
+      logger.error(`Failed to insert into ${tableName} with ORM:`, ormError);
       throw error; // Throw the original error
     }
   }
@@ -182,12 +190,12 @@ export async function safeInsert(
 export async function safeUpdate(
   tableName: string,
   columnsToUpdate: string[],
-  values: any[],
+  values: unknown[],
   conditionColumn: string,
-  conditionValue: any,
+  conditionValue: unknown,
   types: string[] = [],
   returning: boolean = false,
-): Promise<any> {
+): Promise<unknown> {
   try {
     // Build the SET clause
     const setClauses = columnsToUpdate
@@ -204,17 +212,19 @@ export async function safeUpdate(
     // Execute with type annotations
     return await executeTypedQuery(sqlQuery, allValues, types);
   } catch (error) {
-    console.error(`Failed to update table ${tableName} with SQL:`, error);
+    logger.error(`Failed to update table ${tableName} with SQL:`, error);
 
     // Try ORM approach as fallback
     try {
       // Try to find the table in the schema
+      // HACK: Accessing private _schema property as there's no known public API
+      // to get a table object by name dynamically. Brittle if Drizzle internals change.
       const schema = (db as any)?.["_schema"] || {};
       const table = schema[tableName];
 
       if (table) {
         // Convert columns and values to an object
-        const data: Record<string, any> = {};
+        const data: Record<string, unknown> = {};
         columnsToUpdate.forEach((col, i) => {
           data[col] = values[i];
         });
@@ -234,7 +244,7 @@ export async function safeUpdate(
         throw new Error(`Table ${tableName} not found in schema`);
       }
     } catch (ormError) {
-      console.error(`Failed to update table ${tableName} with ORM:`, ormError);
+      logger.error(`Failed to update table ${tableName} with ORM:`, ormError);
       throw error; // Throw the original error
     }
   }

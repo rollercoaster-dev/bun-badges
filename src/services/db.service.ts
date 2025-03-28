@@ -1,6 +1,8 @@
 import { and, eq, gt, lt } from "drizzle-orm";
 import { db, schema } from "@/db/config";
 import { nanoid } from "nanoid";
+import { JSONWebKeySet } from "jose";
+import { createLogger, Logger } from "@/utils/logger";
 
 const {
   verificationCodes,
@@ -28,9 +30,19 @@ const generateRandomString = (length: number): string => {
 
 type NewUser = Omit<InferInsertModel<typeof users>, "createdAt" | "updatedAt">;
 
+export type NewOAuthClient = typeof oauthClients.$inferInsert & {
+  jwks?: JSONWebKeySet;
+};
+
 export class DatabaseService {
+  private logger: Logger;
+
   // Re-export the db instance for direct access when needed
   static db = db;
+
+  constructor() {
+    this.logger = createLogger("DatabaseService");
+  }
 
   // User Management Methods
   async createUser(data: NewUser) {
@@ -141,7 +153,7 @@ export class DatabaseService {
     logoUri?: string;
     isHeadless?: boolean;
     // JAR fields
-    jwks?: any;
+    jwks?: JSONWebKeySet;
     jwksUri?: string;
     requestObjectSigningAlg?: string;
   }): Promise<{ id: string; secret: string }> {
@@ -188,6 +200,10 @@ export class DatabaseService {
     return clients.length > 0 ? clients[0] : null;
   }
 
+  async deleteOAuthClientById(id: string) {
+    await db.delete(oauthClients).where(eq(oauthClients.id, id));
+  }
+
   // Authorization Code Methods
 
   async createAuthorizationCode(data: {
@@ -212,7 +228,7 @@ export class DatabaseService {
         codeChallengeMethod: data.codeChallengeMethod,
       });
     } catch (error) {
-      console.error("Error creating authorization code:", error);
+      this.logger.error("Error creating authorization code:", error);
       throw new Error("Failed to create authorization code");
     }
   }
@@ -380,7 +396,7 @@ export class DatabaseService {
 
       return result[0];
     } catch (error) {
-      console.error("Error creating consent record:", error);
+      this.logger.error("Error creating consent record:", error);
       throw new Error("Failed to create consent record");
     }
   }
@@ -402,7 +418,7 @@ export class DatabaseService {
 
       return result[0];
     } catch (error) {
-      console.error("Error getting consent record:", error);
+      this.logger.error("Error getting consent record:", error);
       throw new Error("Failed to get consent record");
     }
   }
@@ -433,7 +449,7 @@ export class DatabaseService {
           ),
         );
     } catch (error) {
-      console.error("Error updating consent record:", error);
+      this.logger.error("Error updating consent record:", error);
       throw new Error("Failed to update consent record");
     }
   }
@@ -452,7 +468,7 @@ export class DatabaseService {
           ),
         );
     } catch (error) {
-      console.error("Error deleting consent record:", error);
+      this.logger.error("Error deleting consent record:", error);
       throw new Error("Failed to delete consent record");
     }
   }
@@ -467,7 +483,7 @@ export class DatabaseService {
         .set({ isUsed: true })
         .where(eq(schema.authorizationCodes.code, code));
     } catch (error) {
-      console.error("Error marking authorization code as used:", error);
+      this.logger.error("Error marking authorization code as used:", error);
       throw new Error("Failed to update authorization code");
     }
   }
@@ -491,7 +507,7 @@ export class DatabaseService {
         expiresAt: data.expiresAt,
       });
     } catch (error) {
-      console.error("Error creating access token:", error);
+      this.logger.error("Error creating access token:", error);
       throw new Error("Failed to create access token");
     }
   }
@@ -515,7 +531,7 @@ export class DatabaseService {
         expiresAt: data.expiresAt,
       });
     } catch (error) {
-      console.error("Error creating refresh token:", error);
+      this.logger.error("Error creating refresh token:", error);
       throw new Error("Failed to create refresh token");
     }
   }
