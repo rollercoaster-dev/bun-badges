@@ -457,7 +457,7 @@ export class VerificationService {
 
   async verifyTokenSignature(
     token: string,
-    key: jose.KeyLike,
+    key: CryptoKey | Uint8Array,
   ): Promise<boolean> {
     try {
       await jose.jwtVerify(token, key);
@@ -469,7 +469,7 @@ export class VerificationService {
 
   async verifyIssuerSignature(
     token: string,
-    issuerPublicKey: jose.KeyLike,
+    issuerPublicKey: CryptoKey | Uint8Array,
   ): Promise<boolean> {
     try {
       await jose.jwtVerify(token, issuerPublicKey);
@@ -481,8 +481,8 @@ export class VerificationService {
 
   async verifyKey(
     token: string,
-    key: jose.KeyLike,
-  ): Promise<{ key: jose.KeyLike; valid: boolean }> {
+    key: CryptoKey | Uint8Array,
+  ): Promise<{ key: CryptoKey | Uint8Array; valid: boolean }> {
     try {
       await jose.jwtVerify(token, key);
       return { key, valid: true };
@@ -491,7 +491,7 @@ export class VerificationService {
     }
   }
 
-  async generateKeyPair(): Promise<jose.GenerateKeyPairResult<jose.KeyLike>> {
+  async generateKeyPair() {
     try {
       const keyPair = await jose.generateKeyPair("ES256K");
       return keyPair;

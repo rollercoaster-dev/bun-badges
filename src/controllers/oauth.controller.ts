@@ -9,6 +9,7 @@ import { verifyToken } from "../utils/auth/jwt";
 import { OAuthJWTBridge } from "../utils/auth/oauth-jwt-bridge";
 import { verifyPKCE } from "../utils/auth/pkce";
 import { verifyJar } from "../utils/auth/jar";
+import { VerificationService } from "../services/verification.service";
 
 // Client registration request schema
 const clientRegistrationSchema = z
@@ -86,10 +87,12 @@ const clientRegistrationSchema = z
 export class OAuthController {
   private db: DatabaseService;
   private oauthJwtBridge: OAuthJWTBridge;
+  private verificationService: VerificationService;
 
   constructor(db: DatabaseService = new DatabaseService()) {
     this.db = db;
     this.oauthJwtBridge = new OAuthJWTBridge(db);
+    this.verificationService = new VerificationService();
   }
 
   // Utility method to validate scopes
@@ -196,7 +199,7 @@ export class OAuthController {
   }
 
   // Handle authorization code grant flow
-  async authorize(c: Context) {
+  async authorize(c: Context): Promise<Response> {
     // Check if this is a form submission (POST) or initial request (GET)
     if (c.req.method === "POST") {
       return this.handleAuthorizationDecision(c);
@@ -204,20 +207,21 @@ export class OAuthController {
 
     // Initial authorization request (GET)
     let response_type = c.req.query("response_type");
-    let client_id = c.req.query("client_id");
     let redirect_uri = c.req.query("redirect_uri");
     let scope = c.req.query("scope");
     let state = c.req.query("state");
     let code_challenge = c.req.query("code_challenge");
     let code_challenge_method = c.req.query("code_challenge_method");
+    const client_id = c.req.query("client_id");
     const requestJwt = c.req.query("request");
-    let jarPayload: Awaited<ReturnType<typeof verifyJar>> | null = null;
+
+    // Validate client_id
+    if (!client_id) {
+      throw new BadRequestError("client_id is required");
+    }
+
     let client: Awaited<ReturnType<typeof this.db.getOAuthClient>> | null =
       null;
-
-    if (!client_id) {
-      throw new BadRequestError("Missing required parameter: client_id");
-    }
 
     client = await this.db.getOAuthClient(client_id);
     if (!client) {
@@ -227,7 +231,14 @@ export class OAuthController {
     if (requestJwt) {
       const issuerUrl = new URL(c.req.url).origin;
       try {
-        jarPayload = await verifyJar(requestJwt, client, issuerUrl);
+        // Pass client.clientId instead of client object
+        const jarResult = await verifyJar(
+          requestJwt,
+          client.clientId,
+          issuerUrl,
+          this.verificationService,
+        );
+        const jarPayload = jarResult.payload;
 
         response_type = jarPayload.response_type;
         redirect_uri = jarPayload.redirect_uri;
@@ -334,18 +345,22 @@ export class OAuthController {
         }
       }
 
-      return this.renderConsentPage({
-        clientName: client.clientName,
-        clientUri: client.clientUri || "",
-        logoUri: client.logoUri || undefined,
-        scopes: validScopes,
-        redirectUri: redirect_uri,
-        state,
-        clientId: client_id,
-        responseType: response_type,
-        codeChallenge: code_challenge,
-        codeChallengeMethod: code_challenge_method,
-      });
+      // Show consent page using final parameter values
+      // Wrap the HTML string in c.html() to return a Response
+      return c.html(
+        this.renderConsentPage({
+          clientName: client.clientName,
+          clientUri: client.clientUri || "",
+          logoUri: client.logoUri || undefined,
+          scopes: validScopes,
+          redirectUri: redirect_uri,
+          state,
+          clientId: client_id,
+          responseType: response_type,
+          codeChallenge: code_challenge,
+          codeChallengeMethod: code_challenge_method,
+        }),
+      );
     } catch (error) {
       console.error("Error during consent check/rendering:", error);
       if (client.redirectUris.includes(redirect_uri)) {
