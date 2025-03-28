@@ -5,22 +5,23 @@ services:
   db_test:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: bun_badges_test
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-bun_badges_test}
       # Optimize Postgres for testing
       POSTGRES_INITDB_ARGS: "--nosync"
       PGDATA: /var/lib/postgresql/data/pgdata
     command: postgres -c fsync=off -c synchronous_commit=off -c full_page_writes=off -c random_page_cost=1.0
     ports:
-      - "5434:5432"
+      # Use TEST_DB_PORT, default 5434 (to avoid conflict with default 5432)
+      - "${TEST_DB_PORT:-5434}:5432"
     volumes:
       - postgres_test_data:/var/lib/postgresql/data
       - ./scripts/init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql
       # Add schema files for initialization
       - ./scripts/test-db:/docker-entrypoint-initdb.d/schema
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -33,13 +34,13 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     environment:
-      - NODE_ENV=test
-      - CI=true
-      - DATABASE_URL=postgres://postgres:postgres@db_test:5432/bun_badges_test
-      - JWT_SECRET=test-jwt-secret-for-ci-tests
-      - LOG_LEVEL=error
-      - TEST_MODE=true
-      - TEST_RUN_ID=ci-test-run
+      - NODE_ENV=${NODE_ENV:-test}
+      - CI=${CI:-true}
+      - DATABASE_URL=postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db_test:5432/${POSTGRES_DB:-bun_badges_test}
+      - JWT_SECRET=${JWT_SECRET:-test-jwt-secret-for-ci-tests}
+      - LOG_LEVEL=${LOG_LEVEL:-error}
+      - TEST_MODE=${TEST_MODE:-true}
+      - TEST_RUN_ID=${TEST_RUN_ID:-ci-test-run}
     depends_on:
       db_test:
         condition: service_healthy
@@ -57,16 +58,16 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     environment:
-      - NODE_ENV=test
-      - E2E_TEST=true
-      - INTEGRATION_TEST=true
-      - DATABASE_URL=postgres://postgres:postgres@db_test:5432/bun_badges_test
-      - JWT_SECRET=test-jwt-secret-for-e2e-tests
-      - AUTH_TOKEN_EXPIRY=1d
-      - LOG_LEVEL=error
-      - TEST_MODE=true
-      - PORT=3000
-      - HOST=0.0.0.0
+      - NODE_ENV=${NODE_ENV:-test}
+      - E2E_TEST=${E2E_TEST:-true}
+      - INTEGRATION_TEST=${INTEGRATION_TEST:-true}
+      - DATABASE_URL=postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db_test:5432/${POSTGRES_DB:-bun_badges_test}
+      - JWT_SECRET=${JWT_SECRET:-test-jwt-secret-for-e2e-tests}
+      - AUTH_TOKEN_EXPIRY=${AUTH_TOKEN_EXPIRY:-1d}
+      - LOG_LEVEL=${LOG_LEVEL:-error}
+      - TEST_MODE=${TEST_MODE:-true}
+      - PORT=${PORT:-3000}
+      - HOST=${HOST:-0.0.0.0}
       # Added for improved isolation between test runs
       - TEST_RUN_ID=${TEST_RUN_ID:-test-run-1}
     depends_on:
@@ -86,15 +87,15 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     environment:
-      - NODE_ENV=test
-      - E2E_TEST=true
-      - DATABASE_URL=postgres://postgres:postgres@db_test:5432/bun_badges_test
-      - JWT_SECRET=test-jwt-secret-for-e2e-tests
-      - AUTH_TOKEN_EXPIRY=1d
-      - LOG_LEVEL=error
-      - TEST_MODE=true
-      - PORT=3001
-      - HOST=0.0.0.0
+      - NODE_ENV=${NODE_ENV:-test}
+      - E2E_TEST=${E2E_TEST:-true}
+      - DATABASE_URL=postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db_test:5432/${POSTGRES_DB:-bun_badges_test}
+      - JWT_SECRET=${JWT_SECRET:-test-jwt-secret-for-e2e-tests}
+      - AUTH_TOKEN_EXPIRY=${AUTH_TOKEN_EXPIRY:-1d}
+      - LOG_LEVEL=${LOG_LEVEL:-error}
+      - TEST_MODE=${TEST_MODE:-true}
+      - PORT=${E2E_PORT:-3001} # Use E2E_PORT, default 3001
+      - HOST=${HOST:-0.0.0.0}
       - TEST_RUN_ID=${TEST_RUN_ID:-e2e-run-1}
     depends_on:
       db_test:
@@ -111,7 +112,8 @@ services:
   redis_test:
     image: redis:alpine
     ports:
-      - "6379:6379"
+      # Use TEST_REDIS_PORT, default 6379
+      - "${TEST_REDIS_PORT:-6379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -126,7 +128,8 @@ services:
     volumes:
       - ./test-results:/usr/share/nginx/html
     ports:
-      - "8080:80"
+      # Use TEST_REPORTER_PORT, default 8080
+      - "${TEST_REPORTER_PORT:-8080}:80"
     depends_on:
       - test_runner
       - e2e_test_runner
