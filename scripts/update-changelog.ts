@@ -29,7 +29,7 @@ if (!unreleasedContent) {
 }
 
 // Create the new release section
-const newReleaseSection = `## [${version}]${prereleaseSuffix} - ${today}\n\n${unreleasedContent}`;
+// Remove unused variable: const newReleaseSection = `## [${version}]${prereleaseSuffix} - ${today}\n\n${unreleasedContent}`;
 
 // Update the changelog with the new release
 let updatedChangelog = changelog.replace(

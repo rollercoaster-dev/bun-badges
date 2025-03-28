@@ -1,4 +1,5 @@
 import type { NewRevokedToken } from "@/db/schema/auth";
+import type { IDatabaseService } from "@/interfaces/db.interface";
 
 // In-memory token revocation store for testing
 const revokedTokens = new Map<string, boolean>();
@@ -6,7 +7,7 @@ const revokedTokens = new Map<string, boolean>();
 const users = new Map<string, any>();
 
 // Create a mock database service for testing
-export class MockDatabaseService {
+export class MockDatabaseService implements IDatabaseService {
   // Static db property
   static db = {} as Record<string, unknown>;
 
@@ -70,7 +71,7 @@ export class MockDatabaseService {
   }
 
   async cleanupExpiredTokens(): Promise<void> {
-    // No-op for mock
+    console.log("Mock DB: Cleaning up expired tokens");
   }
 
   // OAuth Client Methods
@@ -208,8 +209,7 @@ export class MockDatabaseService {
     scope: string;
     expiresAt: Date;
   }): Promise<void> {
-    console.log("Mock DB: Creating access token", data);
-    revokedTokens.set(data.token, false);
+    console.log("Mock DB: Creating access token (placeholder)", data);
   }
 
   async storeAccessToken(data: {
@@ -219,24 +219,27 @@ export class MockDatabaseService {
     scope: string;
     expiresAt: Date;
   }): Promise<{ success: boolean }> {
-    console.log("Mock DB: Storing access token (storeAccessToken)", data);
+    console.log("Mock DB: Storing access token", data);
     revokedTokens.set(data.token, false);
     return { success: true };
   }
 
-  async getAccessToken(token: string) {
+  async getAccessToken(token: string): Promise<unknown | undefined | null> {
     console.log("Mock DB: Getting access token", token);
     const isRevoked = revokedTokens.get(token) || token === "revoked-token";
-    return {
-      id: "mock-token-id",
-      token,
-      clientId: "mock-client-uuid-123",
-      userId: "mock-user-id-456",
-      scope: "openid profile offline_access",
-      expiresAt: new Date(Date.now() + 3600000),
-      isRevoked: isRevoked,
-      createdAt: new Date(),
-    };
+    if (token.startsWith("valid")) {
+      return {
+        id: "mock-token-id",
+        token,
+        clientId: "mock-client-uuid-123",
+        userId: "mock-user-id-456",
+        scope: "openid profile offline_access",
+        expiresAt: new Date(Date.now() + 3600000),
+        isRevoked: isRevoked,
+        createdAt: new Date(),
+      };
+    }
+    return null;
   }
 
   async revokeAccessToken(token: string) {

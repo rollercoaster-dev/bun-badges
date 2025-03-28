@@ -2,7 +2,8 @@ import { Context, Next } from "hono";
 import { verifyToken } from "@utils/auth/jwt";
 
 // Import as type-only to avoid circular dependency
-import type { DatabaseService } from "@services/db.service";
+// Remove unused import: import type { DatabaseService } from "@services/db.service";
+import type { IDatabaseService } from "@/interfaces/db.interface";
 
 export interface AuthContext extends Context {
   user?: {
@@ -11,7 +12,7 @@ export interface AuthContext extends Context {
   };
 }
 
-export const createAuthMiddleware = (db: DatabaseService) => {
+export const createAuthMiddleware = (db: IDatabaseService) => {
   return async (c: Context, next: Next): Promise<Response | void> => {
     const authHeader = c.req.header("Authorization");
 

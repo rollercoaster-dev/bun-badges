@@ -3,6 +3,7 @@ import { db, schema } from "@/db/config";
 import { nanoid } from "nanoid";
 import { JSONWebKeySet } from "jose";
 import { createLogger, Logger } from "@/utils/logger";
+import type { IDatabaseService } from "@/interfaces/db.interface";
 
 const {
   verificationCodes,
@@ -11,6 +12,9 @@ const {
   authorizationCodes,
   tokenMappings,
   users,
+  oauthAccessTokens,
+  consentRecords,
+  oauthRefreshTokens,
 } = schema;
 
 import type { NewRevokedToken } from "@/db/schema/auth";
@@ -34,7 +38,7 @@ export type NewOAuthClient = typeof oauthClients.$inferInsert & {
   jwks?: JSONWebKeySet;
 };
 
-export class DatabaseService {
+export class DatabaseService implements IDatabaseService {
   private logger: Logger;
 
   // Re-export the db instance for direct access when needed
@@ -256,41 +260,55 @@ export class DatabaseService {
   // OAuth Access Token Methods
   async storeAccessToken(data: {
     token: string;
-    clientId: string; // UUID from oauthClients
+    clientId: string;
     userId: string;
     scope: string;
     expiresAt: Date;
-  }) {
-    await db.insert(schema.oauthAccessTokens).values({
-      token: data.token,
-      clientId: data.clientId,
-      userId: data.userId,
-      scope: data.scope,
-      expiresAt: data.expiresAt,
-      isRevoked: false,
-      createdAt: new Date(),
-    });
-
-    return { success: true };
+  }): Promise<{ success: boolean }> {
+    try {
+      await db.insert(oauthAccessTokens).values(data);
+      return { success: true };
+    } catch (error) {
+      this.logger.error("Error storing access token:", error);
+      return { success: false };
+    }
   }
 
-  async getAccessToken(token: string) {
-    const [result] = await db
-      .select()
-      .from(schema.oauthAccessTokens)
-      .where(eq(schema.oauthAccessTokens.token, token))
-      .limit(1);
-
-    return result;
+  async getAccessToken(
+    token: string,
+  ): Promise<typeof oauthAccessTokens.$inferSelect | null> {
+    try {
+      const [result] = await db
+        .select()
+        .from(oauthAccessTokens)
+        .where(
+          and(
+            eq(oauthAccessTokens.token, token),
+            gt(oauthAccessTokens.expiresAt, new Date()),
+          ),
+        )
+        .limit(1);
+      return result || null;
+    } catch (error) {
+      this.logger.error("Error getting access token:", error);
+      throw new Error("Failed to retrieve access token");
+    }
   }
 
-  async revokeAccessToken(token: string) {
-    await db
-      .update(schema.oauthAccessTokens)
-      .set({ isRevoked: true })
-      .where(eq(schema.oauthAccessTokens.token, token));
-
-    return { success: true };
+  async revokeAccessToken(token: string): Promise<{ success: boolean }> {
+    try {
+      const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+      await this.revokeToken({
+        token,
+        expiresAt,
+        username: "unknown_oauth_user",
+        type: "oauth_access",
+      });
+      return { success: true };
+    } catch (error) {
+      this.logger.error("Error explicitly revoking access token:", error);
+      return { success: false };
+    }
   }
 
   // Token mapping methods
@@ -379,22 +397,16 @@ export class DatabaseService {
    */
   async createConsentRecord(data: {
     userId: string;
-    clientId: string; // UUID from oauthClients
+    clientId: string;
     scope: string;
     expiresAt?: Date;
   }): Promise<{ id: string }> {
     try {
-      const result = await db
-        .insert(schema.consentRecords)
-        .values({
-          userId: data.userId,
-          clientId: data.clientId,
-          scope: data.scope,
-          expiresAt: data.expiresAt,
-        })
-        .returning({ id: schema.consentRecords.id });
-
-      return result[0];
+      const [result] = await db
+        .insert(consentRecords)
+        .values(data)
+        .returning({ id: consentRecords.id });
+      return result;
     } catch (error) {
       this.logger.error("Error creating consent record:", error);
       throw new Error("Failed to create consent record");
@@ -404,22 +416,25 @@ export class DatabaseService {
   /**
    * Gets a consent record for a user and client
    */
-  async getConsentRecord(userId: string, clientId: string) {
+  async getConsentRecord(
+    userId: string,
+    clientId: string,
+  ): Promise<typeof consentRecords.$inferSelect | null> {
     try {
-      const result = await db
+      const [result] = await db
         .select()
-        .from(schema.consentRecords)
+        .from(consentRecords)
         .where(
           and(
-            eq(schema.consentRecords.userId, userId),
-            eq(schema.consentRecords.clientId, clientId),
+            eq(consentRecords.userId, userId),
+            eq(consentRecords.clientId, clientId),
           ),
-        );
-
-      return result[0];
+        )
+        .limit(1);
+      return result || null;
     } catch (error) {
       this.logger.error("Error getting consent record:", error);
-      throw new Error("Failed to get consent record");
+      throw new Error("Failed to retrieve consent record");
     }
   }
 
@@ -436,16 +451,12 @@ export class DatabaseService {
   ) {
     try {
       await db
-        .update(schema.consentRecords)
-        .set({
-          scope: data.scope,
-          expiresAt: data.expiresAt,
-          updatedAt: new Date(),
-        })
+        .update(consentRecords)
+        .set(data)
         .where(
           and(
-            eq(schema.consentRecords.userId, userId),
-            eq(schema.consentRecords.clientId, clientId),
+            eq(consentRecords.userId, userId),
+            eq(consentRecords.clientId, clientId),
           ),
         );
     } catch (error) {
@@ -460,11 +471,11 @@ export class DatabaseService {
   async deleteConsentRecord(userId: string, clientId: string) {
     try {
       await db
-        .delete(schema.consentRecords)
+        .delete(consentRecords)
         .where(
           and(
-            eq(schema.consentRecords.userId, userId),
-            eq(schema.consentRecords.clientId, clientId),
+            eq(consentRecords.userId, userId),
+            eq(consentRecords.clientId, clientId),
           ),
         );
     } catch (error) {
@@ -499,22 +510,14 @@ export class DatabaseService {
     expiresAt: Date;
   }) {
     try {
-      await db.insert(schema.oauthAccessTokens).values({
-        token: data.token,
-        clientId: data.clientId,
-        userId: data.userId,
-        scope: data.scope,
-        expiresAt: data.expiresAt,
-      });
+      await db.insert(oauthAccessTokens).values(data);
     } catch (error) {
       this.logger.error("Error creating access token:", error);
       throw new Error("Failed to create access token");
     }
   }
 
-  /**
-   * Create a refresh token
-   */
+  // Refresh Token Methods (Adding missing methods)
   async createRefreshToken(data: {
     token: string;
     clientId: string;
@@ -523,16 +526,58 @@ export class DatabaseService {
     expiresAt: Date;
   }) {
     try {
-      await db.insert(schema.oauthRefreshTokens).values({
-        token: data.token,
-        clientId: data.clientId,
-        userId: data.userId,
-        scope: data.scope,
-        expiresAt: data.expiresAt,
-      });
+      await db.insert(oauthRefreshTokens).values(data);
     } catch (error) {
       this.logger.error("Error creating refresh token:", error);
       throw new Error("Failed to create refresh token");
+    }
+  }
+
+  async getRefreshToken(
+    token: string,
+  ): Promise<typeof oauthRefreshTokens.$inferSelect | null> {
+    try {
+      const [result] = await db
+        .select()
+        .from(oauthRefreshTokens)
+        .where(
+          and(
+            eq(oauthRefreshTokens.token, token),
+            gt(oauthRefreshTokens.expiresAt, new Date()),
+          ),
+        )
+        .limit(1);
+      return result || null;
+    } catch (error) {
+      this.logger.error("Error getting refresh token:", error);
+      throw new Error("Failed to retrieve refresh token");
+    }
+  }
+
+  async deleteRefreshTokenByToken(token: string) {
+    try {
+      await db
+        .delete(oauthRefreshTokens)
+        .where(eq(oauthRefreshTokens.token, token));
+    } catch (error) {
+      this.logger.error("Error deleting refresh token by token:", error);
+      throw new Error("Failed to delete refresh token by token");
+    }
+  }
+
+  async deleteRefreshTokenByUserClient(userId: string, clientId: string) {
+    try {
+      await db
+        .delete(oauthRefreshTokens)
+        .where(
+          and(
+            eq(oauthRefreshTokens.userId, userId),
+            eq(oauthRefreshTokens.clientId, clientId),
+          ),
+        );
+    } catch (error) {
+      this.logger.error("Error deleting refresh token by user/client:", error);
+      throw new Error("Failed to delete refresh token by user/client");
     }
   }
 }

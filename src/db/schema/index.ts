@@ -43,7 +43,17 @@ export * from "./status";
 // Import and re-export signing last to avoid circular dependencies
 import { signingKeys } from "./signing";
 export { signingKeys };
-// Explicitly re-export specific schemas to fix circular dependency issues
+
+// Explicitly re-export specific schemas to fix circular/export issues
 import { revokedTokens } from "./auth";
+// Import the correct table names from ./oauth
+import { oauthAccessTokens, consentRecords, oauthRefreshTokens } from "./oauth";
 import { statusLists } from "./status";
-export { revokedTokens, statusLists };
+// Add the imported tables to the explicit export
+export {
+  revokedTokens,
+  oauthAccessTokens,
+  consentRecords,
+  oauthRefreshTokens,
+  statusLists,
+};

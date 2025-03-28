@@ -20,7 +20,6 @@ interface OAuthTokenResponse {
 describe("OAuth PKCE Integration Tests", () => {
   let db: DatabaseService;
   let testClientId: string;
-  let testClientSecret: string;
 
   beforeAll(async () => {
     db = new DatabaseService();
@@ -37,7 +36,6 @@ describe("OAuth PKCE Integration Tests", () => {
     });
 
     testClientId = client.id;
-    testClientSecret = client.secret;
   });
 
   afterAll(async () => {

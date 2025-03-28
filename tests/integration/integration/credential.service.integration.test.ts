@@ -50,6 +50,16 @@ interface SigningKey {
   [key: string]: any; // Allow other fields
 }
 
+// Define an interface for the expected structure of the key_info JSONB data
+interface ExpectedKeyInfo {
+  type: string;
+  controller: string;
+  id: string;
+  publicKeyMultibase: string;
+  // Add other potential fields if necessary, or use index signature
+  [key: string]: any;
+}
+
 describe("CredentialService Integration Tests", () => {
   let service: CredentialService;
   const hostUrl = "https://example.com";
@@ -468,7 +478,8 @@ describe("CredentialService Integration Tests", () => {
         expect(keyInfo).toBeDefined();
 
         // Use normalizeJsonb to ensure consistent handling regardless of how JSON is stored
-        const keyInfoData = normalizeJsonb(keyInfo.key_info);
+        // Cast the result to the ExpectedKeyInfo interface
+        const keyInfoData = normalizeJsonb(keyInfo.key_info) as ExpectedKeyInfo;
 
         expect(keyInfoData).toBeDefined();
         expect(keyInfoData.type).toEqual("Ed25519VerificationKey2020");
