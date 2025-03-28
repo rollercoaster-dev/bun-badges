@@ -7,8 +7,8 @@
 
 import { db, dbPool } from "@/db/config";
 import { sql } from "drizzle-orm";
-import { eq } from "drizzle-orm";
 import { createLogger } from "@/utils/logger";
+// Import necessary Drizzle types if possible, otherwise use 'any' loosely
 
 // Create logger instance
 const logger = createLogger("DbUtils");
@@ -67,7 +67,7 @@ export async function executeTypedQuery(
 }
 
 /**
- * Safe delete operation that falls back to SQL if ORM delete is not available
+ * Safe delete operation using executeTypedQuery.
  *
  * @param tableName The name of the table to delete from
  * @param condition Optional WHERE condition string (without "WHERE")
@@ -79,7 +79,7 @@ export async function safeDelete(
   params: unknown[] = [],
 ): Promise<void> {
   try {
-    // Try direct SQL approach first since it's most reliable
+    // Use direct SQL approach via executeTypedQuery
     if (condition) {
       await executeTypedQuery(
         `DELETE FROM ${tableName} WHERE ${condition}`,
@@ -89,34 +89,14 @@ export async function safeDelete(
       await executeTypedQuery(`DELETE FROM ${tableName}`, []);
     }
   } catch (error) {
+    // Log the error from the SQL attempt and rethrow
     logger.error(`Failed to delete from ${tableName} with SQL:`, error);
-
-    // Try to use ORM approach as fallback
-    try {
-      if (condition) {
-        throw new Error("Conditional delete not supported in fallback mode");
-      }
-
-      // Try to find the table in the schema
-      // HACK: Accessing private _schema property as there's no known public API
-      // to get a table object by name dynamically. Brittle if Drizzle internals change.
-      const schema = (db as any)?.["_schema"] || {};
-      const table = schema[tableName];
-
-      if (table) {
-        await db.delete(table);
-      } else {
-        throw new Error(`Table ${tableName} not found in schema`);
-      }
-    } catch (ormError) {
-      logger.error(`Failed to delete from ${tableName} with ORM:`, ormError);
-      throw error; // Throw the original error
-    }
+    throw error;
   }
 }
 
 /**
- * Safe insert operation that handles proper type annotations
+ * Safe insert operation using executeTypedQuery.
  *
  * @param tableName The name of the table to insert into
  * @param columns Array of column names
@@ -137,46 +117,17 @@ export async function safeInsert(
     const placeholders = values.map((_, i) => `$${i + 1}`).join(", ");
     const sqlQuery = `INSERT INTO ${tableName} (${columns.join(", ")}) VALUES (${placeholders})${returning ? " RETURNING *" : ""}`;
 
-    // Try SQL approach first
+    // Use SQL approach via executeTypedQuery
     return await executeTypedQuery(sqlQuery, values, types);
   } catch (error) {
+    // Log the error from the SQL attempt and rethrow
     logger.error(`Failed to insert into ${tableName} with SQL:`, error);
-
-    // Try ORM approach as fallback
-    try {
-      // Try to find the table in the schema
-      // HACK: Accessing private _schema property as there's no known public API
-      // to get a table object by name dynamically. Brittle if Drizzle internals change.
-      const schema = (db as any)?.["_schema"] || {};
-      const table = schema[tableName];
-
-      if (table) {
-        // Convert columns and values to an object
-        const data: Record<string, unknown> = {};
-        columns.forEach((col, i) => {
-          data[col] = values[i];
-        });
-
-        // Insert using the ORM
-        const result = db.insert(table).values(data);
-
-        if (returning && typeof result["returning"] === "function") {
-          return result.returning();
-        }
-
-        return result;
-      } else {
-        throw new Error(`Table ${tableName} not found in schema`);
-      }
-    } catch (ormError) {
-      logger.error(`Failed to insert into ${tableName} with ORM:`, ormError);
-      throw error; // Throw the original error
-    }
+    throw error;
   }
 }
 
 /**
- * Safe update operation that handles proper type annotations
+ * Safe update operation using executeTypedQuery.
  *
  * @param tableName The name of the table to update
  * @param columnsToUpdate Array of column names to update
@@ -209,43 +160,11 @@ export async function safeUpdate(
     // All values plus the condition value
     const allValues = [...values, conditionValue];
 
-    // Execute with type annotations
+    // Execute with type annotations via executeTypedQuery
     return await executeTypedQuery(sqlQuery, allValues, types);
   } catch (error) {
+    // Log the error from the SQL attempt and rethrow
     logger.error(`Failed to update table ${tableName} with SQL:`, error);
-
-    // Try ORM approach as fallback
-    try {
-      // Try to find the table in the schema
-      // HACK: Accessing private _schema property as there's no known public API
-      // to get a table object by name dynamically. Brittle if Drizzle internals change.
-      const schema = (db as any)?.["_schema"] || {};
-      const table = schema[tableName];
-
-      if (table) {
-        // Convert columns and values to an object
-        const data: Record<string, unknown> = {};
-        columnsToUpdate.forEach((col, i) => {
-          data[col] = values[i];
-        });
-
-        // Create a condition using the eq operator from drizzle-orm
-        const condition = eq(table[conditionColumn], conditionValue);
-
-        // Update using the ORM
-        const result = db.update(table).set(data).where(condition);
-
-        if (returning && typeof result["returning"] === "function") {
-          return result.returning();
-        }
-
-        return result;
-      } else {
-        throw new Error(`Table ${tableName} not found in schema`);
-      }
-    } catch (ormError) {
-      logger.error(`Failed to update table ${tableName} with ORM:`, ormError);
-      throw error; // Throw the original error
-    }
+    throw error;
   }
 }
