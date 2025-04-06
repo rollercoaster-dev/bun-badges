@@ -24,17 +24,13 @@ const LOG_LEVEL_MAP: Record<string, LogLevel> = {
   error: LogLevel.ERROR,
 };
 
-// Get log level from environment, default to INFO
-const getLogLevelFromEnv = (): LogLevel => {
+// Helper to get current log level
+const getCurrentLogLevel = (): LogLevel => {
   const envLevel = process.env.LOG_LEVEL?.toLowerCase();
   return envLevel && envLevel in LOG_LEVEL_MAP
     ? LOG_LEVEL_MAP[envLevel]
-    : LogLevel.INFO;
+    : LogLevel.INFO; // Default to INFO
 };
-
-// Current log level from environment
-const currentLogLevel = getLogLevelFromEnv();
-const isProduction = process.env.NODE_ENV === "production";
 
 // Color codes for different log levels
 const colors = {
@@ -80,6 +76,10 @@ class Logger {
   }
 
   private log(level: LogLevel, message: unknown, args: unknown[]): void {
+    // Check ENV Vars INSIDE the log method
+    const currentLogLevel = getCurrentLogLevel();
+    const isProduction = process.env.NODE_ENV === "production";
+
     if (currentLogLevel > level) {
       return; // Skip logging if level is below current setting
     }
@@ -88,7 +88,7 @@ class Logger {
     const { sanitizedMessage, sanitizedArgs } = sanitizeLogArguments(
       message as string,
       args,
-    ); // Assert message as string here for now, sanitize handles non-strings
+    );
 
     const timestamp = formatTime();
     const levelString = LogLevel[level];
@@ -100,10 +100,10 @@ class Logger {
         level: levelString,
         context: this.context,
         hostname: this.hostname,
-        message: sanitizedMessage, // Use sanitized message
-        ...(sanitizedArgs.length > 0 && { data: sanitizedArgs }), // Use sanitized args
+        message: sanitizedMessage,
+        ...(sanitizedArgs.length > 0 && { data: sanitizedArgs }),
       };
-      // Use console.error/warn/info/debug based on level for semantic logging
+      // Use console.error/warn/info/debug based on level
       switch (level) {
         case LogLevel.ERROR:
           console.error(JSON.stringify(logEntry, safeStringify));
@@ -138,7 +138,7 @@ class Logger {
 
       consoleMethod(
         `${colors.dim}${timestamp} ${color}[${levelString}]${colors.reset} ${colors.dim}[${this.context}]${colors.reset} ${String(sanitizedMessage)}`,
-        ...sanitizedArgs, // Use sanitized args
+        ...sanitizedArgs,
       );
     }
   }

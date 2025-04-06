@@ -99,8 +99,8 @@ const tlsConfig = useHttps
 
 // Log HTTPS status information
 if (useHttps) {
-  logger.info(`HTTPS enabled with certificate: ${process.env.TLS_CERT_FILE}`);
-  logger.info(`Key file: ${process.env.TLS_KEY_FILE}`);
+  logger.info(`HTTPS enabled with certificate.`);
+  logger.info(`Key file is configured.`);
   logger.info(`Using port: ${port} for HTTPS server`);
 } else {
   logger.info("HTTPS is disabled. Running in HTTP mode.");
