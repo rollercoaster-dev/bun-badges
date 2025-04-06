@@ -30,7 +30,7 @@
     "cleanup:docker": "bash ./scripts/cleanup-docker-build-files.sh",
     "db:docker:up": "docker-compose -f docker-compose.dev.yml up",
     "db:docker:down": "docker-compose -f docker-compose.dev.yml down",
-    "db:generate": "drizzle-kit generate:pg",
+    "db:generate": "drizzle-kit generate",
     "db:migrate": "bun run tests/scripts/run-migration.js",
     "db:migrate:status": "bun run tests/scripts/run-migration.js",
     "db:migrate:evidence-url": "bun run tests/scripts/run-evidence-url-migration.js",
