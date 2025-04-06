@@ -1,16 +1,7 @@
-import {
-  describe,
-  it,
-  expect,
-  beforeAll,
-  afterAll,
-  beforeEach,
-  afterEach,
-} from "bun:test";
+import { describe, it, expect, beforeAll, afterAll, afterEach } from "bun:test";
 import { KeyManagementService } from "@/services/key.service";
 import { DatabaseService } from "@/services/db.service";
 import { APIError } from "@/utils/errors";
-import { nanoid } from "nanoid";
 import crypto from "node:crypto";
 // Remove unused imports
 // import { issuerProfiles } from "@/db/schema/issuers";

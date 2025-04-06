@@ -1,7 +1,6 @@
 import { resolve } from "path";
 import { config } from "dotenv";
 import { mock, type Mock } from "bun:test";
-import { execSync } from "child_process";
 import * as fs from "fs";
 import { Pool } from "pg";
 
