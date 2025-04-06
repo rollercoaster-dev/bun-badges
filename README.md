@@ -244,6 +244,18 @@ src/
 
 See the [API Documentation](#api-documentation) section for more details on using these endpoints.
 
+## Standard Error Response
+
+API errors are returned with a standardized JSON response body:
+
+```json
+{
+  "error": "A human-readable error message describing the issue"
+}
+```
+
+The HTTP status code accompanying the response indicates the nature of the error (e.g., `400` for Bad Request, `401` for Unauthorized, `404` for Not Found, `500` for Internal Server Error).
+
 ## Environment Variables
 
 Copy `.env.example` to `.env` and update as needed:

@@ -55,7 +55,7 @@ const formatTime = (): string => {
 };
 
 // Helper to safely stringify potential circular structures
-const safeStringify = (key: string, value: unknown) => {
+const safeStringify = (_key: string, value: unknown) => {
   if (value instanceof Error) {
     return {
       message: value.message,
