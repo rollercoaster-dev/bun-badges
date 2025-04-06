@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { eq } from "drizzle-orm";
-import { db, schema } from "@/db/config"; // Import db and schema directly
+import { DatabaseService } from "@/services/db.service"; // Import DatabaseService
+import { issuerProfiles } from "@/db/schema/issuers"; // Import specific schema
 import logger from "@/utils/logger"; // Use default import
 import { APIError } from "@/utils/errors"; // Correct error class name
 
@@ -152,13 +153,15 @@ export class KeyManagementService {
       "Retrieving encrypted private key for issuer...",
     );
 
-    // Query database directly using imported db and schema
+    // Access db via static property
+    const db = DatabaseService.db;
+
     const issuers = await db
       .select({
-        encryptedPrivateKey: schema.issuerProfiles.encryptedPrivateKey,
+        encryptedPrivateKey: issuerProfiles.encryptedPrivateKey,
       })
-      .from(schema.issuerProfiles)
-      .where(eq(schema.issuerProfiles.issuerId, issuerId))
+      .from(issuerProfiles)
+      .where(eq(issuerProfiles.issuerId, issuerId))
       .limit(1);
 
     const issuer = issuers[0];

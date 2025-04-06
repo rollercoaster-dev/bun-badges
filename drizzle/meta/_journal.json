@@ -36,6 +36,13 @@
       "when": 1742602200000,
       "tag": "0004_oauth_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1743964778550,
+      "tag": "0005_worried_magus",
+      "breakpoints": true
     }
   ]
 }
