@@ -5,10 +5,12 @@ import { OpenBadgeCredential } from "@/models/credential.model";
 import { OB3_CREDENTIAL_SCHEMA_URL } from "@/constants/context-urls";
 import Ajv, { AnySchema } from "ajv";
 // Import logger
-import { createLogger } from "@/utils/logger";
+// import { createLogger } from "@/utils/logger";
+import logger from "@/utils/logger";
 
 // Create logger instance
-const logger = createLogger("SchemaValidation");
+// const logger = createLogger("SchemaValidation");
+const baseLogger = logger.child({ context: "SchemaValidation" });
 
 /**
  * Ajv schema validation result
@@ -49,7 +51,8 @@ async function fetchSchema(url: string): Promise<unknown> {
     return schema;
   } catch (error) {
     // Replace console.error
-    logger.error(`Error fetching schema: ${error}`);
+    // logger.error(`Error fetching schema: ${error}`);
+    baseLogger.error(error, `Error fetching schema from URL: ${url}`);
     throw error;
   }
 }
@@ -85,11 +88,18 @@ export async function validateOB3Credential(
         (error) =>
           `${error.instancePath || ""} ${error.message || "Invalid value"}`,
       );
+      // Log validation errors
+      baseLogger.warn({ errors }, "OB3 Credential schema validation failed");
       return { valid: false, errors };
     }
 
     return { valid: true };
   } catch (error) {
+    // Log the error during the validation process (e.g., fetching schema)
+    baseLogger.error(
+      error,
+      "Error during OB3 credential schema validation process",
+    );
     return {
       valid: false,
       errors: [
@@ -202,8 +212,13 @@ export function validateOB3CredentialBasic(
       errors.push(`credentialSchema.id must be: ${OB3_CREDENTIAL_SCHEMA_URL}`);
     }
 
-    // Return validation result
-    return errors.length > 0 ? { valid: false, errors } : { valid: true };
+    if (errors.length > 0) {
+      // Log basic validation errors
+      baseLogger.warn({ errors }, "OB3 Credential basic validation failed");
+      return { valid: false, errors };
+    }
+
+    return { valid: true };
   } catch (error) {
     return {
       valid: false,

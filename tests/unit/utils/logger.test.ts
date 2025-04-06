@@ -1,12 +1,22 @@
-import { describe, it, expect, spyOn, beforeEach, afterEach } from "bun:test";
+import {
+  describe,
+  it,
+  expect,
+  /* spyOn, */ beforeEach,
+  afterEach,
+} from "bun:test";
+// import { Writable } from "stream"; // Comment out unused import
 import pino from "pino";
 import { hostname } from "os";
 import stream from "node:stream";
+// import build from "pino-abstract-transport"; // Comment out unused import
+// import getPinoLogger from "@/utils/logger"; // Comment out unused import
 
 // Capture log output globally for the test file
 let logOutput = "";
 const writableStream = new stream.Writable({
-  write(chunk, encoding, callback) {
+  write(chunk, _encoding, callback) {
+    // Add underscore to unused encoding parameter
     logOutput += chunk.toString();
     callback();
   },

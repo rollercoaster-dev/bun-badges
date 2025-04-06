@@ -1,8 +1,8 @@
 import { dbPool } from "./config";
-import { createLogger } from "@/utils/logger";
+import logger from "@/utils/logger";
 
 // Create logger instance for this script
-const logger = createLogger("CiDbSetup");
+const baseLogger = logger.child({ context: "CiDbSetup" });
 
 // Constant for retry settings
 const MAX_RETRIES = 5;
@@ -13,9 +13,10 @@ const RETRY_DELAY = 2000;
  * This ensures the database is properly initialized for CI tests
  */
 async function setupCiDatabase() {
-  logger.info("Starting CI database setup...");
-  logger.info(
-    `Using database URL: ${process.env.DATABASE_URL?.replace(/:.+@/, ":****@")}`,
+  baseLogger.info("Starting CI database setup...");
+  baseLogger.info(
+    { databaseUrl: process.env.DATABASE_URL?.replace(/:.+@/, ":****@") },
+    "Using database URL",
   );
 
   // No need to create a db instance here since we're using dbPool directly
@@ -28,20 +29,20 @@ async function setupCiDatabase() {
     const tables = await checkTables();
 
     if (tables.length === 0) {
-      logger.info("No tables found, running migrations...");
+      baseLogger.info("No tables found, running migrations...");
       await runMigrations();
     } else {
-      logger.info(`Found ${tables.length} tables:`);
-      tables.forEach((table) => logger.info(`- ${table}`));
+      baseLogger.info(`Found ${tables.length} tables:`);
+      tables.forEach((table) => baseLogger.info(`- ${table}`));
     }
 
     // 3. Verify required tables
     await verifyRequiredTables();
 
-    logger.info("✅ CI database setup completed successfully");
+    baseLogger.info("✅ CI database setup completed successfully");
     process.exit(0);
   } catch (err) {
-    logger.error("❌ CI database setup failed:", err);
+    baseLogger.error(err, "❌ CI database setup failed:");
     process.exit(1);
   }
 }
@@ -55,22 +56,24 @@ async function checkConnection() {
   while (attempt < MAX_RETRIES) {
     try {
       attempt++;
-      logger.info(`Database connection attempt ${attempt}/${MAX_RETRIES}...`);
+      baseLogger.info(
+        `Database connection attempt ${attempt}/${MAX_RETRIES}...`,
+      );
 
       // Try a simple query to test connection
       const result = await dbPool.query("SELECT 1 as test");
       if (result.rows[0].test === 1) {
-        logger.info("✅ Database connection successful");
+        baseLogger.info("✅ Database connection successful");
         return true;
       }
     } catch (err) {
-      logger.error(
-        `Database connection failed (attempt ${attempt}/${MAX_RETRIES}):`,
+      baseLogger.error(
         err,
+        `Database connection failed (attempt ${attempt}/${MAX_RETRIES}):`,
       );
 
       if (attempt < MAX_RETRIES) {
-        logger.info(`Waiting ${RETRY_DELAY}ms before retry...`);
+        baseLogger.info(`Waiting ${RETRY_DELAY}ms before retry...`);
         await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
       } else {
         throw new Error(
@@ -97,7 +100,7 @@ async function checkTables() {
 
     return result.rows.map((row) => row.table_name);
   } catch (err) {
-    logger.error("Failed to check tables:", err);
+    baseLogger.error(err, "Failed to check tables:");
     return [];
   }
 }
@@ -107,7 +110,7 @@ async function checkTables() {
  */
 async function runMigrations() {
   try {
-    logger.info("Running database migrations...");
+    baseLogger.info("Running database migrations...");
 
     // Execute the db:push command
     // This is a simple approach - in a real scenario, you might want to
@@ -115,10 +118,10 @@ async function runMigrations() {
     const { execSync } = require("child_process");
     execSync("bun run db:push", { stdio: "inherit" });
 
-    logger.info("Migrations completed successfully");
+    baseLogger.info("Migrations completed successfully");
     return true;
   } catch (err) {
-    logger.error("Migration failed:", err);
+    baseLogger.error(err, "Migration failed:");
     throw err;
   }
 }
@@ -143,12 +146,12 @@ async function verifyRequiredTables() {
     throw new Error(`Missing required tables: ${missingTables.join(", ")}`);
   }
 
-  logger.info("✅ All required tables verified");
+  baseLogger.info("✅ All required tables verified");
   return true;
 }
 
 // Run the setup
 setupCiDatabase().catch((err) => {
-  logger.error("Unhandled error in CI database setup:", err);
+  baseLogger.error(err, "Unhandled error in CI database setup:");
   process.exit(1);
 });

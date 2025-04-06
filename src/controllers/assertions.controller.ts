@@ -7,16 +7,16 @@ import { isValidUuid } from "@/utils/validation";
 import { OB2BadgeAssertion } from "@/services/verification.service";
 import { OpenBadgeCredential } from "@/models/credential.model";
 import { toJsonb } from "@/utils/db-helpers";
-import { createLogger, Logger } from "@/utils/logger";
+import logger from "@/utils/logger";
 
 type AssertionJson = OB2BadgeAssertion | OpenBadgeCredential;
 
 export class AssertionController {
   private credentialService: CredentialService;
-  private logger: Logger;
+  private controllerLogger = logger.child({ context: "AssertionController" });
+
   constructor() {
     this.credentialService = new CredentialService();
-    this.logger = createLogger("AssertionController");
   }
 
   /**
@@ -93,7 +93,7 @@ export class AssertionController {
         },
       });
     } catch (error) {
-      this.logger.error("Failed to list assertions:", error);
+      this.controllerLogger.error(error, "Failed to list assertions:");
       return c.json(
         {
           status: "error",
@@ -187,7 +187,7 @@ export class AssertionController {
         },
       });
     } catch (error) {
-      this.logger.error("Failed to get assertion:", error);
+      this.controllerLogger.error(error, "Failed to get assertion:");
       return c.json(
         {
           status: "error",
@@ -360,7 +360,7 @@ export class AssertionController {
         },
       });
     } catch (error) {
-      this.logger.error("Failed to create assertion:", error);
+      this.controllerLogger.error(error, "Failed to create assertion:");
       return c.json(
         {
           status: "error",
@@ -486,7 +486,7 @@ export class AssertionController {
         },
       });
     } catch (error) {
-      this.logger.error("Failed to revoke assertion:", error);
+      this.controllerLogger.error(error, "Failed to revoke assertion:");
       return c.json(
         {
           status: "error",

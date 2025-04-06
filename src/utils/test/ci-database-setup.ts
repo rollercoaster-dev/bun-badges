@@ -9,12 +9,12 @@
 import { Pool, PoolClient } from "pg";
 import { config } from "dotenv";
 import * as path from "path";
-import { createLogger } from "../logger";
+import logger from "@/utils/logger";
 
 // Load environment variables
 config({ path: path.resolve(process.cwd(), ".env.ci") });
 
-const logger = createLogger("ci-database-setup");
+const baseLogger = logger.child({ context: "ci-database-setup" });
 
 // Database connection URL
 const DATABASE_URL =
@@ -66,11 +66,11 @@ export async function setupDatabaseSchema(pool: Pool): Promise<void> {
     const usersExist = await tableExists(client, "users");
 
     if (usersExist) {
-      logger.info("Tables already exist, skipping schema creation");
+      baseLogger.info("Tables already exist, skipping schema creation");
       return;
     }
 
-    logger.info("Creating database schema using transaction...");
+    baseLogger.info("Creating database schema using transaction...");
 
     // Start transaction
     await client.query("BEGIN");
@@ -291,11 +291,11 @@ export async function setupDatabaseSchema(pool: Pool): Promise<void> {
     // Commit transaction
     await client.query("COMMIT");
 
-    logger.info("Database schema created successfully");
+    baseLogger.info("Database schema created successfully");
   } catch (error) {
     // Rollback in case of any errors
     await client.query("ROLLBACK");
-    logger.error("Error creating database schema:", error);
+    baseLogger.error(error, "Failed to create schema");
     throw error;
   } finally {
     client.release();
@@ -312,7 +312,7 @@ export async function verifyDatabase(pool: Pool): Promise<boolean> {
     // Check connection
     const result = await client.query("SELECT 1 as test");
     if (result.rows[0]?.test !== 1) {
-      logger.error("Database connection test failed");
+      baseLogger.error("Database connection test failed");
       return false;
     }
 
@@ -328,15 +328,15 @@ export async function verifyDatabase(pool: Pool): Promise<boolean> {
     for (const table of tables) {
       const exists = await tableExists(client, table);
       if (!exists) {
-        logger.error(`Required table '${table}' does not exist`);
+        baseLogger.error(`Required table '${table}' does not exist`);
         return false;
       }
     }
 
-    logger.info("Database connection and schema verified successfully");
+    baseLogger.info("Database connection and schema verified successfully");
     return true;
   } catch (error) {
-    logger.error("Error verifying database:", error);
+    baseLogger.error("Error verifying database:", error);
     return false;
   } finally {
     client.release();
@@ -347,7 +347,7 @@ export async function verifyDatabase(pool: Pool): Promise<boolean> {
  * Main setup function
  */
 export async function setupCiDatabase(): Promise<Pool> {
-  logger.info("Setting up CI database...");
+  baseLogger.info("Setting up CI database...");
 
   const pool = createPool();
 
@@ -356,12 +356,15 @@ export async function setupCiDatabase(): Promise<Pool> {
     const client = await pool.connect();
     try {
       const result = await client.query("SELECT 1 as test");
-      logger.info("Initial database connection successful:", result.rows[0]);
+      baseLogger.info(
+        "Initial database connection successful:",
+        result.rows[0],
+      );
     } finally {
       client.release();
     }
   } catch (error) {
-    logger.error("Failed to establish initial database connection:", error);
+    baseLogger.error("Failed to establish initial database connection:", error);
     throw error;
   }
 
@@ -382,11 +385,11 @@ export async function setupCiDatabase(): Promise<Pool> {
 if (import.meta.main) {
   setupCiDatabase()
     .then((pool) => {
-      logger.info("CI database setup complete");
+      baseLogger.info("CI database setup complete");
       return pool.end();
     })
     .catch((error) => {
-      logger.error("CI database setup failed:", error);
+      baseLogger.error("CI database setup failed:", error);
       process.exit(1);
     });
 }

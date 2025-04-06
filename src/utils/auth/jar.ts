@@ -1,10 +1,12 @@
 import * as jose from "jose";
 import type { VerificationService } from "@services/verification.service";
 // Import logger
-import { createLogger } from "@/utils/logger";
+// import { createLogger } from "@/utils/logger";
+import logger from "@/utils/logger";
 
 // Create logger instance
-const logger = createLogger("JarUtils");
+// const logger = createLogger("JarUtils");
+const baseLogger = logger.child({ context: "JarUtils" });
 
 // Define expected claims for JAR
 interface JarPayload extends jose.JWTPayload {
@@ -82,14 +84,19 @@ export async function verifyJar(
     }
 
     // Replace console.log with logger.info
-    logger.info("JAR Verified Successfully for client:", expectedClientId);
+    // logger.info("JAR Verified Successfully for client:", expectedClientId);
+    baseLogger.info(
+      { clientId: expectedClientId },
+      "JAR Verified Successfully",
+    );
     return result;
   } catch (error: unknown) {
     // Replace console.error
-    logger.error(
-      "JAR Verification Failed:",
-      error instanceof Error ? error.message : String(error),
-    );
+    // logger.error(
+    //  "JAR Verification Failed:",
+    //  error instanceof Error ? error.message : String(error),
+    // );
+    baseLogger.error(error, "JAR Verification Failed");
     if (error instanceof jose.errors.JWTExpired) {
       throw new Error("Request object (JAR) has expired");
     }

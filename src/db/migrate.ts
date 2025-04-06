@@ -1,19 +1,19 @@
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { db, dbPool } from "./config";
-import { createLogger } from "../utils/logger";
+import logger from "@/utils/logger";
 
 // Create a logger instance for migrations
-const logger = createLogger("migrations");
+const baseLogger = logger.child({ context: "migrations" });
 
 // Run migrations
 async function runMigrations(closePool = true) {
   try {
-    logger.info("Running migrations...");
+    baseLogger.info("Running migrations...");
     await migrate(db, { migrationsFolder: "./drizzle" });
-    logger.info("Migrations completed successfully");
+    baseLogger.info("Migrations completed successfully");
     return true;
   } catch (error) {
-    logger.error("Migration failed:", error);
+    baseLogger.error(error, "Migration failed:");
     throw error;
   } finally {
     // Close the pool only if requested and not in CI environment
@@ -23,7 +23,7 @@ async function runMigrations(closePool = true) {
       process.env.CI !== "true" &&
       process.env.NODE_ENV !== "test"
     ) {
-      logger.info("Closing database pool after migrations");
+      baseLogger.info("Closing database pool after migrations");
       await dbPool.end();
     }
   }
@@ -33,7 +33,7 @@ async function runMigrations(closePool = true) {
 if (import.meta.main) {
   runMigrations()
     .then(() => {
-      logger.info("Migration completed successfully");
+      baseLogger.info("Migration completed successfully");
       process.exit(0);
     })
     .catch(() => {

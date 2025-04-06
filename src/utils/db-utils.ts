@@ -7,11 +7,11 @@
 
 import { db, dbPool } from "@/db/config";
 import { sql } from "drizzle-orm";
-import { createLogger } from "@/utils/logger";
+import logger from "@/utils/logger";
 // Import necessary Drizzle types if possible, otherwise use 'any' loosely
 
 // Create logger instance
-const logger = createLogger("DbUtils");
+const baseLogger = logger.child({ context: "DbUtils" });
 
 /**
  * Execute a SQL query with proper type annotations
@@ -61,7 +61,7 @@ export async function executeTypedQuery(
       throw new Error("No database execution method available");
     }
   } catch (error) {
-    logger.error("Error executing typed query:", error);
+    baseLogger.error(error, "Error executing typed query:");
     throw error;
   }
 }
@@ -90,7 +90,7 @@ export async function safeDelete(
     }
   } catch (error) {
     // Log the error from the SQL attempt and rethrow
-    logger.error(`Failed to delete from ${tableName} with SQL:`, error);
+    baseLogger.error(error, `Failed to delete from ${tableName} with SQL:`);
     throw error;
   }
 }
@@ -121,7 +121,7 @@ export async function safeInsert(
     return await executeTypedQuery(sqlQuery, values, types);
   } catch (error) {
     // Log the error from the SQL attempt and rethrow
-    logger.error(`Failed to insert into ${tableName} with SQL:`, error);
+    baseLogger.error(error, `Failed to insert into ${tableName} with SQL:`);
     throw error;
   }
 }
@@ -164,7 +164,7 @@ export async function safeUpdate(
     return await executeTypedQuery(sqlQuery, allValues, types);
   } catch (error) {
     // Log the error from the SQL attempt and rethrow
-    logger.error(`Failed to update table ${tableName} with SQL:`, error);
+    baseLogger.error(error, `Failed to update table ${tableName} with SQL:`);
     throw error;
   }
 }

@@ -7,12 +7,10 @@ import {
   beforeEach,
   afterEach,
 } from "bun:test";
-import { createLogger } from "@/utils/logger";
+import logger from "@/utils/logger";
 import { OAuthJWTBridge } from "@/utils/auth/oauth-jwt-bridge";
 import { DatabaseService } from "@/services/db.service";
 import { mock } from "bun:test";
-
-const logger = createLogger("OAuth-JWT Bridge Tests");
 
 // Mock functions
 const mockGenerateToken = mock((payload: any) => {

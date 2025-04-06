@@ -2,7 +2,8 @@ import { and, eq, gt, lt } from "drizzle-orm";
 import { db, schema } from "@/db/config";
 import { nanoid } from "nanoid";
 import { JSONWebKeySet } from "jose";
-import { createLogger, Logger } from "@/utils/logger";
+import logger from "@/utils/logger";
+import { type Logger as PinoLogger } from "pino";
 import type { IDatabaseService } from "@/interfaces/db.interface";
 
 const {
@@ -39,27 +40,31 @@ export type NewOAuthClient = typeof oauthClients.$inferInsert & {
 };
 
 export class DatabaseService implements IDatabaseService {
-  private logger: Logger;
+  private logger: PinoLogger;
 
   // Re-export the db instance for direct access when needed
   static db = db;
 
   constructor() {
-    this.logger = createLogger("DatabaseService");
+    this.logger = logger.child({ context: "DatabaseService" });
   }
 
   // User Management Methods
   async createUser(data: NewUser) {
-    const [user] = await db
-      .insert(users)
-      .values({
-        ...data,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
-
-    return user;
+    try {
+      const [user] = await db
+        .insert(users)
+        .values({
+          ...data,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning();
+      return user;
+    } catch (error) {
+      this.logger.error(error, "Failed to create user:");
+      throw error;
+    }
   }
 
   async getUserByEmail(email: string) {
@@ -232,7 +237,7 @@ export class DatabaseService implements IDatabaseService {
         codeChallengeMethod: data.codeChallengeMethod,
       });
     } catch (error) {
-      this.logger.error("Error creating authorization code:", error);
+      this.logger.error(error, "Failed to create authorization code:");
       throw new Error("Failed to create authorization code");
     }
   }
@@ -269,7 +274,7 @@ export class DatabaseService implements IDatabaseService {
       await db.insert(oauthAccessTokens).values(data);
       return { success: true };
     } catch (error) {
-      this.logger.error("Error storing access token:", error);
+      this.logger.error(error, "Failed to store access token:");
       return { success: false };
     }
   }
@@ -290,7 +295,7 @@ export class DatabaseService implements IDatabaseService {
         .limit(1);
       return result || null;
     } catch (error) {
-      this.logger.error("Error getting access token:", error);
+      this.logger.error(error, "Failed to retrieve access token:");
       throw new Error("Failed to retrieve access token");
     }
   }
@@ -306,7 +311,7 @@ export class DatabaseService implements IDatabaseService {
       });
       return { success: true };
     } catch (error) {
-      this.logger.error("Error explicitly revoking access token:", error);
+      this.logger.error(error, "Failed to explicitly revoke access token:");
       return { success: false };
     }
   }
@@ -408,7 +413,7 @@ export class DatabaseService implements IDatabaseService {
         .returning({ id: consentRecords.id });
       return result;
     } catch (error) {
-      this.logger.error("Error creating consent record:", error);
+      this.logger.error(error, "Failed to create consent record:");
       throw new Error("Failed to create consent record");
     }
   }
@@ -433,7 +438,7 @@ export class DatabaseService implements IDatabaseService {
         .limit(1);
       return result || null;
     } catch (error) {
-      this.logger.error("Error getting consent record:", error);
+      this.logger.error(error, "Failed to retrieve consent record:");
       throw new Error("Failed to retrieve consent record");
     }
   }
@@ -460,7 +465,7 @@ export class DatabaseService implements IDatabaseService {
           ),
         );
     } catch (error) {
-      this.logger.error("Error updating consent record:", error);
+      this.logger.error(error, "Failed to update consent record:");
       throw new Error("Failed to update consent record");
     }
   }
@@ -479,7 +484,7 @@ export class DatabaseService implements IDatabaseService {
           ),
         );
     } catch (error) {
-      this.logger.error("Error deleting consent record:", error);
+      this.logger.error(error, "Failed to delete consent record:");
       throw new Error("Failed to delete consent record");
     }
   }
@@ -494,7 +499,7 @@ export class DatabaseService implements IDatabaseService {
         .set({ isUsed: true })
         .where(eq(schema.authorizationCodes.code, code));
     } catch (error) {
-      this.logger.error("Error marking authorization code as used:", error);
+      this.logger.error(error, "Failed to mark authorization code as used:");
       throw new Error("Failed to update authorization code");
     }
   }
@@ -512,7 +517,7 @@ export class DatabaseService implements IDatabaseService {
     try {
       await db.insert(oauthAccessTokens).values(data);
     } catch (error) {
-      this.logger.error("Error creating access token:", error);
+      this.logger.error(error, "Failed to create access token:");
       throw new Error("Failed to create access token");
     }
   }
@@ -528,7 +533,7 @@ export class DatabaseService implements IDatabaseService {
     try {
       await db.insert(oauthRefreshTokens).values(data);
     } catch (error) {
-      this.logger.error("Error creating refresh token:", error);
+      this.logger.error(error, "Failed to create refresh token:");
       throw new Error("Failed to create refresh token");
     }
   }
@@ -549,7 +554,7 @@ export class DatabaseService implements IDatabaseService {
         .limit(1);
       return result || null;
     } catch (error) {
-      this.logger.error("Error getting refresh token:", error);
+      this.logger.error(error, "Failed to retrieve refresh token:");
       throw new Error("Failed to retrieve refresh token");
     }
   }
@@ -560,7 +565,7 @@ export class DatabaseService implements IDatabaseService {
         .delete(oauthRefreshTokens)
         .where(eq(oauthRefreshTokens.token, token));
     } catch (error) {
-      this.logger.error("Error deleting refresh token by token:", error);
+      this.logger.error(error, "Failed to delete refresh token by token:");
       throw new Error("Failed to delete refresh token by token");
     }
   }
@@ -576,7 +581,10 @@ export class DatabaseService implements IDatabaseService {
           ),
         );
     } catch (error) {
-      this.logger.error("Error deleting refresh token by user/client:", error);
+      this.logger.error(
+        error,
+        "Failed to delete refresh token by user/client:",
+      );
       throw new Error("Failed to delete refresh token by user/client");
     }
   }

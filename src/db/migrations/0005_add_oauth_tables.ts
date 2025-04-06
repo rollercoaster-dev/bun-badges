@@ -1,9 +1,9 @@
 import { sql } from "drizzle-orm";
 import { PostgresJsDatabase } from "drizzle-orm/postgres-js";
-import { createLogger } from "../../utils/logger";
+import logger from "@/utils/logger";
 
 // Create a logger for migrations
-const logger = createLogger("migrations:oauth");
+const baseLogger = logger.child({ context: "migrations:oauth" });
 
 export async function up(db: PostgresJsDatabase) {
   // First create the oauth_clients table
@@ -40,7 +40,7 @@ export async function up(db: PostgresJsDatabase) {
     );
   `);
 
-  logger.info("✅ Created OAuth tables");
+  baseLogger.info("✅ Created OAuth tables");
 }
 
 export async function down(db: PostgresJsDatabase) {
@@ -48,5 +48,5 @@ export async function down(db: PostgresJsDatabase) {
   await db.execute(sql`DROP TABLE IF EXISTS authorization_codes;`);
   await db.execute(sql`DROP TABLE IF EXISTS oauth_clients;`);
 
-  logger.info("✅ Dropped OAuth tables");
+  baseLogger.info("✅ Dropped OAuth tables");
 }

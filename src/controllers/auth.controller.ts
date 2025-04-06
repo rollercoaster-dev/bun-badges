@@ -7,7 +7,8 @@ import {
   verifyToken,
 } from "@utils/auth/jwt";
 import { DatabaseService } from "@services/db.service";
-import { createLogger, Logger } from "@/utils/logger";
+import logger from "@/utils/logger";
+import { type Logger as PinoLogger } from "pino";
 // Use Bun's built-in password hashing instead of bcrypt
 
 type CodeRequestBody = {
@@ -42,7 +43,7 @@ type LoginBody = {
 export class AuthController {
   private rateLimiter: RateLimiter;
   private db: DatabaseService;
-  private logger: Logger;
+  private logger: PinoLogger;
 
   constructor(rateLimiter?: RateLimiter, db?: DatabaseService) {
     this.rateLimiter =
@@ -52,7 +53,7 @@ export class AuthController {
         windowMs: 3600000, // 1 hour
       });
     this.db = db || new DatabaseService();
-    this.logger = createLogger("AuthController");
+    this.logger = logger.child({ context: "AuthController" });
   }
 
   async register(c: Context) {
@@ -106,7 +107,7 @@ export class AuthController {
         201,
       );
     } catch (error) {
-      this.logger.error("Registration error:", error);
+      this.logger.error(error, "Registration error:");
       return c.json({ error: "Failed to register user" }, 500);
     }
   }
@@ -171,7 +172,7 @@ export class AuthController {
         200,
       );
     } catch (error) {
-      this.logger.error("Login error:", error);
+      this.logger.error(error, "Login error:");
       return c.json({ error: "Failed to log in" }, 500);
     }
   }
@@ -208,6 +209,8 @@ export class AuthController {
     });
 
     // In production, this should be sent via the configured provider
+    this.logger.info(`Generated code for ${body.username}: ${code}`);
+
     return c.json(
       {
         message: "Code generated successfully",
@@ -389,6 +392,8 @@ export class AuthController {
         username: payload.sub,
         expiresAt: new Date(payload.exp! * 1000),
       });
+
+      this.logger.info(`Token revoked: ${body.token.substring(0, 10)}...`);
 
       return c.json(
         {

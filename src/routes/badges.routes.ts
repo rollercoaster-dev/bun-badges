@@ -6,10 +6,10 @@ import { BADGE_ROUTES } from "./aliases";
 import { BadgeController } from "@/controllers/badge.controller";
 import { bakeImage, extractImage } from "../utils/badge-baker";
 import { isValidUuid } from "@/utils/validation";
-import { createLogger } from "@/utils/logger";
+import logger from "@/utils/logger";
 
 // Create logger instance
-const logger = createLogger("BadgesRoutes");
+const baseLogger = logger.child({ context: "BadgesRoutes" });
 
 const badges = new Hono();
 const controller = new BadgeController();
@@ -67,7 +67,7 @@ badges.get(BADGE_ROUTES.LIST, async (c) => {
       });
     }
   } catch (error) {
-    logger.error("Failed to list badges:", error);
+    baseLogger.error(error, "Failed to list badges:");
     return c.json(
       {
         status: "error",
@@ -126,7 +126,7 @@ badges.get(BADGE_ROUTES.GET, async (c) => {
       },
     });
   } catch (error) {
-    logger.error("Failed to get badge:", error);
+    baseLogger.error(error, "Failed to get badge:");
     return c.json(
       {
         status: "error",
@@ -254,7 +254,7 @@ badges.post(BADGE_ROUTES.CREATE, async (c) => {
       201,
     );
   } catch (error) {
-    logger.error("Failed to create badge:", error);
+    baseLogger.error(error, "Failed to create badge:");
     return c.json(
       {
         status: "error",
@@ -354,7 +354,7 @@ badges.put(BADGE_ROUTES.UPDATE, async (c) => {
       },
     });
   } catch (error) {
-    logger.error("Failed to update badge:", error);
+    baseLogger.error(error, "Failed to update badge:");
     return c.json(
       {
         status: "error",
@@ -432,7 +432,7 @@ badges.delete(BADGE_ROUTES.DELETE, async (c) => {
       },
     });
   } catch (error) {
-    logger.error("Failed to delete badge:", error);
+    baseLogger.error(error, "Failed to delete badge:");
     return c.json(
       {
         status: "error",
@@ -571,7 +571,7 @@ badges.get(BADGE_ROUTES.BAKE_BADGE, async (c) => {
 
     return new Response(bakedImage);
   } catch (error) {
-    logger.error("Error baking badge:", error);
+    baseLogger.error(error, "Error baking badge:");
 
     return c.json(
       {
@@ -634,7 +634,7 @@ badges.post(BADGE_ROUTES.EXTRACT_BADGE, async (c) => {
       },
     });
   } catch (error) {
-    logger.error("Error extracting badge data:", error);
+    baseLogger.error(error, "Error extracting badge data:");
 
     return c.json(
       {

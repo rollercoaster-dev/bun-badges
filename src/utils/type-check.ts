@@ -18,6 +18,8 @@ import {
   OB2_CONTEXT_URL,
 } from "@/constants/context-urls";
 
+import logger from "./logger";
+
 // Example OB3 credential for testing
 const testCredential: OpenBadgeCredential = {
   "@context": OB3_CREDENTIAL_CONTEXT,
@@ -87,9 +89,6 @@ const testOB2Assertion: OB2BadgeAssertion = {
   },
   issuedOn: "2023-01-01T00:00:00Z",
 };
-
-// Import console logger for tests
-import { logger } from "./logger";
 
 // Test type guards
 logger.info("Is valid OB3 credential:", isOpenBadgeCredential(testCredential));

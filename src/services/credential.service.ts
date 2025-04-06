@@ -28,7 +28,8 @@ import {
   OB3_ACHIEVEMENT_CONTEXT,
   OB3_CREDENTIAL_SCHEMA_URL,
 } from "@/constants/context-urls";
-import { createLogger, Logger } from "@/utils/logger";
+import logger from "@/utils/logger";
+import { type Logger as PinoLogger } from "pino";
 
 /**
  * Interface for a signable credential document without proof
@@ -49,10 +50,10 @@ export interface SignableCredential {
  * Service for managing and processing Open Badge Credentials
  */
 export class CredentialService {
-  private logger: Logger;
+  private logger: PinoLogger;
 
   constructor() {
-    this.logger = createLogger("CredentialService");
+    this.logger = logger.child({ context: "CredentialService" });
   }
 
   /**
@@ -116,7 +117,7 @@ export class CredentialService {
         issuer: `${hostUrl}/issuers/${badge.issuerId}`,
       };
     } catch (error) {
-      this.logger.error("Error creating achievement:", error);
+      this.logger.error(error, "Error creating achievement:");
       throw error;
     }
   }
@@ -146,10 +147,11 @@ export class CredentialService {
       if (assertionResult && assertionResult.length > 0) {
         // Production path - we got a result from the database
         assertion = assertionResult[0];
-        this.logger.info("Using assertion from database");
+        this.logger.info({ assertionId }, "Using assertion from database");
       } else {
         // Test environment fallback - create a mock assertion
         this.logger.info(
+          { assertionId },
           "No assertion found in database, creating mock for testing",
         );
         const badgeId = crypto.randomUUID();
@@ -267,7 +269,7 @@ export class CredentialService {
 
       return signedCredential;
     } catch (error) {
-      this.logger.error("Error creating credential:", error);
+      this.logger.error(error, "Error creating credential:");
       throw error;
     }
   }

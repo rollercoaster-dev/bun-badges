@@ -1,14 +1,15 @@
 import { Context } from "hono";
 import { VerificationService } from "@/services/verification.service";
-import { createLogger, Logger } from "@/utils/logger";
+import logger from "@/utils/logger";
+import { type Logger as PinoLogger } from "pino";
 
 export class VerificationController {
   private verificationService: VerificationService;
-  private logger: Logger;
+  private logger: PinoLogger;
 
   constructor() {
     this.verificationService = new VerificationService();
-    this.logger = createLogger("VerificationController");
+    this.logger = logger.child({ context: "VerificationController" });
   }
 
   /**
@@ -45,7 +46,7 @@ export class VerificationController {
         },
       });
     } catch (error) {
-      this.logger.error("Verification error:", error);
+      this.logger.error(error, "Verification error:");
       return c.json(
         {
           status: "error",
@@ -132,7 +133,7 @@ export class VerificationController {
         },
       });
     } catch (error) {
-      this.logger.error("Verification error:", error);
+      this.logger.error(error, "Verification error:");
       return c.json(
         {
           status: "error",
@@ -165,7 +166,7 @@ export class VerificationController {
         },
       });
     } catch (error) {
-      this.logger.error("Status list verification error:", error);
+      this.logger.error(error, "Status list verification error:");
       return c.json(
         {
           status: "error",

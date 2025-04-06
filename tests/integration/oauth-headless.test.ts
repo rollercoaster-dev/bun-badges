@@ -1,9 +1,10 @@
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
-import { createLogger } from "@/utils/logger";
+import logger from "@/utils/logger";
 import { createTestServer } from "../e2e/setup/server-setup";
 import { Hono } from "hono";
 
-const logger = createLogger("Headless OAuth Tests");
+// Create a logger instance if needed for the test file itself
+const testLogger = logger.child({ context: "HeadlessOAuthIntegration" });
 
 // Test client data
 const testClient = {
@@ -22,7 +23,7 @@ describe("Headless OAuth Integration Tests", () => {
 
   // Set up before all tests
   beforeAll(async () => {
-    logger.info("Starting headless OAuth integration tests");
+    testLogger.info("Starting headless OAuth integration tests");
 
     // Create a test app and server
     const app = new Hono();
@@ -132,16 +133,16 @@ describe("Headless OAuth Integration Tests", () => {
 
     // Clean up any existing test clients
     try {
-      logger.info("Cleaning up existing test clients");
+      testLogger.info("Cleaning up existing test clients");
       // In a real implementation, we would have a better way to clean up test data
     } catch (error) {
-      logger.error("Error during test setup:", error);
+      testLogger.error("Error during test setup:", error);
     }
   });
 
   // Clean up after all tests
   afterAll(async () => {
-    logger.info("Completed headless OAuth integration tests");
+    testLogger.info("Completed headless OAuth integration tests");
     // Close the server
     if (server) {
       server.close();

@@ -6,10 +6,10 @@ import { CredentialProof } from "@/models/credential.model";
 import * as ed from "@noble/ed25519";
 import { base64url } from "@scure/base";
 import * as crypto from "crypto";
-import { createLogger } from "@/utils/logger";
+import logger from "@/utils/logger";
 
 // Create logger instance
-const logger = createLogger("CredentialSigning");
+const baseLogger = logger.child({ context: "CredentialSigning" });
 
 /**
  * Options for signing a credential
@@ -177,7 +177,7 @@ export async function verifyCredential<T extends Record<string, unknown>>(
 
     return { verified, results: { signatureVerification: verified } };
   } catch (error) {
-    logger.error("Verification error:", error);
+    baseLogger.error(error, "Credential signature verification failed");
     return {
       verified: false,
       error: `Verification error: ${error instanceof Error ? error.message : "Unknown error"}`,
