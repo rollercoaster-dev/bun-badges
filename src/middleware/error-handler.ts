@@ -1,17 +1,19 @@
 import { Context, Next } from "hono";
 import { APIError } from "../utils/errors";
 import { ContentfulStatusCode } from "hono/utils/http-status";
-import { createLogger } from "../utils/logger";
+// Import default Pino logger instance
+import logger from "../utils/logger";
 
-// Create logger instance
-const logger = createLogger("ErrorHandler");
+// Create a child logger with context
+const handlerLogger = logger.child({ context: "ErrorHandler" });
 
 // Global error handler middleware
 export const errorHandler = async (c: Context, next: Next) => {
   try {
     return await next();
   } catch (error: unknown) {
-    logger.error("Unhandled API Error:", error);
+    // Log error object first for better stack trace handling in Pino
+    handlerLogger.error(error, "Unhandled API Error caught by global handler");
 
     if (error instanceof APIError) {
       return c.json(

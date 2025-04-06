@@ -15,7 +15,7 @@ import { errorHandler } from "@middleware/error-handler";
 import { createAuthMiddleware } from "@middleware/auth.middleware";
 import { DatabaseService } from "@services/db.service";
 import { createSwaggerUI } from "./swagger";
-import { logger } from "@utils/logger";
+import logger from "@utils/logger";
 import { findAvailablePort } from "@utils/network";
 
 // Create the Hono app instance
