@@ -6,6 +6,7 @@
  */
 
 import { hostname } from "os";
+import { sanitizeLogArguments } from "./sanitize"; // Import the sanitizer
 
 // LogLevels in order of verbosity (most to least verbose)
 export enum LogLevel {
@@ -78,23 +79,29 @@ class Logger {
     this.hostname = hostname(); // Get hostname once
   }
 
-  private log(level: LogLevel, message: string, args: unknown[]): void {
+  private log(level: LogLevel, message: unknown, args: unknown[]): void {
     if (currentLogLevel > level) {
       return; // Skip logging if level is below current setting
     }
+
+    // Sanitize message and arguments BEFORE logging to prevent sensitive data leakage
+    const { sanitizedMessage, sanitizedArgs } = sanitizeLogArguments(
+      message as string,
+      args,
+    ); // Assert message as string here for now, sanitize handles non-strings
 
     const timestamp = formatTime();
     const levelString = LogLevel[level];
 
     if (isProduction) {
-      // Production: Output structured JSON
+      // Production: Output structured JSON using SANITIZED data
       const logEntry = {
         timestamp,
         level: levelString,
         context: this.context,
         hostname: this.hostname,
-        message,
-        ...(args.length > 0 && { data: args }), // Include args if present
+        message: sanitizedMessage, // Use sanitized message
+        ...(sanitizedArgs.length > 0 && { data: sanitizedArgs }), // Use sanitized args
       };
       // Use console.error/warn/info/debug based on level for semantic logging
       switch (level) {
@@ -113,7 +120,7 @@ class Logger {
           break;
       }
     } else {
-      // Development/Test: Output pretty-printed console logs
+      // Development/Test: Output pretty-printed console logs using SANITIZED data
       const colorMap = {
         [LogLevel.DEBUG]: colors.cyan,
         [LogLevel.INFO]: colors.green,
@@ -130,8 +137,8 @@ class Logger {
         }[level] || console.log;
 
       consoleMethod(
-        `${colors.dim}${timestamp} ${color}[${levelString}]${colors.reset} ${colors.dim}[${this.context}]${colors.reset} ${message}`,
-        ...args,
+        `${colors.dim}${timestamp} ${color}[${levelString}]${colors.reset} ${colors.dim}[${this.context}]${colors.reset} ${String(sanitizedMessage)}`,
+        ...sanitizedArgs, // Use sanitized args
       );
     }
   }
@@ -139,28 +146,28 @@ class Logger {
   /**
    * Log a debug message - most verbose, for detailed troubleshooting
    */
-  debug(message: string, ...args: unknown[]): void {
+  debug(message: unknown, ...args: unknown[]): void {
     this.log(LogLevel.DEBUG, message, args);
   }
 
   /**
    * Log an info message - normal operational messages
    */
-  info(message: string, ...args: unknown[]): void {
+  info(message: unknown, ...args: unknown[]): void {
     this.log(LogLevel.INFO, message, args);
   }
 
   /**
    * Log a warning message - potential issues that don't prevent operation
    */
-  warn(message: string, ...args: unknown[]): void {
+  warn(message: unknown, ...args: unknown[]): void {
     this.log(LogLevel.WARN, message, args);
   }
 
   /**
    * Log an error message - serious issues that may impact operation
    */
-  error(message: string, ...args: unknown[]): void {
+  error(message: unknown, ...args: unknown[]): void {
     this.log(LogLevel.ERROR, message, args);
   }
 }
