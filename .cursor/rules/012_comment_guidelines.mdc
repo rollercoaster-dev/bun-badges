@@ -1,0 +1,48 @@
+---
+description: Guidelines for code comments and documentation
+globs: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"]
+alwaysApply: true
+---
+# Comment Guidelines
+
+## Core Principles
+- Code should be self-documenting through clear naming and structure
+- Comments should only explain "why", not "what" or "how"
+- TODOs are acceptable for tracking future work
+- Avoid redundant or obvious comments
+
+## When to Comment
+- Complex business logic that needs context
+- Non-obvious technical decisions or workarounds
+- Important warnings or edge cases
+- API documentation (using JSDoc/TSDoc)
+
+## When NOT to Comment
+- To explain what the code does (make the code clearer instead)
+- To restate obvious operations
+- To mark sections of code (use clear function names instead)
+- To comment out code (use version control instead)
+
+## TODO Format
+```typescript
+// TODO: Brief description of what needs to be done
+// TODO(username): Task with assignee
+// TODO(#123): Task with issue reference
+```
+
+## Examples
+
+Good Comments:
+```typescript
+// TODO: Add rate limiting once Redis is set up
+// Reverse the string to handle right-to-left languages
+// Skip validation for admin users due to legacy requirements
+```
+
+Bad Comments:
+```typescript
+// Get the user from the database
+// Loop through the array
+// Update the timestamp
+// Function to handle clicks
+``` 
