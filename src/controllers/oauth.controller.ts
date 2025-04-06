@@ -10,7 +10,8 @@ import { OAuthJWTBridge } from "../utils/auth/oauth-jwt-bridge";
 import { verifyPKCE } from "../utils/auth/pkce";
 import { verifyJar } from "../utils/auth/jar";
 import { VerificationService } from "../services/verification.service";
-import { createLogger, Logger } from "../utils/logger";
+import logger from "@/utils/logger";
+import { type Logger as PinoLogger } from "pino";
 
 // Basic JWK schema (can be expanded if more validation is needed)
 const jwkSchema = z
@@ -105,13 +106,13 @@ export class OAuthController {
   private db: DatabaseService;
   private oauthJwtBridge: OAuthJWTBridge;
   private verificationService: VerificationService;
-  private logger: Logger;
+  private logger: PinoLogger;
 
   constructor(db: DatabaseService = new DatabaseService()) {
     this.db = db;
     this.oauthJwtBridge = new OAuthJWTBridge(db);
     this.verificationService = new VerificationService();
-    this.logger = createLogger("OAuthController");
+    this.logger = logger.child({ context: "OAuthController" });
   }
 
   // Utility method to validate scopes
@@ -209,11 +210,20 @@ export class OAuthController {
         scope: client.scope,
       });
     } catch (error) {
+      this.logger.error(error, "Client registration failed:");
       if (error instanceof BadRequestError) {
-        throw error;
+        return c.json(
+          { error: "invalid_request", error_description: error.message },
+          400,
+        );
       }
-      this.logger.error("Client registration error:", error);
-      throw new BadRequestError("Failed to register client");
+      return c.json(
+        {
+          error: "server_error",
+          error_description: "Failed to register client",
+        },
+        500,
+      );
     }
   }
 
@@ -432,8 +442,11 @@ export class OAuthController {
         throw new BadRequestError("Failed to process authorization request");
       }
     } catch (error) {
-      this.logger.error("Error during authorization:", error);
-      throw new BadRequestError("Failed to process authorization request");
+      this.logger.error(error, "Authorization error:");
+      if (error instanceof BadRequestError) {
+        return c.html(`<h1>Error</h1><p>${error.message}</p>`, 400);
+      }
+      return c.html("<h1>Internal Server Error</h1>", 500);
     }
   }
 
@@ -516,8 +529,8 @@ export class OAuthController {
         codeChallengeMethod,
       });
     } catch (error) {
-      this.logger.error("Error in authorization decision:", error);
-      throw new BadRequestError("Failed to process authorization decision");
+      this.logger.error("Authorization decision handling error:", error);
+      return c.html("<h1>Internal Server Error</h1>", 500);
     }
   }
 
@@ -731,14 +744,17 @@ export class OAuthController {
           throw new BadRequestError(`Unsupported grant type: ${grant_type}`);
       }
     } catch (error) {
+      this.logger.error(error, "Token endpoint error:");
       if (
         error instanceof BadRequestError ||
         error instanceof UnauthorizedError
       ) {
         throw error;
       }
-      this.logger.error("Token endpoint error:", error);
-      throw new BadRequestError("Token request failed");
+      return c.json(
+        { error: "server_error", error_description: "Internal server error" },
+        500,
+      );
     }
   }
 
@@ -841,8 +857,23 @@ export class OAuthController {
         scope: validScopes.join(" "),
       });
     } catch (error) {
-      this.logger.error("Refresh token error:", error);
-      throw new UnauthorizedError("Invalid refresh token");
+      this.logger.error("Refresh token grant error:", error);
+      if (error instanceof BadRequestError) {
+        return c.json(
+          { error: "invalid_request", error_description: error.message },
+          400,
+        );
+      }
+      if (error instanceof UnauthorizedError) {
+        return c.json(
+          { error: "invalid_grant", error_description: error.message },
+          400,
+        );
+      }
+      return c.json(
+        { error: "server_error", error_description: "Internal server error" },
+        500,
+      );
     }
   }
 

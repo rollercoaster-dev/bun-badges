@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
-import { createLogger } from "@/utils/logger";
+import logger from "@/utils/logger";
 import { createTestServer } from "../../setup/server-setup";
 import { Hono } from "hono";
 import {
@@ -7,7 +7,8 @@ import {
   teardownTestEnvironment,
 } from "../../setup/environment";
 
-const logger = createLogger("Headless OAuth E2E Tests");
+// Create a logger instance if needed for the test file itself
+const testLogger = logger.child({ context: "HeadlessOAuthE2E" });
 
 // Test client data
 const testClient = {
@@ -133,12 +134,12 @@ describe("Headless OAuth E2E Tests", () => {
     server = testServer.server;
     request = testServer.request;
 
-    logger.info("Starting headless OAuth E2E tests");
+    testLogger.info("Starting headless OAuth E2E tests");
   });
 
   // Clean up after all tests
   afterAll(async () => {
-    logger.info("Completed headless OAuth E2E tests");
+    testLogger.info("Completed headless OAuth E2E tests");
     if (server) {
       server.close();
     }
@@ -161,7 +162,7 @@ describe("Headless OAuth E2E Tests", () => {
   test("should get access token with client credentials", async () => {
     // Skip if client registration failed
     if (!clientId || !clientSecret) {
-      logger.warn("Skipping token test as client credentials are missing");
+      testLogger.warn("Skipping token test as client credentials are missing");
       return;
     }
 
@@ -186,7 +187,7 @@ describe("Headless OAuth E2E Tests", () => {
   test("should validate token with introspection endpoint", async () => {
     // Skip if token acquisition failed
     if (!accessToken) {
-      logger.warn("Skipping introspection test as access token is missing");
+      testLogger.warn("Skipping introspection test as access token is missing");
       return;
     }
 
@@ -207,7 +208,7 @@ describe("Headless OAuth E2E Tests", () => {
   test("should revoke access token", async () => {
     // Skip if token acquisition failed
     if (!accessToken) {
-      logger.warn("Skipping revocation test as access token is missing");
+      testLogger.warn("Skipping revocation test as access token is missing");
       return;
     }
 

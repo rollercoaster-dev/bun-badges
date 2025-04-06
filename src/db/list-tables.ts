@@ -6,9 +6,9 @@
  */
 
 import { dbPool } from "./config";
-import { createLogger } from "../utils/logger";
+import logger from "@/utils/logger";
 
-const logger = createLogger("db-list-tables");
+const baseLogger = logger.child({ context: "db-list-tables" });
 
 // Required tables for the application
 const REQUIRED_TABLES = [
@@ -22,7 +22,7 @@ const REQUIRED_TABLES = [
 
 async function listTables() {
   try {
-    logger.info("Checking database tables...");
+    baseLogger.info("Checking database tables...");
 
     const client = await dbPool.connect();
 
@@ -37,8 +37,8 @@ async function listTables() {
 
       const tables = tablesResult.rows.map((row) => row.table_name);
 
-      logger.info(`Found ${tables.length} tables in database:`);
-      tables.forEach((table) => logger.info(`- ${table}`));
+      baseLogger.info(`Found ${tables.length} tables in database:`);
+      tables.forEach((table) => baseLogger.info(`- ${table}`));
 
       // Check if required tables exist
       const missingTables = REQUIRED_TABLES.filter(
@@ -46,11 +46,13 @@ async function listTables() {
       );
 
       if (missingTables.length > 0) {
-        logger.error(`Missing required tables: ${missingTables.join(", ")}`);
+        baseLogger.error(
+          `Missing required tables: ${missingTables.join(", ")}`,
+        );
         // Replace console.log with logger.error
         // console.log(`Missing required tables: ${missingTables.join(", ")}`);
       } else {
-        logger.info("All required tables exist");
+        baseLogger.info("All required tables exist");
         // Replace console.log with logger.info
         // console.log("All required tables exist");
       }
@@ -65,7 +67,7 @@ async function listTables() {
       client.release();
     }
   } catch (error) {
-    logger.error("Error listing tables:", error);
+    baseLogger.error(error, "Error listing tables:");
     // Replace console.error with logger.error
     // console.error("Error:", error);
     throw error;

@@ -5,120 +5,96 @@
  * throughout the application. It respects the LOG_LEVEL environment variable.
  */
 
-// LogLevels in order of verbosity (most to least verbose)
-export enum LogLevel {
-  DEBUG = 0,
-  INFO = 1,
-  WARN = 2,
-  ERROR = 3,
+import pino from "pino";
+import { hostname } from "os";
+
+// Define log levels compatible with Pino
+const PINO_LOG_LEVELS = ["fatal", "error", "warn", "info", "debug", "trace"];
+
+// Determine log level from environment, default to 'info'
+const logLevel = process.env.LOG_LEVEL?.toLowerCase() || "info";
+const validLogLevel = PINO_LOG_LEVELS.includes(logLevel) ? logLevel : "info";
+
+// Determine if running in production
+const isProduction = process.env.NODE_ENV === "production";
+
+// Define keys/paths to redact (adjust and expand as needed)
+// Note: Simple paths for keys. Use wildcards (*) for array elements or deeper paths.
+const redactPaths = [
+  // Sensitive Env Vars often found in config objects
+  "*.DATABASE_URL",
+  "DATABASE_URL",
+  "*.JWT_SECRET",
+  "JWT_SECRET",
+  "*.REFRESH_TOKEN_SECRET",
+  "REFRESH_TOKEN_SECRET",
+  "*.API_KEY",
+  "API_KEY",
+  "*.CLIENT_SECRET",
+  "CLIENT_SECRET",
+  // Common sensitive fields in objects
+  "*.password",
+  "password",
+  "*.passwd",
+  "passwd",
+  "*.pwd",
+  "pwd",
+  "*.secret",
+  "secret",
+  "*.token",
+  "token",
+  "*.accessToken",
+  "accessToken",
+  "*.refreshToken",
+  "refreshToken",
+  // Headers
+  "*.authorization",
+  "authorization",
+  "*.Authorization",
+  "Authorization",
+  "*.cookie",
+  "cookie",
+  "*.Cookie",
+  "Cookie",
+  // Example: Redact nested secrets
+  "config.credentials.secretKey",
+];
+
+// Base Pino options
+const pinoOptions: pino.LoggerOptions = {
+  level: validLogLevel,
+  // Redact sensitive information
+  redact: {
+    paths: redactPaths,
+    censor: "[REDACTED]", // Character used for redaction
+    remove: false, // Set to true to remove the key entirely instead of redacting
+  },
+  // Add hostname to logs
+  formatters: {
+    log(object) {
+      return { hostname: hostname(), ...object };
+    },
+  },
+};
+
+// Conditional transport for pretty printing in development/test
+if (!isProduction) {
+  pinoOptions.transport = {
+    target: "pino-pretty",
+    options: {
+      colorize: true, // Enable colors
+      levelFirst: true, // Show level first
+      translateTime: "SYS:standard", // Human-readable timestamp
+      ignore: "pid,hostname", // Don't duplicate hostname
+    },
+  };
 }
 
-// Map string log levels from environment to enum values
-const LOG_LEVEL_MAP: Record<string, LogLevel> = {
-  debug: LogLevel.DEBUG,
-  info: LogLevel.INFO,
-  warn: LogLevel.WARN,
-  error: LogLevel.ERROR,
-};
+// Create the logger instance
+const logger = pino(pinoOptions);
 
-// Get log level from environment, default to INFO
-const getLogLevelFromEnv = (): LogLevel => {
-  const envLevel = process.env.LOG_LEVEL?.toLowerCase();
-  return envLevel && envLevel in LOG_LEVEL_MAP
-    ? LOG_LEVEL_MAP[envLevel]
-    : LogLevel.INFO;
-};
+// Export the configured logger instance as default
+export default logger;
 
-// Current log level from environment
-const currentLogLevel = getLogLevelFromEnv();
-
-// Color codes for different log levels
-const colors = {
-  reset: "\x1b[0m",
-  bright: "\x1b[1m",
-  dim: "\x1b[2m",
-  red: "\x1b[31m",
-  green: "\x1b[32m",
-  yellow: "\x1b[33m",
-  blue: "\x1b[34m",
-  magenta: "\x1b[35m",
-  cyan: "\x1b[36m",
-  white: "\x1b[37m",
-};
-
-// Timestamp formatter
-const formatTime = (): string => {
-  return new Date().toISOString();
-};
-
-// Primary logger class
-class Logger {
-  // Context for this logger instance
-  private context: string;
-
-  constructor(context: string) {
-    this.context = context;
-  }
-
-  /**
-   * Log a debug message - most verbose, for detailed troubleshooting
-   */
-  debug(message: string, ...args: unknown[]): void {
-    if (currentLogLevel <= LogLevel.DEBUG) {
-      console.debug(
-        `${colors.dim}${formatTime()} ${colors.cyan}[DEBUG]${colors.reset} ${colors.dim}[${this.context}]${colors.reset} ${message}`,
-        ...args,
-      );
-    }
-  }
-
-  /**
-   * Log an info message - normal operational messages
-   */
-  info(message: string, ...args: unknown[]): void {
-    if (currentLogLevel <= LogLevel.INFO) {
-      console.info(
-        `${colors.dim}${formatTime()} ${colors.green}[INFO]${colors.reset} ${colors.dim}[${this.context}]${colors.reset} ${message}`,
-        ...args,
-      );
-    }
-  }
-
-  /**
-   * Log a warning message - potential issues that don't prevent operation
-   */
-  warn(message: string, ...args: unknown[]): void {
-    if (currentLogLevel <= LogLevel.WARN) {
-      console.warn(
-        `${colors.dim}${formatTime()} ${colors.yellow}[WARN]${colors.reset} ${colors.dim}[${this.context}]${colors.reset} ${message}`,
-        ...args,
-      );
-    }
-  }
-
-  /**
-   * Log an error message - serious issues that may impact operation
-   */
-  error(message: string, ...args: unknown[]): void {
-    if (currentLogLevel <= LogLevel.ERROR) {
-      console.error(
-        `${colors.dim}${formatTime()} ${colors.red}[ERROR]${colors.reset} ${colors.dim}[${this.context}]${colors.reset} ${message}`,
-        ...args,
-      );
-    }
-  }
-}
-
-// Explicitly export the Logger class
-export { Logger };
-
-/**
- * Create a logger instance for a specific context
- * @param context The context for this logger (usually the class or file name)
- */
-export const createLogger = (context: string): Logger => {
-  return new Logger(context);
-};
-
-// Export a default logger for quick usage
-export const logger = createLogger("app");
+// Optional: Re-export pino types if needed elsewhere, though direct usage is preferred
+// export type { Logger } from 'pino';

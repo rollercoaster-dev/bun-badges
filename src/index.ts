@@ -15,7 +15,7 @@ import { errorHandler } from "@middleware/error-handler";
 import { createAuthMiddleware } from "@middleware/auth.middleware";
 import { DatabaseService } from "@services/db.service";
 import { createSwaggerUI } from "./swagger";
-import { logger } from "@utils/logger";
+import logger from "@utils/logger";
 import { findAvailablePort } from "@utils/network";
 
 // Create the Hono app instance
@@ -99,8 +99,8 @@ const tlsConfig = useHttps
 
 // Log HTTPS status information
 if (useHttps) {
-  logger.info(`HTTPS enabled with certificate: ${process.env.TLS_CERT_FILE}`);
-  logger.info(`Key file: ${process.env.TLS_KEY_FILE}`);
+  logger.info(`HTTPS enabled with certificate.`);
+  logger.info(`Key file is configured.`);
   logger.info(`Using port: ${port} for HTTPS server`);
 } else {
   logger.info("HTTPS is disabled. Running in HTTP mode.");

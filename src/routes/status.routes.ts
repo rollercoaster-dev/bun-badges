@@ -12,10 +12,10 @@ import {
   getIndexFromUuid,
   isCredentialRevoked,
 } from "@/utils/signing/status-list";
-import { createLogger } from "@/utils/logger";
+import logger from "@/utils/logger";
 
 // Create logger instance
-const logger = createLogger("StatusRoutes");
+const baseLogger = logger.child({ context: "StatusRoutes" });
 
 const STATUS_ROUTES = {
   GET_STATUS_LIST: "/list/:issuerId",
@@ -87,7 +87,7 @@ status.get(STATUS_ROUTES.GET_STATUS_LIST, async (c) => {
       },
     });
   } catch (error) {
-    logger.error("Failed to get status list:", error);
+    baseLogger.error(error, "Failed to get status list:");
     return c.json(
       {
         status: "error",
@@ -182,7 +182,7 @@ status.get(STATUS_ROUTES.GET_STATUS, async (c) => {
             statusListCredential: `${hostUrl}/status/list/${issuerId}`,
           } as StatusList2021Entry;
         } catch (error) {
-          logger.error("Status list verification error:", error);
+          baseLogger.error(error, "Status list verification error:");
         }
       }
     }
@@ -197,7 +197,7 @@ status.get(STATUS_ROUTES.GET_STATUS, async (c) => {
       },
     });
   } catch (error) {
-    logger.error("Failed to get credential status:", error);
+    baseLogger.error(error, "Failed to get credential status:");
     return c.json(
       {
         status: "error",
