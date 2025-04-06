@@ -11,6 +11,7 @@ import { KeyManagementService } from "@/services/key.service";
 import { DatabaseService } from "@/services/db.service";
 import { APIError } from "@/utils/errors";
 import { nanoid } from "nanoid";
+import crypto from "node:crypto";
 // Remove unused imports
 // import { issuerProfiles } from "@/db/schema/issuers";
 // import { eq } from "drizzle-orm";
@@ -23,13 +24,13 @@ describe("KeyManagementService (Integration) - Crash Isolation", () => {
   let service: KeyManagementService;
   let dbService: DatabaseService;
   let createdIssuerId: string | null = null;
-  const testOwnerUserId = nanoid();
+  const testOwnerUserId = crypto.randomUUID();
   const testKey = `-----BEGIN PRIVATE KEY-----
 MIICajCCAdOgAwIBAgIEA...INTEGRATION_EXAMPLE...=
 -----END PRIVATE KEY-----`;
   let encryptedTestKey: string;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     console.log("beforeAll: Setting up service instance...");
     if (!process.env.MASTER_ENCRYPTION_KEY) {
       process.env.MASTER_ENCRYPTION_KEY = "test-integration-master-key";
@@ -39,11 +40,50 @@ MIICajCCAdOgAwIBAgIEA...INTEGRATION_EXAMPLE...=
       service = new KeyManagementService();
       dbService = new DatabaseService(); // Still instantiate to check for import/constructor issues
       encryptedTestKey = service.encryptPrivateKey(testKey); // Crypto operation
+
+      // Create the test user
+      try {
+        await dbService.createUser({
+          userId: testOwnerUserId,
+          email: `test-owner-${testOwnerUserId}@example.com`,
+          passwordHash: "test-password", // Use passwordHash (camelCase)
+          // role: "issuer", // Remove role
+          // status: "active", // Remove status
+        });
+        console.log(`beforeAll: Created test user ${testOwnerUserId}`);
+      } catch (userError) {
+        console.error(
+          `Error creating test user ${testOwnerUserId}:`,
+          userError,
+        );
+        // Decide if we should throw or try to continue
+        throw new Error(
+          `Failed to create prerequisite test user: ${userError}`,
+        );
+      }
+
       console.log("beforeAll: Service instances created.");
     } catch (error) {
       console.error("Error during beforeAll service instantiation:", error);
       throw error;
     }
+  });
+
+  afterAll(async () => {
+    console.log("afterAll: Cleaning up test user...");
+    if (testOwnerUserId) {
+      try {
+        await dbService.deleteUserById(testOwnerUserId);
+        console.log(`afterAll: Deleted test user ${testOwnerUserId}`);
+      } catch (cleanupError) {
+        console.error(
+          `Error cleaning up test user ${testOwnerUserId}:`,
+          cleanupError,
+        );
+        // Log error but don't fail tests during cleanup
+      }
+    }
+    // Optional: Close db connection if opened by dbService? Check dbService implementation.
   });
 
   afterEach(async () => {
@@ -61,7 +101,7 @@ MIICajCCAdOgAwIBAgIEA...INTEGRATION_EXAMPLE...=
   // Helper to create issuer using the service
   async function createTestIssuerViaService(data: any = {}) {
     const issuerData = {
-      issuerId: data.issuerId ?? nanoid(),
+      issuerId: data.issuerId ?? crypto.randomUUID(),
       name: data.name ?? "Test Issuer via Service",
       url: data.url ?? "https://example.com/issuerservice",
       email: data.email ?? "issuerservice@example.com",
@@ -94,7 +134,7 @@ MIICajCCAdOgAwIBAgIEA...INTEGRATION_EXAMPLE...=
   });
 
   it("getIssuerPrivateKey: should return 404 if issuer does not exist", async () => {
-    const nonExistentIssuerId = nanoid();
+    const nonExistentIssuerId = crypto.randomUUID();
     let caughtError: any = null;
     try {
       await service.getIssuerPrivateKey(nonExistentIssuerId);

@@ -7,24 +7,23 @@ import { APIError } from "@/utils/errors"; // Correct error class name
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 16; // Bytes for AES GCM
-const SALT_LENGTH = 16; // Bytes for key derivation
-const KEY_LENGTH = 32; // Bytes for AES-256
+const KEY_LENGTH = 32; // Bytes for derived key
 const TAG_LENGTH = 16; // Bytes for GCM auth tag
 const ITERATIONS = 100000; // Key derivation iterations
-const DIGEST = "sha512";
+const DIGEST = "sha512"; // Hash algorithm for PBKDF2
 
 export class KeyManagementService {
   private masterKey: Buffer;
 
   constructor(/* db: IDatabaseService */) {
-    // Remove unused db parameter
-    const masterEncryptionKey = process.env.MASTER_ENCRYPTION_KEY; // Use process.env
+    const masterEncryptionKey = process.env.MASTER_ENCRYPTION_KEY;
     if (!masterEncryptionKey) {
       logger.error(
         "MASTER_ENCRYPTION_KEY is not set in environment variables!",
       );
       throw new Error("MASTER_ENCRYPTION_KEY must be configured.");
     }
+
     // Derive a stable key from the master key using PBKDF2. This adds protection against weak master keys.
     // In a real scenario, the salt might be stored or derived consistently, but for simplicity here, we'll use a fixed salt.
     // WARNING: Using a fixed salt reduces security compared to a unique salt per encryption.
@@ -72,15 +71,26 @@ export class KeyManagementService {
   encryptPrivateKey(privateKey: string): string {
     logger.debug("Encrypting private key...");
     try {
+      logger.debug(`Master key length: ${this.masterKey?.length}`);
       const iv = crypto.randomBytes(IV_LENGTH);
+      logger.debug(`Generated IV: ${iv?.toString("hex")}`);
+
+      logger.debug("Creating cipher...");
       const cipher = crypto.createCipheriv(ALGORITHM, this.masterKey, iv);
+      logger.debug("Cipher created.");
 
+      logger.debug("Updating cipher...");
       let encrypted = cipher.update(privateKey, "utf8", "base64");
+      logger.debug("Cipher updated.");
+
+      logger.debug("Finalizing cipher...");
       encrypted += cipher.final("base64");
+      logger.debug("Cipher finalized.");
 
+      logger.debug("Getting auth tag...");
       const tag = cipher.getAuthTag();
+      logger.debug(`Got auth tag: ${tag?.toString("hex")}`);
 
-      // Combine IV, ciphertext, and tag for storage
       const combined = Buffer.concat([
         iv,
         tag,
@@ -104,21 +114,34 @@ export class KeyManagementService {
     logger.debug("Decrypting private key...");
     try {
       const combined = Buffer.from(encryptedKey, "base64");
+      logger.debug(`Combined buffer length: ${combined?.length}`);
 
-      // Extract IV, tag, and ciphertext
       const iv = combined.subarray(0, IV_LENGTH);
       const tag = combined.subarray(IV_LENGTH, IV_LENGTH + TAG_LENGTH);
       const ciphertext = combined.subarray(IV_LENGTH + TAG_LENGTH);
+      logger.debug(`Extracted IV: ${iv?.toString("hex")}`);
+      logger.debug(`Extracted tag: ${tag?.toString("hex")}`);
+      logger.debug(`Ciphertext length: ${ciphertext?.length}`);
 
+      logger.debug("Creating decipher...");
       const decipher = crypto.createDecipheriv(ALGORITHM, this.masterKey, iv);
-      decipher.setAuthTag(tag);
+      logger.debug("Decipher created.");
 
+      logger.debug("Setting auth tag...");
+      decipher.setAuthTag(tag);
+      logger.debug("Auth tag set.");
+
+      logger.debug("Updating decipher...");
       let decrypted = decipher.update(
         ciphertext.toString("base64"),
         "base64",
         "utf8",
       );
+      logger.debug("Decipher updated.");
+
+      logger.debug("Finalizing decipher...");
       decrypted += decipher.final("utf8");
+      logger.debug("Decipher finalized.");
 
       logger.debug("Private key decrypted successfully.");
       return decrypted;

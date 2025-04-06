@@ -79,6 +79,23 @@ export class DatabaseService implements IDatabaseService {
     return user;
   }
 
+  async deleteUserById(userId: string): Promise<void> {
+    try {
+      this.logger.info({ userId }, "Deleting user...");
+      const result = await db.delete(users).where(eq(users.userId, userId));
+      if (result.rowCount === 0) {
+        this.logger.warn({ userId }, "Attempted to delete non-existent user.");
+        // Decide if throwing an error is appropriate, or just logging.
+        // For test cleanup, logging might be sufficient.
+      }
+      this.logger.info({ userId }, "User deleted successfully.");
+    } catch (error) {
+      this.logger.error({ userId, error }, "Failed to delete user:");
+      // Re-throw the error to signal failure
+      throw error;
+    }
+  }
+
   // Verification Code Methods
   async createVerificationCode(
     data: Omit<schema.NewVerificationCode, "id">,
