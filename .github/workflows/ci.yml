@@ -102,6 +102,10 @@ jobs:
           # Use the service name 'postgres' as the host, not localhost
           DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@postgres:5432/${{ env.POSTGRES_DB }}
         run: |
+          # Add a small delay to ensure the DB service is fully ready
+          echo "Waiting 5 seconds for DB service..."
+          sleep 5 
+          
           # First, setup basic database structure with CI setup script
           # (which now checks if tables exist before creating them)
           echo "Setting up base database structure..."
