@@ -9,40 +9,43 @@ services:
       # Use environment variable for port, default to 3000
       - "${PORT:-3000}:${PORT:-3000}"
     environment:
+      # Set node environment, default to production
       - NODE_ENV=${NODE_ENV:-production}
-      - PORT=${PORT:-3000}
-      - DATABASE_URL=postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-bun_badges}
-      - JWT_SECRET=${JWT_SECRET:-your-jwt-secret-change-in-production}
-      - LOG_LEVEL=${LOG_LEVEL:-info}
     depends_on:
       - db
     restart: unless-stopped
     healthcheck:
       # Healthcheck uses the internal port defined by PORT env var
-      test: ["CMD", "curl", "-f", "http://localhost:${PORT:-3000}/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:${PORT}/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
+    networks:
+      - bun-badges-network
 
   db:
     image: postgres:16-alpine
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      - POSTGRES_DB=${POSTGRES_DB:-bun_badges}
-    ports:
-      # Use environment variable for DB port, default to 5432
-      - "${DB_PORT:-5432}:5432"
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    # ports: # Removed - Generally avoid exposing DB directly in production
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
       # Healthcheck uses the user defined by POSTGRES_USER env var
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - bun-badges-network
 
 volumes:
   postgres_data:
+
+networks:
+  bun-badges-network:
+    driver: bridge

@@ -68,24 +68,12 @@ Bun.plugin({
 
 console.log("✅ Path aliases configured for tests");
 
-// Determine if running in CI environment
-const isCI = process.env.CI === "true";
-
-// Load appropriate environment variables based on environment
-if (isCI) {
-  console.log("🔄 Running in CI environment");
-  try {
-    config({ path: resolve(process.cwd(), ".env.ci") });
-    console.log("✅ Loaded CI environment variables from .env.ci");
-  } catch (error) {
-    console.warn("⚠️ Failed to load .env.ci, falling back to .env.test");
-    config({ path: resolve(process.cwd(), ".env.test") });
-  }
-} else {
-  console.log("🔄 Running in local environment");
-  config({ path: resolve(process.cwd(), ".env.test") });
-  console.log("✅ Loaded test environment variables from .env.test");
-}
+// Load test environment variables. In CI, GitHub Actions workflow sets these.
+// Locally, this ensures test-specific settings are used.
+console.log(
+  "🔄 Loading test environment variables from .env.test if present...",
+);
+config({ path: resolve(process.cwd(), ".env.test") });
 
 // Ensure DATABASE_URL is available
 console.log(`Environment: ${process.env.NODE_ENV}`);

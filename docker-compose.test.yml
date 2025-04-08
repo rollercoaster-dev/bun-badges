@@ -10,20 +10,18 @@ services:
       POSTGRES_INITDB_ARGS: "--nosync"
       PGDATA: /var/lib/postgresql/data/pgdata
     command: postgres -c fsync=off -c synchronous_commit=off -c full_page_writes=off -c random_page_cost=1.0
-    ports:
-      # Use TEST_DB_PORT, default 5434 (to avoid conflict with default 5432)
-      - "${TEST_DB_PORT:-5434}:5432"
+    # ports: # Removed port mapping - connect via Docker network using service name
     volumes:
       - postgres_test_data:/var/lib/postgresql/data
       # - ./scripts/init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql
       # - ./scripts/test-db:/docker-entrypoint-initdb.d/schema
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"] # Use default user directly
       interval: 5s
       timeout: 5s
       retries: 5
     networks:
-      - test_network
+      - bun-badges-network
 
   # Test runner service (Consolidated)
   test_runner:
@@ -31,18 +29,19 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     environment:
+      # Keep variables potentially used by test scripts/runner logic
       - NODE_ENV=${NODE_ENV:-test}
-      - E2E_TEST=${E2E_TEST:-true}
-      - INTEGRATION_TEST=${INTEGRATION_TEST:-true}
-      - DATABASE_URL=postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db_test:5432/${POSTGRES_DB:-bun_badges_test}
-      - JWT_SECRET=${JWT_SECRET:-test-jwt-secret-for-e2e-tests}
-      - AUTH_TOKEN_EXPIRY=${AUTH_TOKEN_EXPIRY:-1d}
-      - LOG_LEVEL=${LOG_LEVEL:-error}
-      - TEST_MODE=${TEST_MODE:-true}
-      - PORT=${PORT:-3000}
-      - HOST=${HOST:-0.0.0.0}
-      # Added for improved isolation between test runs
-      - TEST_RUN_ID=${TEST_RUN_ID:-test-run-1}
+      - E2E_TEST=${E2E_TEST:-false}
+      - INTEGRATION_TEST=${INTEGRATION_TEST:-false}
+      - TEST_MODE=${TEST_MODE} # Keep if used, though it warned
+      - TEST_RUN_ID=${TEST_RUN_ID} # Keep if used, though it warned
+      # Removed redundant variables - App should use .env.test inside container
+      # - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db_test:5432/${POSTGRES_DB}
+      # - JWT_SECRET=${JWT_SECRET}
+      # - JWT_EXPIRY=${JWT_EXPIRY}
+      # - LOG_LEVEL=${LOG_LEVEL}
+      # - PORT=${PORT}
+      # - HOST=${HOST}
     depends_on:
       db_test:
         condition: service_healthy
@@ -50,38 +49,32 @@ services:
       - .:/app
       - node_modules:/app/node_modules # Persist node_modules across runs
       - ./test-results:/app/test-results # Mount test results volume
-    # Default command is essentially ignored when using `docker-compose run` 
+    # Default command is essentially ignored when using `docker-compose run`
     # with a specific command override, but set a simple default.
     command: ["sh", "-c", "echo 'Test runner container ready. Use docker-compose run to execute tests.'"]
     networks:
-      - test_network
+      - bun-badges-network
 
   # Redis for caching (if needed by your app)
   redis_test:
     image: redis:alpine
-    ports:
-      # Use TEST_REDIS_PORT, default 6379
-      - "${TEST_REDIS_PORT:-6379}:6379"
+    # ports: # Removed port mapping
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
-      timeout: 5s
-      retries: 5
     networks:
-      - test_network
+      - bun-badges-network
 
   # Test reports viewer service
   test_reporter:
     image: nginx:alpine
     volumes:
       - ./test-results:/usr/share/nginx/html
-    ports:
-      # Use TEST_REPORTER_PORT, default 8080
-      - "${TEST_REPORTER_PORT:-8080}:80"
+    # ports: # Removed port mapping
     depends_on:
       - test_runner
     networks:
-      - test_network
+      - bun-badges-network
 
 volumes:
   postgres_test_data:
@@ -92,5 +85,5 @@ volumes:
     driver: local
 
 networks:
-  test_network:
+  bun-badges-network: # Renamed from test_network
     driver: bridge

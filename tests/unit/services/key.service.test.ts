@@ -1,19 +1,7 @@
 import { describe, it, expect, mock, beforeAll, afterAll } from "bun:test";
 import { KeyManagementService } from "@/services/key.service";
 import { APIError } from "@/utils/errors";
-
-// Remove database mock - DB interactions will be tested in integration tests
-/*
-mock.module("@/db/config", () => ({
-  db: mockDb,
-  schema: {
-    issuerProfiles: {
-      encryptedPrivateKey: "encryptedPrivateKey",
-      issuerId: "issuerId",
-    },
-  },
-}));
-*/
+import crypto from "node:crypto"; // Import crypto for mocking
 
 // Simpler logger mock (remains useful for unit tests)
 mock.module("@/utils/logger", () => {
@@ -79,8 +67,33 @@ describe("KeyManagementService (Unit)", () => {
     });
 
     describe("encryptPrivateKey / decryptPrivateKey", () => {
-      // TODO: Unskip these tests if Bun test runner interference issue with crypto is resolved
-      // See: [Link to relevant issue/discussion if created]
+      // Mock crypto.randomBytes specifically for these tests
+      // to ensure it returns a Buffer, working around potential env issues.
+      // NOTE: SALT_LENGTH is 16, IV_LENGTH is 16
+      const MOCK_SALT = Buffer.alloc(16, "a"); // Create a 16-byte buffer
+      const MOCK_IV = Buffer.alloc(16, "b"); // Create a 16-byte buffer
+      let originalRandomBytes: any;
+
+      beforeAll(() => {
+        originalRandomBytes = crypto.randomBytes;
+        // Mock implementation: return salt first, then iv
+        let callCount = 0;
+        crypto.randomBytes = mock((size: number) => {
+          if (size === 16) {
+            // Assuming SALT_LENGTH and IV_LENGTH are 16
+            callCount++;
+            return callCount === 1 ? MOCK_SALT : MOCK_IV;
+          }
+          // Fallback to original if size is different (shouldn't happen here)
+          return originalRandomBytes(size);
+        });
+      });
+
+      afterAll(() => {
+        // Restore original crypto.randomBytes
+        crypto.randomBytes = originalRandomBytes;
+      });
+
       it("should encrypt and decrypt a private key successfully", () => {
         const { privateKey } = service.generateKeyPair();
         const encrypted = service.encryptPrivateKey(privateKey);
@@ -98,7 +111,9 @@ describe("KeyManagementService (Unit)", () => {
         const { privateKey } = service.generateKeyPair();
         const encrypted = service.encryptPrivateKey(privateKey);
         const tampered = Buffer.from(encrypted, "base64");
-        tampered[tampered.length - 1] = tampered[tampered.length - 1] ^ 1;
+        // Tamper the tag part (offset SALT_LENGTH + IV_LENGTH)
+        const tagOffset = 16 + 16;
+        tampered[tagOffset] = tampered[tagOffset] ^ 1; // Flip a bit in the tag
 
         expect(() =>
           service.decryptPrivateKey(tampered.toString("base64")),

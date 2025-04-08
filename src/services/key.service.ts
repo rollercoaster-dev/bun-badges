@@ -81,6 +81,15 @@ export class KeyManagementService {
       const salt = crypto.randomBytes(SALT_LENGTH);
       logger.debug(`Generated Salt: ${salt.toString("hex")}`);
 
+      // Add check to ensure salt is a Buffer (workaround for potential test env issues)
+      if (!Buffer.isBuffer(salt)) {
+        logger.error(
+          { saltType: typeof salt },
+          "Generated salt is not a Buffer!",
+        );
+        throw new TypeError("Generated salt is not a Buffer as expected.");
+      }
+
       // 2. Derive unique key using PBKDF2 with the unique salt
       const derivedKey = crypto.pbkdf2Sync(
         this.masterEncryptionKey,

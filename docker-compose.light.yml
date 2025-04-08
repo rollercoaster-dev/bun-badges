@@ -9,11 +9,6 @@ services:
       - db
     environment:
       NODE_ENV: development
-      PORT: 7777
-      DATABASE_URL: postgres://${POSTGRES_USER:-badges_user}:${POSTGRES_PASSWORD:-badges_password}@db:5432/${POSTGRES_DB:-badges}
-      JWT_SECRET: ${JWT_SECRET:-your-secret-key}
-      JWT_EXPIRY: ${JWT_EXPIRY:-15m}
-      REFRESH_TOKEN_EXPIRY: ${REFRESH_TOKEN_EXPIRY:-7d}
       DOCKER_CONTAINER: 'true'
       SKIP_CANVAS: 'true'
     ports:
@@ -26,33 +21,33 @@ services:
       sh -c "bun install --no-optional &&
              bun run dev"
     networks:
-      - bun-badges-network-dev
+      - bun-badges-network
 
   db:
     image: postgres:15
     container_name: bun-badges-db-light
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-badges}
-      POSTGRES_USER: ${POSTGRES_USER:-badges_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-badges_password}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - "${DB_PORT:-5434}:5432"
     volumes:
       - postgres_data_light:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-badges_user} -d ${POSTGRES_DB:-badges}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
     networks:
-      - bun-badges-network-light
+      - bun-badges-network
 
   pgadmin:
     image: dpage/pgadmin4
     container_name: bun-badges-pgadmin-light
     environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@admin.com}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
       PGADMIN_CONFIG_SERVER_MODE: 'False'
     ports:
       - "${PGADMIN_PORT:-5050}:80"
@@ -61,12 +56,12 @@ services:
     depends_on:
       - db
     networks:
-      - bun-badges-network-light
+      - bun-badges-network
 
 volumes:
   postgres_data_light:
   pgadmin_data_light:
 
 networks:
-  bun-badges-network-light:
+  bun-badges-network:
     driver: bridge

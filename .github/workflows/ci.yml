@@ -51,31 +51,36 @@ jobs:
     needs: [typecheck]
     runs-on: ubuntu-latest
     
+    # Define environment variables for the test job centrally
+    env:
+      CI: true
+      NODE_ENV: test
+      SKIP_DOCKER: true
+      # Define DB config centrally (referenced by service and steps)
+      POSTGRES_USER: postgres        # Standard default user
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }} # Use GitHub Secret
+      POSTGRES_DB: bun_badges_test   # Standard test DB name
+      # DATABASE_URL will be defined in steps that need it
+      # Use GitHub Secret for JWT
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      LOG_LEVEL: info # Or perhaps debug for CI?
+
     # Add PostgreSQL service container
     services:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: bun_badges_test
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
         ports:
-          - 5432:5432
+          - 5432:5432 # Standard port mapping
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
     
-    # Define environment variables for the test job
-    env:
-      CI: true
-      NODE_ENV: test
-      SKIP_DOCKER: true
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/bun_badges_test
-      JWT_SECRET: ci-test-jwt-secret-for-github-actions
-      LOG_LEVEL: info
-      
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -89,17 +94,24 @@ jobs:
         run: bun install
         
       - name: Initialize test database
+        # Define DATABASE_URL specifically for this step
+        env:
+          DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
         run: |
-          # Setup database
-          echo "Setting up database with CI database setup..."
+          # First, setup basic database structure with CI setup script
+          # (which now checks if tables exist before creating them)
+          echo "Setting up base database structure..."
           bun run src/utils/test/ci-database-setup.ts
           
-          # Run migrations
-          echo "Running database migrations..."
-          bun run db:migrate
-          bun run db:migrate:evidence-url
+          # Then run our comprehensive schema validation utility
+          # This handles all migrations and ensures critical columns exist
+          echo "Running schema validation and migrations..."
+          bun run src/db/schema/ensure-schema.ts
         
       - name: Run tests (unit, integration, e2e)
+        # Define DATABASE_URL specifically for this step as well
+        env:
+          DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
         run: |
           bun run test:unit
           bun run test:integration

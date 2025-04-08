@@ -2,6 +2,32 @@ import { Hono } from "hono";
 import { logger as honoLogger } from "hono/logger";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
+import * as dotenv from "dotenv";
+import * as path from "path";
+
+// --- Load environment-specific .env file ---
+const nodeEnv = process.env.NODE_ENV;
+if (nodeEnv === "development") {
+  dotenv.config({
+    path: path.resolve(process.cwd(), ".env.development"),
+    override: true,
+  });
+  console.log("Loaded environment variables from .env.development");
+} else if (nodeEnv === "test") {
+  dotenv.config({
+    path: path.resolve(process.cwd(), ".env.test"),
+    override: true,
+  });
+  console.log("Loaded environment variables from .env.test");
+} else {
+  // In production or other environments, rely on system environment variables
+  // or potentially a base .env file loaded elsewhere if needed.
+  // We could optionally load the base .env here as a fallback:
+  dotenv.config(); // Load base .env if it exists
+  console.log("Attempted to load base .env file (if exists)");
+}
+// --- End environment loading ---
+
 import auth from "@routes/auth.routes";
 import badges from "@routes/badges.routes";
 import assertions from "@routes/assertions.routes";
@@ -16,7 +42,6 @@ import { createAuthMiddleware } from "@middleware/auth.middleware";
 import { DatabaseService } from "@services/db.service";
 import { createSwaggerUI } from "./swagger";
 import logger from "@utils/logger";
-import { findAvailablePort } from "@utils/network";
 
 // Create the Hono app instance
 const app = new Hono();
@@ -41,7 +66,7 @@ app.use("/api/*", authMiddleware);
 const oauthRouter = createOAuthRouter(oauthController);
 
 // Add routes
-app.route("/auth", auth);
+app.route("/api/auth", auth);
 app.route("/api/badges", badges);
 app.route("/api/assertions", assertions);
 app.route("/api/issuers", issuers);
@@ -52,68 +77,34 @@ app.route("/oauth", oauthRouter);
 
 // Add Swagger UI in development
 if (process.env.NODE_ENV === "development") {
-  app.route("/docs", createSwaggerUI("/docs"));
+  app.route("/docs", createSwaggerUI());
 }
 
-// Server startup configuration
-const isDevEnv = process.env.NODE_ENV === "development";
-
-// Get port configuration
-const requestedPort = parseInt(process.env.PORT || "7777", 10);
-
-// Find an available port starting from the requested port
-const port = await findAvailablePort(requestedPort);
-
-// Log server startup information
-logger.info(
-  `Server starting on port ${port} in ${process.env.NODE_ENV || "development"} mode...`,
-);
-
-// Display development tips
-if (isDevEnv && !process.env.DOCKER_CONTAINER) {
-  logger.info("Development Tips:");
-  logger.info(
-    '• For local database development, run: "bun run dev:docker" to use Docker Compose',
-  );
-  logger.info(`• Access API documentation at: http://localhost:${port}/docs`);
-  logger.info(
-    '• Try the Open Badges 3.0 example: "bun run examples/ob3-workflow.ts"',
-  );
+// Environment variables
+const portEnv = process.env.PORT;
+if (!portEnv) {
+  throw new Error("PORT environment variable is not set.");
 }
+const port = parseInt(portEnv, 10);
+const environment = process.env.NODE_ENV || "development";
 
-// Configure TLS if HTTPS is enabled
-const useHttps = process.env.USE_HTTPS === "true";
-const tlsConfig = useHttps
-  ? {
-      tls: {
-        cert: process.env.TLS_CERT_FILE
-          ? Bun.file(process.env.TLS_CERT_FILE)
-          : undefined,
-        key: process.env.TLS_KEY_FILE
-          ? Bun.file(process.env.TLS_KEY_FILE)
-          : undefined,
-        passphrase: process.env.TLS_PASSPHRASE,
-      },
-    }
-  : {};
-
-// Log HTTPS status information
-if (useHttps) {
-  logger.info(`HTTPS enabled with certificate.`);
-  logger.info(`Key file is configured.`);
-  logger.info(`Using port: ${port} for HTTPS server`);
-} else {
-  logger.info("HTTPS is disabled. Running in HTTP mode.");
-  logger.info(`Using port: ${port} for HTTP server`);
-}
-
-// Export the app with optional TLS configuration
-// When USE_HTTPS is not set, this behaves exactly like the original export
-export default {
+// Start server
+const server = Bun.serve({
   port,
+  hostname: process.env.HOST,
   fetch: app.fetch,
-  ...tlsConfig,
-};
+});
+
+logger.info(`🚀 Server running at http://${server.hostname}:${server.port}`);
+logger.info(`Environment: ${environment}`);
+
+if (environment === "development") {
+  logger.info(
+    `📚 API documentation available at: http://${server.hostname}:${server.port}/docs`,
+  );
+}
+
+export default server;
 
 // Export the app instance directly for testing purposes
 export { app as honoApp };
