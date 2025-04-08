@@ -93,13 +93,25 @@ export async function ensureSchemaComplete(closePool = true): Promise<void> {
  * Uses a raw PostgreSQL connection rather than the ORM
  */
 async function checkDatabaseExists(): Promise<void> {
-  // Extract database name from CONNECTION_STRING
-  const dbNameMatch = DATABASE_URL?.match(/\/([^?]*)/);
-  const dbName = dbNameMatch ? dbNameMatch[1] : null;
+  // Get database name from environment variables or extract from DATABASE_URL
+  let dbName = process.env.DB_NAME || process.env.POSTGRES_DB;
 
-  if (!dbName) {
-    throw new Error("Could not extract database name from DATABASE_URL");
+  // If not found in environment variables, try to extract from DATABASE_URL
+  if (!dbName && DATABASE_URL) {
+    const dbNameMatch = DATABASE_URL.match(/\/([^?]*)/);
+    dbName = dbNameMatch ? dbNameMatch[1] : undefined;
   }
+
+  // Use default if still not found
+  if (!dbName) {
+    dbName = "bun_badges_test";
+    baseLogger.warn(
+      `Could not determine database name, using default: ${dbName}`,
+    );
+  }
+
+  // Ensure the database name doesn't contain any invalid characters
+  dbName = dbName.replace(/[^a-zA-Z0-9_]/g, "_");
 
   // Get explicit credentials from environment variables or extract from DATABASE_URL
   const dbUser = process.env.DB_USER || process.env.POSTGRES_USER || "postgres";
@@ -115,6 +127,8 @@ async function checkDatabaseExists(): Promise<void> {
   baseLogger.info(
     `[DIAGNOSTIC] Attempting connection to postgres DB with connection string: postgres://${dbUser}:***@${dbHost}:${dbPort}/postgres`,
   );
+
+  baseLogger.info(`Using sanitized database name: '${dbName}'`);
 
   // Connect to 'postgres' database to check if our target database exists
   const pgPool = new Pool({

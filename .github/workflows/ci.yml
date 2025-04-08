@@ -60,7 +60,7 @@ jobs:
       POSTGRES_USER: postgres        # Standard default user
       POSTGRES_PASSWORD: postgres    # Use a hardcoded password for CI
       POSTGRES_DB: bun_badges_test   # Standard test DB name
-      # Database connection variables
+      # Database connection variables - ensure these are valid identifiers
       DB_USER: postgres
       DB_PASSWORD: postgres
       DB_HOST: localhost
@@ -104,6 +104,7 @@ jobs:
 
       - name: Initialize test database
         env:
+          # Ensure DATABASE_URL is properly formatted with valid database name
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/bun_badges_test
           # Explicitly set these variables to ensure they're strings
           DB_PASSWORD: postgres
@@ -136,7 +137,7 @@ jobs:
       - name: Run tests (unit, integration, e2e)
         # Define DATABASE_URL specifically for this step as well
         env:
-          # Connect to the host-mapped port (localhost)
+          # Connect to the host-mapped port (localhost) with valid database name
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/bun_badges_test
           # Explicitly set these variables to ensure they're strings
           DB_PASSWORD: postgres
