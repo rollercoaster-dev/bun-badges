@@ -95,27 +95,28 @@ jobs:
           
       - name: Install dependencies
         run: bun install
-        
-      - name: Install psql client # Add step to install psql
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
+
+      # - name: Install psql client # REMOVED DIAGNOSTIC STEP
+      #   run: |
+      #     sudo apt-get update
+      #     sudo apt-get install -y postgresql-client
 
       - name: Initialize test database
         # Define DATABASE_URL specifically for this step
         env:
-          # Use the service name 'postgres' as the host, not localhost
-          DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@postgres:5432/${{ env.POSTGRES_DB }}
+          # Connect to the host-mapped port (localhost)
+          DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
         run: |
-          # Add a small delay to ensure the DB service is fully ready
-          echo "Waiting 5 seconds for DB service..."
-          sleep 5 
-          
-          # Log the connection string (mask password) and test with psql
-          echo "Attempting to connect to URL: postgres://${{ env.POSTGRES_USER }}:***@postgres:5432/${{ env.POSTGRES_DB }}"
-          echo "Testing connection with psql..."
-          PGPASSWORD=${{ env.POSTGRES_PASSWORD }} psql -h postgres -U ${{ env.POSTGRES_USER }} -d ${{ env.POSTGRES_DB }} -c "\conninfo" || echo "psql connection command failed."
-          echo "Finished psql test."
+          # REMOVED DIAGNOSTIC STEPS:
+          # # Add a small delay to ensure the DB service is fully ready
+          # echo "Waiting 5 seconds for DB service..."
+          # sleep 5 
+          # 
+          # # Log the connection string (mask password) and test with psql
+          # echo "Attempting to connect to URL: postgres://${{ env.POSTGRES_USER }}:***@localhost:5432/${{ env.POSTGRES_DB }}"
+          # echo "Testing connection with psql..."
+          # PGPASSWORD=${{ env.POSTGRES_PASSWORD }} psql -h localhost -U ${{ env.POSTGRES_USER }} -d ${{ env.POSTGRES_DB }} -c "\conninfo" || echo "psql connection command failed."
+          # echo "Finished psql test."
           
           # First, setup basic database structure with CI setup script
           # (which now checks if tables exist before creating them)
@@ -130,8 +131,8 @@ jobs:
       - name: Run tests (unit, integration, e2e)
         # Define DATABASE_URL specifically for this step as well
         env:
-          # Use the service name 'postgres' as the host, not localhost
-          DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@postgres:5432/${{ env.POSTGRES_DB }}
+          # Connect to the host-mapped port (localhost)
+          DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
         run: |
           bun run test:unit
           bun run test:integration
