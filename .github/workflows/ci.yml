@@ -96,15 +96,8 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      # - name: Install psql client # REMOVED DIAGNOSTIC STEP
-      #   run: |
-      #     sudo apt-get update
-      #     sudo apt-get install -y postgresql-client
-
       - name: Initialize test database
-        # Define DATABASE_URL specifically for this step
         env:
-          # Connect to the host-mapped port (localhost)
           DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
         run: |
           # REMOVED DIAGNOSTIC STEPS:
