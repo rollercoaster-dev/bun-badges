@@ -7,35 +7,41 @@ import { APIError } from "@/utils/errors"; // Correct error class name
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 16; // Bytes for AES GCM
-const KEY_LENGTH = 32; // Bytes for derived key
+const SALT_LENGTH = 16; // Bytes for PBKDF2 salt
+const KEY_LENGTH = 32; // Bytes for derived key (AES-256)
 const TAG_LENGTH = 16; // Bytes for GCM auth tag
 const ITERATIONS = 100000; // Key derivation iterations
 const DIGEST = "sha512"; // Hash algorithm for PBKDF2
 
+/**
+ * Service for managing cryptographic keys.
+ *
+ * Key Storage Format:
+ * Encrypted private keys are stored as base64-encoded strings with the following components concatenated:
+ *   - Salt (16 bytes): Unique per encryption operation, used for key derivation
+ *   - IV (16 bytes): Initialization vector for AES-GCM
+ *   - Auth Tag (16 bytes): Authentication tag from AES-GCM
+ *   - Ciphertext (variable length): The encrypted private key data
+ *
+ * The storage format is: base64(salt + iv + tag + ciphertext)
+ *
+ * This format ensures each encryption operation uses a unique salt for key derivation
+ * rather than a fixed salt, improving security by preventing related-key attacks.
+ */
 export class KeyManagementService {
-  private masterKey: Buffer;
+  private masterEncryptionKey: string; // Store the raw key from env
 
   constructor(/* db: IDatabaseService */) {
-    const masterEncryptionKey = process.env.MASTER_ENCRYPTION_KEY;
-    if (!masterEncryptionKey) {
+    const masterEnvKey = process.env.MASTER_ENCRYPTION_KEY;
+    if (!masterEnvKey) {
       logger.error(
         "MASTER_ENCRYPTION_KEY is not set in environment variables!",
       );
       throw new Error("MASTER_ENCRYPTION_KEY must be configured.");
     }
-
-    // Derive a stable key from the master key using PBKDF2. This adds protection against weak master keys.
-    // In a real scenario, the salt might be stored or derived consistently, but for simplicity here, we'll use a fixed salt.
-    // WARNING: Using a fixed salt reduces security compared to a unique salt per encryption.
-    // Consider storing a unique salt alongside the encrypted data if enhancing security.
-    const salt = Buffer.from("fixed-salt-for-key-derivation"); // Example fixed salt - IMPROVE THIS IN PRODUCTION
-    this.masterKey = crypto.pbkdf2Sync(
-      masterEncryptionKey,
-      salt,
-      ITERATIONS,
-      KEY_LENGTH,
-      DIGEST,
-    );
+    this.masterEncryptionKey = masterEnvKey; // Store the raw key
+    logger.info("KeyManagementService initialized with master key.");
+    // Removed PBKDF2 derivation with fixed salt from constructor
   }
 
   /**
@@ -64,50 +70,72 @@ export class KeyManagementService {
   }
 
   /**
-   * Encrypts a private key using AES-256-GCM with the derived master key.
+   * Encrypts a private key using AES-256-GCM with a key derived from the master key and a unique salt.
    * @param privateKey The private key string to encrypt.
-   * @returns Base64 encoded string containing iv + ciphertext + authTag.
+   * @returns Base64 encoded string containing salt + iv + authTag + ciphertext.
    */
   encryptPrivateKey(privateKey: string): string {
-    logger.debug("Encrypting private key...");
+    logger.debug("Encrypting private key with unique salt...");
     try {
-      logger.debug(`Master key length: ${this.masterKey?.length}`);
-      const iv = crypto.randomBytes(IV_LENGTH);
-      logger.debug(`Generated IV: ${iv?.toString("hex")}`);
+      // 1. Generate unique salt
+      const salt = crypto.randomBytes(SALT_LENGTH);
+      logger.debug(`Generated Salt: ${salt.toString("hex")}`);
 
-      logger.debug("Creating cipher...");
-      const cipher = crypto.createCipheriv(ALGORITHM, this.masterKey, iv);
+      // 2. Derive unique key using PBKDF2 with the unique salt
+      const derivedKey = crypto.pbkdf2Sync(
+        this.masterEncryptionKey,
+        salt,
+        ITERATIONS,
+        KEY_LENGTH,
+        DIGEST,
+      );
+      logger.debug(`Derived key using unique salt.`); // Avoid logging the key itself
+
+      // 3. Generate unique IV
+      const iv = crypto.randomBytes(IV_LENGTH);
+      logger.debug(`Generated IV: ${iv.toString("hex")}`);
+
+      // 4. Create cipher with derived key and IV
+      const cipher = crypto.createCipheriv(ALGORITHM, derivedKey, iv);
       logger.debug("Cipher created.");
 
-      logger.debug("Updating cipher...");
-      let encrypted = cipher.update(privateKey, "utf8", "base64");
-      logger.debug("Cipher updated.");
+      // 5. Encrypt data
+      // Ensure update and final work correctly with Buffer output
+      const encryptedBuffer = Buffer.concat([
+        cipher.update(privateKey, "utf8"),
+        cipher.final(),
+      ]);
+      logger.debug("Encryption complete.");
 
-      logger.debug("Finalizing cipher...");
-      encrypted += cipher.final("base64");
-      logger.debug("Cipher finalized.");
-
-      logger.debug("Getting auth tag...");
+      // 6. Get auth tag
       const tag = cipher.getAuthTag();
-      logger.debug(`Got auth tag: ${tag?.toString("hex")}`);
+      logger.debug(`Got auth tag: ${tag.toString("hex")}`);
 
+      // 7. Combine salt, iv, tag, and ciphertext
       const combined = Buffer.concat([
-        iv,
-        tag,
-        Buffer.from(encrypted, "base64"),
+        salt, // SALT_LENGTH bytes
+        iv, // IV_LENGTH bytes
+        tag, // TAG_LENGTH bytes
+        encryptedBuffer, // Variable length
       ]);
 
-      logger.debug("Private key encrypted successfully.");
-      return combined.toString("base64");
+      // 8. Encode as Base64
+      const result = combined.toString("base64");
+      logger.debug("Private key encrypted successfully with unique salt.");
+      return result;
     } catch (error) {
-      logger.error({ err: error }, "Failed to encrypt private key");
+      logger.error(
+        { err: error },
+        "Failed to encrypt private key with unique salt",
+      );
+      // Ensure error handling is appropriate, maybe re-throw or use specific error type
       throw new APIError("Encryption failed", 500);
     }
   }
 
   /**
    * Decrypts a private key encrypted with encryptPrivateKey.
-   * @param encryptedKey Base64 encoded string (iv + ciphertext + authTag).
+   * @param encryptedKey Base64 encoded string (salt + iv + authTag + ciphertext).
    * @returns The original private key string.
    */
   decryptPrivateKey(encryptedKey: string): string {
@@ -116,35 +144,58 @@ export class KeyManagementService {
       const combined = Buffer.from(encryptedKey, "base64");
       logger.debug(`Combined buffer length: ${combined?.length}`);
 
-      const iv = combined.subarray(0, IV_LENGTH);
-      const tag = combined.subarray(IV_LENGTH, IV_LENGTH + TAG_LENGTH);
-      const ciphertext = combined.subarray(IV_LENGTH + TAG_LENGTH);
-      logger.debug(`Extracted IV: ${iv?.toString("hex")}`);
-      logger.debug(`Extracted tag: ${tag?.toString("hex")}`);
-      logger.debug(`Ciphertext length: ${ciphertext?.length}`);
+      // 1. Extract components using correct offsets
+      const salt = combined.subarray(0, SALT_LENGTH);
+      const iv = combined.subarray(SALT_LENGTH, SALT_LENGTH + IV_LENGTH);
+      const tag = combined.subarray(
+        SALT_LENGTH + IV_LENGTH,
+        SALT_LENGTH + IV_LENGTH + TAG_LENGTH,
+      );
+      const ciphertext = combined.subarray(
+        SALT_LENGTH + IV_LENGTH + TAG_LENGTH,
+      );
 
+      logger.debug(`Extracted Salt: ${salt.toString("hex")}`);
+      logger.debug(`Extracted IV: ${iv.toString("hex")}`);
+      logger.debug(`Extracted Tag: ${tag.toString("hex")}`);
+      logger.debug(`Ciphertext length: ${ciphertext.length}`);
+
+      // 2. Derive key using extracted salt
+      const derivedKey = crypto.pbkdf2Sync(
+        this.masterEncryptionKey, // Use the stored master key
+        salt,
+        ITERATIONS,
+        KEY_LENGTH,
+        DIGEST,
+      );
+      logger.debug("Derived key using extracted salt."); // Avoid logging key
+
+      // 3. Create decipher with derived key and IV
       logger.debug("Creating decipher...");
-      const decipher = crypto.createDecipheriv(ALGORITHM, this.masterKey, iv);
+      const decipher = crypto.createDecipheriv(ALGORITHM, derivedKey, iv);
       logger.debug("Decipher created.");
 
+      // 4. Set auth tag
       logger.debug("Setting auth tag...");
       decipher.setAuthTag(tag);
       logger.debug("Auth tag set.");
 
+      // 5. Decrypt data (pass raw buffer to update)
       logger.debug("Updating decipher...");
-      let decrypted = decipher.update(
-        ciphertext.toString("base64"),
-        "base64",
-        "utf8",
-      );
+      const decryptedBufferPart1 = decipher.update(ciphertext); // Pass buffer directly
       logger.debug("Decipher updated.");
 
       logger.debug("Finalizing decipher...");
-      decrypted += decipher.final("utf8");
+      const decryptedBufferPart2 = decipher.final();
+      const finalDecryptedBuffer = Buffer.concat([
+        decryptedBufferPart1,
+        decryptedBufferPart2,
+      ]);
+      const decryptedString = finalDecryptedBuffer.toString("utf8");
       logger.debug("Decipher finalized.");
 
       logger.debug("Private key decrypted successfully.");
-      return decrypted;
+      return decryptedString;
     } catch (error) {
       logger.error(
         { err: error },

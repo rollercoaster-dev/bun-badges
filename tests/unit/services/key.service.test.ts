@@ -81,8 +81,7 @@ describe("KeyManagementService (Unit)", () => {
     describe("encryptPrivateKey / decryptPrivateKey", () => {
       // TODO: Unskip these tests if Bun test runner interference issue with crypto is resolved
       // See: [Link to relevant issue/discussion if created]
-      it.skip("should encrypt and decrypt a private key successfully", () => {
-        // SKIP
+      it("should encrypt and decrypt a private key successfully", () => {
         const { privateKey } = service.generateKeyPair();
         const encrypted = service.encryptPrivateKey(privateKey);
         const decrypted = service.decryptPrivateKey(encrypted);
@@ -95,8 +94,7 @@ describe("KeyManagementService (Unit)", () => {
         );
       });
 
-      it.skip("should throw error when decrypting with tampered data (invalid tag)", () => {
-        // SKIP
+      it("should throw error when decrypting with tampered data (invalid tag)", () => {
         const { privateKey } = service.generateKeyPair();
         const encrypted = service.encryptPrivateKey(privateKey);
         const tampered = Buffer.from(encrypted, "base64");
