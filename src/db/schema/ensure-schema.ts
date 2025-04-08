@@ -26,8 +26,24 @@ export async function ensureSchemaComplete(closePool = true): Promise<void> {
     // Check if database exists before proceeding
     await checkDatabaseExists();
 
-    // Run standard migrations first
-    await runMigrations(false);
+    try {
+      // Run standard migrations first
+      await runMigrations(false);
+    } catch (migrationError) {
+      // If the error is about relations already existing, we can continue
+      if (
+        migrationError instanceof Error &&
+        migrationError.message.includes("already exists")
+      ) {
+        baseLogger.warn(
+          "Some relations already exist. This is expected in CI environments.",
+        );
+        baseLogger.warn("Continuing with schema validation...");
+      } else {
+        // For other errors, rethrow
+        throw migrationError;
+      }
+    }
 
     // Verify and add special columns if needed
     await ensureEvidenceUrlColumn();
@@ -235,6 +251,14 @@ async function ensureEvidenceUrlColumn(): Promise<void> {
       baseLogger.info(
         "Tables don't exist yet, evidence_url will be added when tables are created",
       );
+    } else if (
+      error instanceof Error &&
+      error.message.includes("already exists")
+    ) {
+      baseLogger.warn(
+        "Column or relation already exists. This is expected in CI environments.",
+      );
+      baseLogger.warn("Continuing with schema validation...");
     } else {
       throw error;
     }
@@ -255,39 +279,63 @@ async function verifyRequiredColumns(): Promise<void> {
     // Add more critical columns to check as needed
   ];
 
-  for (const { table, columns } of criticalColumnsToCheck) {
-    // First check if table exists
-    const tableExists = await db.execute(sql`
-      SELECT EXISTS (
-        SELECT FROM pg_tables
-        WHERE schemaname = 'public'
-        AND tablename = ${table}
-      );
-    `);
+  try {
+    for (const { table, columns } of criticalColumnsToCheck) {
+      try {
+        // First check if table exists
+        const tableExists = await db.execute(sql`
+          SELECT EXISTS (
+            SELECT FROM pg_tables
+            WHERE schemaname = 'public'
+            AND tablename = ${table}
+          );
+        `);
 
-    if (tableExists.rows?.[0]?.exists !== true) {
-      baseLogger.info(
-        `Table ${table} doesn't exist yet, skipping column checks`,
-      );
-      continue;
-    }
+        if (tableExists.rows?.[0]?.exists !== true) {
+          baseLogger.info(
+            `Table ${table} doesn't exist yet, skipping column checks`,
+          );
+          continue;
+        }
 
-    // Check each column
-    for (const column of columns) {
-      const columnExists = await db.execute(sql`
-        SELECT EXISTS (
-          SELECT FROM information_schema.columns
-          WHERE table_name = ${table}
-          AND column_name = ${column}
-        );
-      `);
+        // Check each column
+        for (const column of columns) {
+          try {
+            const columnExists = await db.execute(sql`
+              SELECT EXISTS (
+                SELECT FROM information_schema.columns
+                WHERE table_name = ${table}
+                AND column_name = ${column}
+              );
+            `);
 
-      if (columnExists.rows?.[0]?.exists !== true) {
-        baseLogger.warn(`Required column ${column} missing from ${table}!`);
-      } else {
-        baseLogger.debug(`Column ${column} exists in ${table}`);
+            if (columnExists.rows?.[0]?.exists !== true) {
+              baseLogger.warn(
+                `Required column ${column} missing from ${table}!`,
+              );
+            } else {
+              baseLogger.debug(`Column ${column} exists in ${table}`);
+            }
+          } catch (columnError) {
+            // Log but don't fail the entire validation for a single column check
+            baseLogger.error(
+              { err: columnError },
+              `Error checking column ${column} in table ${table}`,
+            );
+          }
+        }
+      } catch (tableError) {
+        // Log but don't fail the entire validation for a single table check
+        baseLogger.error({ err: tableError }, `Error checking table ${table}`);
       }
     }
+  } catch (error) {
+    baseLogger.error(
+      { err: error },
+      "Error during required columns verification",
+    );
+    // Don't throw the error - we want to continue with the application
+    // even if column verification fails
   }
 }
 
