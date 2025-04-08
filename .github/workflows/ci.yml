@@ -146,9 +146,10 @@ jobs:
           DB_HOST: localhost
           DB_PORT: 5432
         run: |
-          bun run test:unit
-          bun run test:integration
-          bun run test:e2e
+          # Run tests directly without Docker Compose
+          node scripts/run-tests.js unit
+          node scripts/run-tests.js integration
+          node scripts/run-tests.js e2e
 
   build:
     needs: [test]
