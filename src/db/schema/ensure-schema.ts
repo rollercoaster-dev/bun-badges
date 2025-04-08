@@ -55,6 +55,17 @@ export async function ensureSchemaComplete(closePool = true): Promise<void> {
         baseLogger.info(
           "      For CI, the database setup is handled automatically",
         );
+      } else if (error.message.includes("client password must be a string")) {
+        baseLogger.error(
+          { err: error },
+          "Database authentication error: Password must be a string. Check your environment variables.",
+        );
+        baseLogger.info(
+          "Hint: Ensure DB_PASSWORD or POSTGRES_PASSWORD is properly set as a string value",
+        );
+        baseLogger.info(
+          "      For CI, check that secrets are properly configured in your workflow",
+        );
       } else {
         baseLogger.error({ err: error }, "Schema validation failed:");
       }
@@ -90,9 +101,17 @@ async function checkDatabaseExists(): Promise<void> {
     throw new Error("Could not extract database name from DATABASE_URL");
   }
 
+  // Calculate the connection string targeting the 'postgres' database
+  const connectionStringToPostgres = DATABASE_URL?.replace(dbName, "postgres");
+
+  // Log the connection string being used for diagnostics (ensure this runs!)
+  baseLogger.info(
+    `[DIAGNOSTIC] Attempting connection to postgres DB with connection string: ${connectionStringToPostgres?.replace(/:[^:]*@/, ":***@")}`,
+  );
+
   // Connect to 'postgres' database to check if our target database exists
   const pgPool = new Pool({
-    connectionString: DATABASE_URL?.replace(dbName, "postgres"),
+    connectionString: connectionStringToPostgres, // Use the calculated string
   });
 
   try {

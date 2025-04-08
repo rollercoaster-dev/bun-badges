@@ -17,15 +17,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: 'latest'
-          
+
       - name: Install dependencies
         run: bun install
-        
+
       - name: Run linter
         run: bun run lint
 
@@ -35,22 +35,22 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: 'latest'
-          
+
       - name: Install dependencies
         run: bun install
-        
+
       - name: Type check
         run: bun run tsc
 
   test:
     needs: [typecheck]
     runs-on: ubuntu-latest
-    
+
     # Define environment variables for the test job centrally
     env:
       CI: true
@@ -83,49 +83,61 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: 'latest'
-          
+
       - name: Install dependencies
         run: bun install
 
       - name: Initialize test database
         env:
           DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
+          # Explicitly set these variables to ensure they're strings
+          DB_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          DB_USER: ${{ env.POSTGRES_USER }}
+          DB_NAME: ${{ env.POSTGRES_DB }}
+          DB_HOST: localhost
+          DB_PORT: 5432
         run: |
           # REMOVED DIAGNOSTIC STEPS:
           # # Add a small delay to ensure the DB service is fully ready
           # echo "Waiting 5 seconds for DB service..."
-          # sleep 5 
-          # 
+          # sleep 5
+          #
           # # Log the connection string (mask password) and test with psql
           # echo "Attempting to connect to URL: postgres://${{ env.POSTGRES_USER }}:***@localhost:5432/${{ env.POSTGRES_DB }}"
           # echo "Testing connection with psql..."
           # PGPASSWORD=${{ env.POSTGRES_PASSWORD }} psql -h localhost -U ${{ env.POSTGRES_USER }} -d ${{ env.POSTGRES_DB }} -c "\conninfo" || echo "psql connection command failed."
           # echo "Finished psql test."
-          
+
           # First, setup basic database structure with CI setup script
           # (which now checks if tables exist before creating them)
           echo "Setting up base database structure..."
           bun run src/utils/test/ci-database-setup.ts
-          
+
           # Then run our comprehensive schema validation utility
           # This handles all migrations and ensures critical columns exist
           echo "Running schema validation and migrations..."
           bun run src/db/schema/ensure-schema.ts
-        
+
       - name: Run tests (unit, integration, e2e)
         # Define DATABASE_URL specifically for this step as well
         env:
           # Connect to the host-mapped port (localhost)
           DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
+          # Explicitly set these variables to ensure they're strings
+          DB_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          DB_USER: ${{ env.POSTGRES_USER }}
+          DB_NAME: ${{ env.POSTGRES_DB }}
+          DB_HOST: localhost
+          DB_PORT: 5432
         run: |
           bun run test:unit
           bun run test:integration
@@ -139,18 +151,18 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: 'latest'
-          
+
       - name: Install dependencies
         run: bun install
-        
+
       - name: Build
         run: bun run build
-        
+
       - name: Verify build output
         run: |
           # Check if dist/index.js exists
@@ -158,4 +170,4 @@ jobs:
             echo "Error: dist/index.js not found. Build failed."
             exit 1
           fi
-          echo "✅ Build verification successful" 
+          echo "✅ Build verification successful"

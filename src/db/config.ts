@@ -17,6 +17,9 @@ if (!DATABASE_URL) {
 // Create a PostgreSQL connection pool
 export const dbPool = new Pool({
   connectionString: DATABASE_URL,
+  // Ensure password is always a string (fixes SCRAM authentication issues)
+  password:
+    process.env.DB_PASSWORD || process.env.POSTGRES_PASSWORD || "postgres",
   // Consider adding pool configuration options here (e.g., max connections, connectionTimeoutMillis)
 });
 

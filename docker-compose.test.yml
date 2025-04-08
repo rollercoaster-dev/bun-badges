@@ -33,15 +33,21 @@ services:
       - NODE_ENV=${NODE_ENV:-test}
       - E2E_TEST=${E2E_TEST:-false}
       - INTEGRATION_TEST=${INTEGRATION_TEST:-false}
-      - TEST_MODE=${TEST_MODE} # Keep if used, though it warned
-      - TEST_RUN_ID=${TEST_RUN_ID} # Keep if used, though it warned
-      # Removed redundant variables - App should use .env.test inside container
-      # - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db_test:5432/${POSTGRES_DB}
-      # - JWT_SECRET=${JWT_SECRET}
-      # - JWT_EXPIRY=${JWT_EXPIRY}
-      # - LOG_LEVEL=${LOG_LEVEL}
-      # - PORT=${PORT}
-      # - HOST=${HOST}
+      - TEST_MODE=${TEST_MODE:-false}
+      - TEST_RUN_ID=${TEST_RUN_ID:-test-run}
+      # Database connection variables
+      - DATABASE_URL=postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db_test:5432/${POSTGRES_DB:-bun_badges_test}
+      - DB_HOST=db_test
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER:-postgres}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - DB_NAME=${POSTGRES_DB:-bun_badges_test}
+      # Other configuration
+      - JWT_SECRET=${JWT_SECRET:-test-secret-key}
+      - JWT_EXPIRY=${JWT_EXPIRY:-15m}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - PORT=${PORT:-3000}
+      - HOST=${HOST:-0.0.0.0}
     depends_on:
       db_test:
         condition: service_healthy
