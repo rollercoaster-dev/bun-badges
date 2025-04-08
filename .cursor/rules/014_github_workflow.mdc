@@ -1,0 +1,80 @@
+---
+description: gh cli use
+globs: 
+alwaysApply: false
+---
+ # GitHub Workflow Guidelines
+
+## Core Principles
+
+- **CLI-First Approach:** Use GitHub CLI (`gh`) for repository operations when possible rather than the web interface.
+- **Temporary Files for Content:** Create temporary Markdown files for PR descriptions, comments, and other long-form content rather than embedding text directly in commands.
+- **Documentation in Version Control:** Keep all important PR information and discussions properly documented in the GitHub repository.
+
+## GitHub CLI Usage
+
+### Installation and Authentication
+```bash
+# Installation (if not installed)
+brew install gh
+
+# Authentication
+gh auth login
+```
+
+### Pull Request Workflow
+
+1. **Creating Pull Requests**
+   ```bash
+   # Simple PR creation
+   gh pr create --title "PR Title" --body "PR Description"
+   
+   # Better approach: Use a temporary file for the description
+   echo "# PR Description\n\nDetailed explanation here..." > pr-description.md
+   gh pr create --title "PR Title" --body-file pr-description.md
+   rm pr-description.md  # Clean up after PR creation
+   ```
+
+2. **Viewing and Checking Status**
+   ```bash
+   # List PRs
+   gh pr list
+   
+   # View specific PR
+   gh pr view [PR-NUMBER]
+   
+   # Check status of current branch's PR
+   gh pr status
+   ```
+
+3. **Reviewing and Commenting**
+   ```bash
+   # Create a temporary file for your review
+   echo "Great work! Here are some suggestions..." > review.md
+   
+   # Submit review
+   gh pr review [PR-NUMBER] --body-file review.md
+   rm review.md  # Clean up
+   ```
+
+4. **Merging and Closing**
+   ```bash
+   # Merge current PR
+   gh pr merge
+   
+   # Merge with specific options
+   gh pr merge --squash --delete-branch
+   ```
+
+## Template Files
+
+- Store common PR templates in `.github/PULL_REQUEST_TEMPLATE.md`
+- For complex descriptions that need formatting, always use temporary Markdown files to ensure proper rendering.
+
+## Benefits
+
+- Avoids command line length limitations for descriptions
+- Enables proper Markdown formatting with headings, lists, code blocks
+- Allows for complex content editing in your preferred editor before submission
+- Keeps PR history clean and well-documented
+- Provides consistent formatting across team members

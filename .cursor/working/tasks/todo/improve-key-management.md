@@ -41,21 +41,30 @@
   - [x] Step 2: Modified `KeyManagementService.decryptPrivateKey` to correctly parse the salt, IV, tag, and ciphertext from the base64 string, derive the key using the extracted salt, and decrypt the data. Fixed several bugs in this implementation, including incorrect subarray offsets and improper buffer handling.
   - [x] Step 3: Updated unit tests by unskipping the encryption/decryption tests that were previously disabled. These tests now pass with the updated implementation.
   - [x] Step 4: Integration tests were run and confirmed to be working with the new implementation. No changes were needed to the integration tests themselves, as they were already designed to work with the updated format.
-  - [ ] Step 5: No migration utility appears to be needed at this time, as the key management implementation was likely not actively used in production data yet.
+  - [x] Step 5: No migration utility was needed, as the key management implementation was likely not actively used in production data yet. Added documentation in code comments to explain the key storage format for future developers.
 - **Context Resume Point:**
-  Last working on: Completing Steps 1-4 of the task.
-  Next planned action: Complete a PR with the fixes to `decryptPrivateKey`.
+  Last working on: Completed all steps and committed changes.
+  Next planned action: Create a PR for review.
   Current blockers: None.
 
 ## 6. Next Actions & Blockers
 - **Immediate Next Actions:**
-  - [ ] Create a PR with the changes to `decryptPrivateKey` and the unskipped unit tests.
-  - [ ] Document the key storage format in a comment or README to ensure future developers understand the implementation.
+  - [x] Create a commit with the changes to `decryptPrivateKey` and the unskipped unit tests.
+  - [x] Document the key storage format in a comment to ensure future developers understand the implementation.
+  - [x] Create a PR to merge the branch `fix/key-management-salt` to the main branch. PR #45: https://github.com/rollercoaster-dev/bun-badges/pull/45
 - **Current Blockers:**
   - None
 
 ## 7. User Experience & Reflection
 - **Friction Points:**
+  - Initially misunderstood how tests were structured in the codebase, trying to run integration tests directly instead of using the containerized test environment.
 - **Flow Moments:**
+  - Successfully identified and fixed the issue in the decryption function.
+  - All tests passing after fixes.
 - **Observations:**
-- **Celebration Notes:** 🎉 Successfully initiated task using the new framework! 
+  - The implementation was already using unique salts for encryption, but the decryption function had bugs preventing it from correctly handling this format.
+  - The test infrastructure is well-designed with proper separation between development and test environments.
+- **Celebration Notes:** 🎉 
+  - Successfully fixed the critical bug in the private key decryption logic.
+  - Added thorough documentation on the key storage format.
+  - Created a new testing setup rule file (`013_testing_setup.mdc`) to document how tests should be run. 
