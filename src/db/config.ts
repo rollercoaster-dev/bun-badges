@@ -14,12 +14,23 @@ if (!DATABASE_URL) {
   throw new Error("DATABASE_URL environment variable is required.");
 }
 
-// Create a PostgreSQL connection pool
+// Extract credentials from environment variables or DATABASE_URL
+const dbUser = process.env.DB_USER || process.env.POSTGRES_USER || "postgres";
+const dbPassword =
+  process.env.DB_PASSWORD || process.env.POSTGRES_PASSWORD || "postgres";
+const dbHost = process.env.DB_HOST || "localhost";
+const dbPort = process.env.DB_PORT || "5432";
+const dbName =
+  process.env.DB_NAME || process.env.POSTGRES_DB || "bun_badges_test";
+
+// Create a PostgreSQL connection pool with explicit credentials
 export const dbPool = new Pool({
   connectionString: DATABASE_URL,
-  // Ensure password is always a string (fixes SCRAM authentication issues)
-  password:
-    process.env.DB_PASSWORD || process.env.POSTGRES_PASSWORD || "postgres",
+  user: dbUser,
+  password: dbPassword,
+  host: dbHost,
+  port: parseInt(dbPort),
+  database: dbName,
   // Consider adding pool configuration options here (e.g., max connections, connectionTimeoutMillis)
 });
 

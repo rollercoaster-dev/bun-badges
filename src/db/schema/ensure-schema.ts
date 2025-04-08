@@ -101,17 +101,29 @@ async function checkDatabaseExists(): Promise<void> {
     throw new Error("Could not extract database name from DATABASE_URL");
   }
 
-  // Calculate the connection string targeting the 'postgres' database
-  const connectionStringToPostgres = DATABASE_URL?.replace(dbName, "postgres");
+  // Get explicit credentials from environment variables or extract from DATABASE_URL
+  const dbUser = process.env.DB_USER || process.env.POSTGRES_USER || "postgres";
+  const dbPassword =
+    process.env.DB_PASSWORD || process.env.POSTGRES_PASSWORD || "postgres";
+  const dbHost = process.env.DB_HOST || "localhost";
+  const dbPort = process.env.DB_PORT || "5432";
+
+  // Construct a proper connection string targeting the 'postgres' database
+  const connectionStringToPostgres = `postgres://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/postgres`;
 
   // Log the connection string being used for diagnostics (ensure this runs!)
   baseLogger.info(
-    `[DIAGNOSTIC] Attempting connection to postgres DB with connection string: ${connectionStringToPostgres?.replace(/:[^:]*@/, ":***@")}`,
+    `[DIAGNOSTIC] Attempting connection to postgres DB with connection string: postgres://${dbUser}:***@${dbHost}:${dbPort}/postgres`,
   );
 
   // Connect to 'postgres' database to check if our target database exists
   const pgPool = new Pool({
-    connectionString: connectionStringToPostgres, // Use the calculated string
+    connectionString: connectionStringToPostgres,
+    user: dbUser,
+    password: dbPassword,
+    host: dbHost,
+    port: parseInt(dbPort),
+    database: "postgres",
   });
 
   try {
