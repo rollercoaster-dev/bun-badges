@@ -63,6 +63,9 @@ jobs:
       # DATABASE_URL will be defined in steps that need it
       # Use GitHub Secret for JWT
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      # Add secrets for key management and refresh tokens
+      MASTER_ENCRYPTION_KEY: ${{ secrets.MASTER_ENCRYPTION_KEY }}
+      REFRESH_TOKEN_SECRET: ${{ secrets.REFRESH_TOKEN_SECRET }}
       LOG_LEVEL: info # Or perhaps debug for CI?
 
     # Add PostgreSQL service container
@@ -96,7 +99,8 @@ jobs:
       - name: Initialize test database
         # Define DATABASE_URL specifically for this step
         env:
-          DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
+          # Use the service name 'postgres' as the host, not localhost
+          DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@postgres:5432/${{ env.POSTGRES_DB }}
         run: |
           # First, setup basic database structure with CI setup script
           # (which now checks if tables exist before creating them)
@@ -111,7 +115,8 @@ jobs:
       - name: Run tests (unit, integration, e2e)
         # Define DATABASE_URL specifically for this step as well
         env:
-          DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
+          # Use the service name 'postgres' as the host, not localhost
+          DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@postgres:5432/${{ env.POSTGRES_DB }}
         run: |
           bun run test:unit
           bun run test:integration

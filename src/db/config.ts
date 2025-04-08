@@ -17,7 +17,14 @@ if (!DATABASE_URL) {
 // Create a PostgreSQL connection pool
 export const dbPool = new Pool({
   connectionString: DATABASE_URL,
-  // Consider adding pool configuration options here (e.g., max connections)
+  // Consider adding pool configuration options here (e.g., max connections, connectionTimeoutMillis)
+});
+
+// Add listener for pool errors
+dbPool.on("error", (err, _client) => {
+  logger.error("Unexpected error on idle client", err);
+  // Depending on the severity, you might want to implement more robust handling
+  // like attempting to reconnect or shutting down gracefully.
 });
 
 // Create a Drizzle instance with the pool and schema

@@ -1,1 +1,55 @@
-# Environment Variable Strategy\n\nThis document outlines the strategy for managing environment variables in the bun-badges project.\nThe goal is to ensure consistency, security, and clarity across different deployment and development environments.\n\n## Core Principles\n\n1.  **Explicit Configuration:** Rely on environment variables being explicitly set for the target environment. Avoid hardcoded fallback values in the code or Docker Compose files.\n2.  **Environment-Specific Files:** Use dedicated `.env` files for specific environments (`.env.development`, `.env.test`) to manage differing configurations.\n3.  **Single Source of Truth:** For any given environment, the configuration should ideally come from a single, clear source (e.g., `.env.development` for local dev, GitHub Actions `env:` block for CI).\n4.  **Security:** Never commit sensitive credentials (`.env` files should be in `.gitignore`). Use secrets management tools for production and CI environments.\n\n## File Usage\n\n-   **`.env`:** (Optional) Can be used for shared, non-sensitive variables or as a base for local development if `.env.development` is not present. It is loaded as a fallback if no environment-specific file is loaded.\n-   **`.env.development`:** Contains variables specific to local development (`NODE_ENV=development`). This file is loaded automatically by the application (`src/index.ts`) when `NODE_ENV` is set to `development`.\n-   **`.env.test`:** Contains variables specific to the testing environment (`NODE_ENV=test`). This is loaded automatically by the application (`src/index.ts`) and test setup files (`tests/setup.ts`) when `NODE_ENV` is set to `test`.\n-   **`.env.example`:** Serves as a template, listing all required environment variables with example (non-sensitive) values. Keep this file up-to-date.\n\n## Loading Precedence\n\n1.  **System Environment Variables:** Variables set directly in the shell or by the hosting environment/CI runner typically override any values defined in `.env` files.\n2.  **Environment-Specific Files (`.env.development`, `.env.test`):** These files are loaded based on `NODE_ENV` and use `override: true` in the `dotenv` configuration, meaning they take precedence over variables defined in the base `.env` file.\n3.  **Base `.env` File:** Loaded as a fallback if no environment-specific file is loaded.\n\n## Docker Configuration\n\n-   All `docker-compose.*.yml` files have been standardized to *not* include hardcoded default values (e.g., `\${VAR:-default}`).\n-   They rely entirely on variables being present in the environment where `docker-compose` is run (which `dotenv` helps populate locally).\n-   A consistent network name (`bun-badges-network`) is used across all Docker Compose files.\n\n## CI Environment (GitHub Actions)\n\n-   The CI environment does *not* rely on loading an `.env.ci` file.\n-   Required environment variables (`NODE_ENV`, `DATABASE_URL`, `POSTGRES_USER`, etc.) are defined directly within the `.github/workflows/ci.yml` file using the `env:` block.\n-   Sensitive values (`POSTGRES_PASSWORD`, `JWT_SECRET`) are injected using GitHub Actions Secrets.\n\n## Key Variables\n\n-   `NODE_ENV`: Determines the environment (`development`, `test`, `production`). Critical for loading the correct `.env` file and conditional logic (e.g., enabling Swagger UI).\n-   `PORT`: The port the application server should listen on.\n-   `DATABASE_URL`: The full connection string for the PostgreSQL database.\n-   `JWT_SECRET`: The secret key used for signing and verifying JWTs.\n-   `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `DB_PORT`: Used by Docker Compose to configure the PostgreSQL container service.\n-   `PGADMIN_DEFAULT_EMAIL`, `PGADMIN_DEFAULT_PASSWORD`, `PGADMIN_PORT`: Used by Docker Compose to configure the pgAdmin service.\n\n*Note: Ensure `.env.example` is kept current with all necessary variables.* 
+# Environment Variable Management
+
+This document outlines the strategy for managing environment variables in the `bun-badges` project.
+
+## Core Principles
+
+1.  **Single Source of Truth:** Environment variables required by the application at runtime should primarily be defined via a `DATABASE_URL` string or other specific variables set in the deployment environment (e.g., Docker, systemd, hosting provider UI).
+2.  **Development Convenience:** `.env.*` files are used *exclusively* for local development and running scripts (`npm run ...`). They are *not* the primary source for the running application container.
+3.  **Clear Separation:** Distinguish between build-time/script variables and runtime application variables.
+4.  **Security:** Never commit `.env` or `.env.*` files containing secrets to version control. Use `.env.example` to document required variables.
+5.  **Consistency:** Use a consistent naming convention (e.g., `UPPER_SNAKE_CASE`).
+
+## Environment-Specific Files (`.env.*`)
+
+These files are used for local development and scripts via `dotenv-cli`.
+
+-   `.env`: Base file, potentially for shared non-secret variables (committed if no secrets). Typically holds `NODE_ENV=development`.
+-   `.env.development`: Variables specific to local development (e.g., database connection details for the dev database). **Do not commit.**
+-   `.env.test`: Variables specific to running local tests (e.g., database connection details for the test database). **Do not commit.**
+-   `.env.example`: Template file documenting all *required* environment variables for the application and scripts. Includes placeholder values and descriptions. **Commit this file.**
+
+## Application Configuration (`src/db/config.ts`, etc.)
+
+-   The application code (e.g., `src/db/config.ts`) reads variables directly from `process.env`.
+-   It expects critical variables like `DATABASE_URL` to be present in the runtime environment.
+-   It should provide clear error messages or fail gracefully if required variables are missing at startup.
+
+## Docker Configuration (`docker-compose.*.yml`)
+
+-   Compose files define the services and their environments.
+-   They can set environment variables directly using the `environment:` block.
+-   For development (`docker-compose.dev.yml`), the `env_file:` directive *can* be used to load variables from `.env.development` into the *container's* environment, making them available to `process.env`.
+-   Avoid defining the *same* variable in both `environment:` and an `env_file:` to prevent confusion. Prefer setting runtime variables directly in the container's environment where possible (either via `environment:` or the mechanism that loads `.env.*` files).
+
+## Scripts (`package.json`)
+
+-   Scripts requiring specific environment variables (e.g., database migrations) use `dotenv-cli` to load the appropriate `.env.*` file before execution.
+    ```json
+    "scripts": {
+      "db:migrate:dev": "dotenv -e .env.development -- bun run src/db/migrate.ts",
+      "test": "dotenv -e .env.test -- bun test"
+    }
+    ```
+
+## Checklist for Adding a New Environment Variable
+
+1.  **Necessity:** Is this configuration truly needed as an environment variable, or can it be application code configuration?
+2.  **Scope:** Is it for runtime, development scripts, testing, or build time?
+3.  **Naming:** Choose a clear `UPPER_SNAKE_CASE` name.
+4.  **Documentation:** Add the variable to `.env.example` with a description and placeholder value.
+5.  **Development:** Add the variable to relevant `.env.*` files (e.g., `.env.development`) with the appropriate development value.
+6.  **Application Code:** If needed at runtime, update application code (e.g., config files) to read `process.env.YOUR_NEW_VARIABLE`. Add checks/defaults if necessary.
+7.  **Scripts:** If needed for scripts, update `package.json` commands if they don't already load the correct `.env.*` file.
+8.  **Deployment:** Update deployment configurations (Docker `environment:`, hosting provider settings, etc.) to include the new variable.
+9.  **Secrets:** Ensure secret values are *never* committed. Manage them securely in deployment environments. 
