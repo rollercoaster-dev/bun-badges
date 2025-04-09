@@ -20,26 +20,29 @@ Key design decisions:
 - Support for hierarchical roles with permission inheritance
 
 ### Current Status
-- [x] Created permission/role model
-- [x] Implemented role-based access control middleware
+- [x] Created permission/role model (in `src/models/auth/roles.ts`)
+- [x] Implemented role-based access control middleware (in `src/middleware/authorization.middleware.ts`)
 - [x] Integrated authorization with protected routes
-- [ ] Updated database schema to store user roles and permissions
-- [ ] Implemented database service methods for role and permission management
-- [ ] Added caching for frequently accessed permissions
-- [ ] Written tests for authorization middleware and service
+- [x] Updated database schema to store user roles and permissions
+- [x] Implemented database service methods for role and permission management
+- [x] Added caching for frequently accessed permissions
+- [x] Written tests for authorization middleware and service
 
 ### Implementation Plan
 1. Update database schema to store user roles and permissions
    - Create tables for roles, permissions, and user-role assignments
    - Add relationships between users, roles, and permissions
+   - Create a migration file for the new schema
 2. Implement database service methods for role and permission management
-   - Assign roles to users
-   - Check user permissions
-   - Manage roles and permissions
+   - Create an authorization service with methods to:
+     - Assign roles to users
+     - Check user permissions
+     - Manage roles and permissions
 3. Add caching for frequently accessed permissions
    - Implement cache invalidation on role/permission changes
    - Configure cache TTL for optimal performance
 4. Update authorization middleware to use database service
+   - Modify the existing middleware to fetch roles and permissions from the database
 5. Write tests for authorization middleware and service
 
 ### Learnings
@@ -47,18 +50,31 @@ Key design decisions:
 - Storing roles and permissions in the database allows for dynamic updates without code changes
 - Caching frequently accessed permissions improves performance
 - Proper error handling for unauthorized access is critical for security
+- Using a combination of role-based and permission-based checks provides fine-grained control
+- Database migrations with seed data ensure consistent setup across environments
+- Integration tests are essential for verifying authorization logic
 
 ### Next Steps
-- Update database schema to store user roles and permissions
-- Implement database service methods for role and permission management
-- Add caching for frequently accessed permissions
-- Update authorization middleware to use database service
+- Review and merge PR #47
+- Monitor performance of permission checks in production
+- Consider adding admin UI for role and permission management
+- Add more comprehensive tests for edge cases
+
+### Future Enhancements
+- Expand test coverage for error conditions and edge cases
+- Implement performance testing and optimization for the caching strategy
+- Develop an admin UI for managing roles and permissions
+- Add methods for bulk role/permission assignments for large-scale operations
+- Implement audit logging for role and permission changes
+- Consider hierarchical roles with permission inheritance
 
 ### Related Code Sections
+- `src/models/auth/roles.ts` - Role and permission definitions
+- `src/middleware/authorization.middleware.ts` - Authorization middleware (updated to use DB)
 - `src/db/schema/roles.schema.ts` - Database schema for roles and permissions
-- `src/services/authorization.service.ts` - Authorization service implementation
-- `src/middleware/auth.middleware.ts` - Authorization middleware
-- `src/routes/` - Protected routes using authorization
+- `src/db/migrations/0012_add_roles_permissions.ts` - Migration for roles and permissions
+- `src/services/authorization.service.ts` - Authorization service with DB integration
+- `tests/integration/services/authorization.service.integration.test.ts` - Integration tests
 
 ### Testing Strategy
 - Unit tests for authorization service methods
