@@ -39,6 +39,9 @@ export * from "./oauth";
 export * from "./badges";
 export * from "./issuers";
 export * from "./status";
+export * from "./keys.schema";
+export * from "./tokens.schema";
+export * from "./credentials.schema";
 
 // Import and re-export signing last to avoid circular dependencies
 import { signingKeys } from "./signing";

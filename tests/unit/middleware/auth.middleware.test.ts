@@ -1,6 +1,7 @@
 import { expect, test, describe, mock, beforeEach } from "bun:test";
 import { Context } from "hono";
 import { createAuthMiddleware, AuthContext } from "@middleware/auth.middleware";
+import { Role } from "@middleware/auth";
 import { MockDatabaseService } from "@utils/test/db-mock";
 import { mockVerifyToken } from "@utils/test/jwt-test-utils";
 
@@ -113,6 +114,7 @@ describe("Auth Middleware", () => {
       ctx.user = {
         username: "admin@example.com",
         tokenType: "access",
+        roles: [Role.ADMIN],
       };
 
       const next = mock(() => Promise.resolve());
@@ -142,6 +144,7 @@ describe("Auth Middleware", () => {
       ctx.user = {
         username: "regular@example.com",
         tokenType: "access",
+        roles: [Role.ISSUER_VIEWER],
       };
 
       const next = mock(() => Promise.resolve());

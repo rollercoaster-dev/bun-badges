@@ -12,19 +12,16 @@ if (nodeEnv === "development") {
     path: path.resolve(process.cwd(), ".env.development"),
     override: true,
   });
-  console.log("Loaded environment variables from .env.development");
 } else if (nodeEnv === "test") {
   dotenv.config({
     path: path.resolve(process.cwd(), ".env.test"),
     override: true,
   });
-  console.log("Loaded environment variables from .env.test");
 } else {
-  // In production or other environments, rely on system environment variables
-  // or potentially a base .env file loaded elsewhere if needed.
-  // We could optionally load the base .env here as a fallback:
-  dotenv.config(); // Load base .env if it exists
-  console.log("Attempted to load base .env file (if exists)");
+  // In production, load from .env file if it exists
+  // This should be used only as a fallback, as production should use
+  // environment variables set at the system/container level
+  dotenv.config();
 }
 // --- End environment loading ---
 
@@ -40,8 +37,14 @@ import { OAuthController } from "@controllers/oauth.controller";
 import { errorHandler } from "@middleware/error-handler";
 import { createAuthMiddleware } from "@middleware/auth.middleware";
 import { DatabaseService } from "@services/db.service";
+import { createProtectedRoutes } from "@routes/protected.routes";
+import { createKeyManagementRoutes } from "@routes/key-management.routes";
+import { createCredentialSigningRoutes } from "@routes/credential-signing.routes";
 import { createSwaggerUI } from "./swagger";
 import logger from "@utils/logger";
+
+// Log environment configuration
+logger.info(`Server starting in ${process.env.NODE_ENV || "production"} mode`);
 
 // Create the Hono app instance
 const app = new Hono();
@@ -62,8 +65,16 @@ app.use("*", errorHandler);
 // Add the auth middleware to protected routes
 app.use("/api/*", authMiddleware);
 
-// Create the OAuth router
-const oauthRouter = createOAuthRouter(oauthController);
+// Create the OAuth router with Open Badges 3.0 endpoints
+const oauthRouter = createOAuthRouter({
+  registerClient: (c) => oauthController.registerClient(c),
+  authorize: (c) => oauthController.authorize(c),
+  token: (c) => oauthController.token(c),
+  introspect: (c) => oauthController.introspect(c),
+  revoke: (c) => oauthController.revoke(c),
+  getServiceDescription: (c) => oauthController.getServiceDescription(c),
+  getJwks: (c) => oauthController.getJwks(c),
+});
 
 // Add routes
 app.route("/api/auth", auth);
@@ -74,6 +85,18 @@ app.route("/api/verify", verification);
 app.route("/status", status);
 app.route("/health", health);
 app.route("/oauth", oauthRouter);
+
+// Add protected routes with role-based access control
+const protectedRoutes = createProtectedRoutes(db);
+app.route("/protected", protectedRoutes);
+
+// Add key management routes
+const keyManagementRoutes = createKeyManagementRoutes(db);
+app.route("/keys", keyManagementRoutes);
+
+// Add credential signing routes
+const credentialSigningRoutes = createCredentialSigningRoutes(db);
+app.route("/credentials", credentialSigningRoutes);
 
 // Add Swagger UI in development
 if (process.env.NODE_ENV === "development") {
