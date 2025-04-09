@@ -14,27 +14,27 @@ import { DatabaseService } from "../services/db.service";
  * @returns Protected routes
  */
 export const createProtectedRoutes = (db: DatabaseService) => {
-  const protected = new Hono();
+  const protectedRoutes = new Hono();
 
   // Apply authentication middleware to all routes
-  protected.use("*", createAuthMiddleware(db));
+  protectedRoutes.use("*", createAuthMiddleware(db));
 
   // Role-based access control examples
 
   // Admin-only route
-  protected.get("/admin", requireRole(Role.ADMIN), (c) => {
+  protectedRoutes.get("/admin", requireRole(Role.ADMIN), (c) => {
     return c.json({ message: "Admin access granted", user: c.get("user") });
   });
 
   // Issuer-only route
-  protected.get("/issuer", requireRole(Role.ISSUER), (c) => {
+  protectedRoutes.get("/issuer", requireRole(Role.ISSUER), (c) => {
     return c.json({ message: "Issuer access granted", user: c.get("user") });
   });
 
   // Permission-based access control examples
 
   // Route requiring credential creation permission
-  protected.post(
+  protectedRoutes.post(
     "/credentials",
     requirePermission(Permission.CREATE_CREDENTIALS),
     (c) => {
@@ -46,30 +46,38 @@ export const createProtectedRoutes = (db: DatabaseService) => {
   );
 
   // Route requiring profile read permission
-  protected.get("/profile", requirePermission(Permission.READ_PROFILE), (c) => {
-    return c.json({
-      message: "Profile read access granted",
-      user: c.get("user"),
-    });
-  });
+  protectedRoutes.get(
+    "/profile",
+    requirePermission(Permission.READ_PROFILE),
+    (c) => {
+      return c.json({
+        message: "Profile read access granted",
+        user: c.get("user"),
+      });
+    },
+  );
 
   // Scope-based access control examples
 
   // Route requiring ob:credentials:read scope
-  protected.get("/credentials", requireScope("ob:credentials:read"), (c) => {
-    return c.json({
-      message: "Credential read access granted",
-      tokenPayload: c.get("tokenPayload"),
-    });
-  });
+  protectedRoutes.get(
+    "/credentials",
+    requireScope("ob:credentials:read"),
+    (c) => {
+      return c.json({
+        message: "Credential read access granted",
+        tokenPayload: c.get("tokenPayload"),
+      });
+    },
+  );
 
   // Route requiring ob:profile:write scope
-  protected.put("/profile", requireScope("ob:profile:write"), (c) => {
+  protectedRoutes.put("/profile", requireScope("ob:profile:write"), (c) => {
     return c.json({
       message: "Profile write access granted",
       tokenPayload: c.get("tokenPayload"),
     });
   });
 
-  return protected;
+  return protectedRoutes;
 };

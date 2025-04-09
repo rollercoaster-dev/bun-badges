@@ -126,7 +126,8 @@ export class OAuthService {
 
       // Create authorization code record
       // Store the authorization code
-      const _authorizationCode: AuthorizationCode = {
+
+      const authorizationCode: AuthorizationCode = {
         code,
         clientId,
         redirectUri,
@@ -188,7 +189,8 @@ export class OAuthService {
 
       // Create token record
       // Store the token
-      const _token: Token = {
+
+      const token: Token = {
         accessToken,
         refreshToken,
         clientId,

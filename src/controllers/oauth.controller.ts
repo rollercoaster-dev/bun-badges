@@ -107,7 +107,7 @@ export class OAuthController {
   private oauthJwtBridge: OAuthJWTBridge;
   private verificationService: VerificationService;
   private logger: PinoLogger;
-  private jwks: { keys: Array<Record<string, string>> };
+  private jwks: { keys: Array<Record<string, string>> } = { keys: [] };
 
   constructor(db: DatabaseService = new DatabaseService()) {
     this.db = db;

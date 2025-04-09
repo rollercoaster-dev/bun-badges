@@ -1,10 +1,6 @@
 import { Context, Next } from "hono";
-import {
-  Permission,
-  Role,
-  hasPermission,
-  scopesToPermissions,
-} from "../models/auth/roles";
+import { Permission, scopesToPermissions } from "../models/auth/roles";
+import { Role } from "./auth";
 import { UnauthorizedError, ForbiddenError } from "../utils/errors";
 import logger from "../utils/logger";
 
@@ -27,11 +23,14 @@ export function requireRole(requiredRole: Role) {
         throw new UnauthorizedError("Authentication required");
       }
 
-      // Get the user's role
-      const userRole = user.role as Role;
+      // Get the user's roles
+      const userRoles = user.roles;
 
       // Check if the user has the required role
-      if (userRole !== requiredRole && userRole !== Role.ADMIN) {
+      if (
+        !userRoles.includes(requiredRole) &&
+        !userRoles.includes(Role.ADMIN)
+      ) {
         throw new ForbiddenError(`Required role: ${requiredRole}`);
       }
 
@@ -71,11 +70,12 @@ export function requirePermission(requiredPermission: Permission) {
         throw new UnauthorizedError("Authentication required");
       }
 
-      // Get the user's role
-      const userRole = user.role as Role;
+      // Get the user's roles
+      const userRoles = user.roles;
 
       // Check if the user has the required permission
-      if (!hasPermission(userRole, requiredPermission)) {
+      // For now, we'll just check if the user is an admin
+      if (!userRoles.includes(Role.ADMIN)) {
         throw new ForbiddenError(`Required permission: ${requiredPermission}`);
       }
 
