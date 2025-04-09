@@ -5,6 +5,8 @@ import { JSONWebKeySet } from "jose";
 import logger from "@/utils/logger";
 import { type Logger as PinoLogger } from "pino";
 import type { IDatabaseService } from "@/interfaces/db.interface";
+import { VerificationResult } from "@/services/credential-verification.service";
+import { isOpenBadgeCredential } from "@/models/credential.model";
 
 const {
   verificationCodes,
@@ -17,6 +19,7 @@ const {
   consentRecords,
   oauthRefreshTokens,
   issuerProfiles,
+  credentials,
 } = schema;
 
 import type { NewRevokedToken } from "@/db/schema/auth";
@@ -686,6 +689,250 @@ export class DatabaseService implements IDatabaseService {
         "Failed to delete issuer profile by ID",
       );
       throw error; // Re-throw original error
+    }
+  }
+
+  // --- Credential Methods ---
+
+  /**
+   * Create a new credential
+   * @param data Credential data
+   * @returns Created credential
+   */
+  async createCredential(
+    data: Omit<InferInsertModel<typeof credentials>, "createdAt" | "issuedAt">,
+  ): Promise<typeof credentials.$inferSelect> {
+    try {
+      const [credential] = await db
+        .insert(credentials)
+        .values({
+          ...data,
+          createdAt: new Date(),
+          issuedAt: new Date(),
+        })
+        .returning();
+      return credential;
+    } catch (error) {
+      this.logger.error(error, "Failed to create credential:");
+      throw error;
+    }
+  }
+
+  /**
+   * Get a credential by ID
+   * @param credentialId Credential ID
+   * @returns Credential or undefined if not found
+   */
+  async getCredentialById(
+    credentialId: string,
+  ): Promise<typeof credentials.$inferSelect | undefined> {
+    try {
+      const [credential] = await db
+        .select()
+        .from(credentials)
+        .where(eq(credentials.id, credentialId))
+        .limit(1);
+      return credential;
+    } catch (error) {
+      this.logger.error(error, "Failed to get credential by ID:");
+      throw error;
+    }
+  }
+
+  /**
+   * Get credentials by issuer ID
+   * @param issuerId Issuer ID
+   * @returns Array of credentials
+   */
+  async getCredentialsByIssuerId(
+    issuerId: string,
+  ): Promise<(typeof credentials.$inferSelect)[]> {
+    try {
+      return await db
+        .select()
+        .from(credentials)
+        .where(eq(credentials.issuerId, issuerId));
+    } catch (error) {
+      this.logger.error(error, "Failed to get credentials by issuer ID:");
+      throw error;
+    }
+  }
+
+  /**
+   * Get credentials by recipient ID
+   * @param recipientId Recipient ID
+   * @returns Array of credentials
+   */
+  async getCredentialsByRecipientId(
+    recipientId: string,
+  ): Promise<(typeof credentials.$inferSelect)[]> {
+    try {
+      return await db
+        .select()
+        .from(credentials)
+        .where(eq(credentials.recipientId, recipientId));
+    } catch (error) {
+      this.logger.error(error, "Failed to get credentials by recipient ID:");
+      throw error;
+    }
+  }
+
+  /**
+   * Update credential status
+   * @param credentialId Credential ID
+   * @param status New status (active, revoked, suspended)
+   * @param reason Reason for status change
+   * @returns Whether the update was successful
+   */
+  async updateCredentialStatus(
+    credentialId: string,
+    status: string,
+    reason?: string,
+  ): Promise<boolean> {
+    try {
+      const updateData: Record<string, unknown> = {
+        status,
+        isActive: status === "active",
+      };
+
+      // Add revocation data if status is revoked
+      if (status === "revoked") {
+        updateData.revokedAt = new Date();
+        updateData.revocationReason = reason || "Revoked by issuer";
+      }
+
+      const result = await db
+        .update(credentials)
+        .set(updateData)
+        .where(eq(credentials.id, credentialId));
+
+      return result && typeof result.rowCount === "number"
+        ? result.rowCount > 0
+        : false;
+    } catch (error) {
+      this.logger.error(error, "Failed to update credential status:");
+      return false;
+    }
+  }
+
+  /**
+   * Revoke a credential
+   * @param credentialId Credential ID
+   * @param reason Reason for revocation
+   * @returns Whether the revocation was successful
+   */
+  async revokeCredential(
+    credentialId: string,
+    reason?: string,
+  ): Promise<boolean> {
+    return this.updateCredentialStatus(
+      credentialId,
+      "revoked",
+      reason || "Revoked by issuer",
+    );
+  }
+
+  /**
+   * Verify a credential
+   * @param credentialId Credential ID
+   * @returns Verification result
+   */
+  async verifyCredential(credentialId: string): Promise<VerificationResult> {
+    const result: VerificationResult = {
+      valid: false,
+      checks: {
+        structure: false,
+        revocation: false,
+      },
+      errors: [],
+    };
+
+    try {
+      // Get the credential from the database
+      const credential = await this.getCredentialById(credentialId);
+
+      if (!credential) {
+        result.errors.push("Credential not found in database");
+        return result;
+      }
+
+      // Add credential ID to details
+      result.details = {
+        credentialId: credential.id,
+        issuerId: credential.issuerId,
+      };
+
+      // Check credential status (active, revoked, suspended)
+      result.checks.revocation =
+        credential.status === "active" && credential.isActive;
+      if (!result.checks.revocation) {
+        result.errors.push(`Credential has been ${credential.status}`);
+      }
+
+      // Check for expiration
+      if (credential.expiresAt) {
+        const expirationDate = new Date(credential.expiresAt);
+        const now = new Date();
+        result.checks.expiration = expirationDate > now;
+        if (!result.checks.expiration) {
+          result.errors.push(
+            `Credential expired on ${expirationDate.toISOString()}`,
+          );
+        }
+      } else {
+        // No expiration date means it doesn't expire
+        result.checks.expiration = true;
+      }
+
+      // Parse the credential data
+      const credentialData = credential.data as Record<string, unknown>;
+
+      // Validate credential structure
+      result.checks.structure = isOpenBadgeCredential(credentialData);
+      if (!result.checks.structure) {
+        result.errors.push("Invalid credential structure");
+        return result;
+      }
+
+      // Determine if the credential is valid overall
+      result.valid = Object.values(result.checks).every(
+        (check) => check !== false,
+      );
+    } catch (error) {
+      this.logger.error(error, "Credential verification error:");
+      result.errors.push(
+        `Verification error: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+    }
+
+    return result;
+  }
+
+  /**
+   * Check if a credential is revoked
+   * @param credentialId Credential ID
+   * @returns Whether the credential is revoked
+   */
+  async isCredentialRevoked(credentialId: string): Promise<boolean> {
+    try {
+      const [credential] = await db
+        .select({
+          status: credentials.status,
+          isActive: credentials.isActive,
+        })
+        .from(credentials)
+        .where(eq(credentials.id, credentialId))
+        .limit(1);
+
+      if (!credential) {
+        return true; // Consider non-existent credentials as "revoked" for security
+      }
+
+      // Check if the credential is revoked or suspended
+      return credential.status !== "active" || !credential.isActive;
+    } catch (error) {
+      this.logger.error(error, "Error checking credential revocation status:");
+      return true; // Consider errors as "revoked" for security
     }
   }
 }

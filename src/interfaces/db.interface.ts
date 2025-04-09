@@ -1,8 +1,9 @@
 import type { NewRevokedToken } from "@/db/schema/auth";
 import { schema } from "@/db/config";
-import type { InferInsertModel } from "drizzle-orm";
+import type { InferInsertModel, InferSelectModel } from "drizzle-orm";
 import type { JSONWebKeySet } from "jose";
 import type { NewIssuer, Issuer } from "@/db/schema/issuers";
+import type { VerificationResult } from "@/services/credential-verification.service";
 // Omit db import for interface file - static props don't belong in instance interface
 
 // Define types used in DatabaseService public methods
@@ -63,6 +64,13 @@ type RefreshTokenData = {
   scope: string;
   expiresAt: Date;
 };
+
+// Credential types
+type Credential = InferSelectModel<typeof schema.credentials>;
+type NewCredential = Omit<
+  InferInsertModel<typeof schema.credentials>,
+  "createdAt" | "issuedAt"
+>;
 
 // Define the interface based on DatabaseService public members
 export interface IDatabaseService {
@@ -148,10 +156,24 @@ export interface IDatabaseService {
     clientId: string,
   ): Promise<void>;
 
-  // Issuer Profile Methods (NEW)
+  // Issuer Profile Methods
   createIssuerProfile(
     data: Omit<NewIssuer, "createdAt" | "updatedAt">,
   ): Promise<Issuer>;
   getIssuerProfileById(issuerId: string): Promise<Issuer | undefined>;
   deleteIssuerProfileById(issuerId: string): Promise<void>;
+
+  // Credential Methods
+  createCredential(data: NewCredential): Promise<Credential>;
+  getCredentialById(credentialId: string): Promise<Credential | undefined>;
+  getCredentialsByIssuerId(issuerId: string): Promise<Credential[]>;
+  getCredentialsByRecipientId(recipientId: string): Promise<Credential[]>;
+  updateCredentialStatus(
+    credentialId: string,
+    status: string,
+    reason?: string,
+  ): Promise<boolean>;
+  revokeCredential(credentialId: string, reason?: string): Promise<boolean>;
+  verifyCredential(credentialId: string): Promise<VerificationResult>;
+  isCredentialRevoked(credentialId: string): Promise<boolean>;
 }
