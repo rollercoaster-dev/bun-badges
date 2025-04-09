@@ -2,35 +2,45 @@
 
 ## Definition of Done (DoD) Checklist
 1.  **Authentication Strategy:**
-    *   [ ] Authentication middleware implemented (API Keys, JWT, or OAuth2).
+    *   [ ] OAuth 2.0 Authorization Code Grant flow implemented per Open Badges 3.0 spec.
+    *   [ ] Dynamic client registration support.
     *   [ ] Secure key/token generation and validation logic.
-    *   [ ] Token storage and retrieval mechanisms.
-    *   [ ] Authentication endpoints (if applicable).
+    *   [ ] Token storage, refresh, and revocation mechanisms.
+    *   [ ] Authentication endpoints with proper scopes.
 2.  **Authorization Middleware:**
     *   [ ] Role/permission-based access control implemented.
     *   [ ] Middleware to check permissions based on authenticated identity.
     *   [ ] Integration with routes requiring authorization.
 3.  **Secure Key Management:**
-    *   [ ] Secure loading of issuer private keys.
+    *   [ ] Secure loading of issuer private keys for credential signing.
+    *   [ ] Support for both JWT and Linked Data Signature formats.
     *   [ ] Protection against key exposure in logs or error messages.
-    *   [ ] Key rotation mechanisms (if applicable).
+    *   [ ] Key rotation mechanisms and versioning.
 4.  **Protected Routes:**
     *   [ ] Auth middleware applied to relevant routes.
     *   [ ] Proper error handling for unauthorized access.
     *   [ ] Test routes for authentication verification.
 5.  **Security Headers & Protections:**
-    *   [ ] CORS configuration.
-    *   [ ] Content Security Policy.
-    *   [ ] XSS protection.
-    *   [ ] CSRF protection (if applicable).
+    *   [ ] CORS configuration per Open Badges API requirements.
+    *   [ ] Content Security Policy implementation.
+    *   [ ] XSS protection mechanisms.
+    *   [ ] CSRF protection for relevant endpoints.
+    *   [ ] Implementation of CLR Standard API Security requirements.
 6.  **Input Validation & Sanitization:**
     *   [ ] Request validation using Zod schemas.
     *   [ ] Input sanitization to prevent injection attacks.
     *   [ ] Rate limiting or throttling mechanisms.
-7.  **Documentation Updates:**
+7.  **Credential Verification & Status:**
+    *   [ ] Credential signature verification implementation.
+    *   [ ] Recipient identifier validation.
+    *   [ ] Credential status checking and revocation support.
+    *   [ ] Support for verification of both JWT and Linked Data proofs.
+
+8.  **Documentation Updates:**
     *   [ ] Authentication process documented in README.
     *   [ ] Key management procedures documented.
     *   [ ] Security model updated with implementation details.
+    *   [ ] API security and OAuth 2.0 flow documentation.
 
 ---
 
@@ -59,27 +69,47 @@
 ---
 
 ## Required Improvements / Actionable Tasks
-1.  **Implement Role-Based Authorization:**
+1.  **Implement OAuth 2.0 Authorization Code Grant Flow:**
+    * Implement OAuth 2.0 endpoints according to Open Badges 3.0 spec
+    * Add dynamic client registration support
+    * Implement proper scope handling for different operations
+    * Add token refresh and revocation endpoints
+
+2.  **Implement Role-Based Authorization:**
     * Create a permission/role model in `src/models/auth/`
     * Implement role checking in the authorization middleware
     * Update database schema to store user roles and permissions
-2.  **Enhance Secure Key Management:**
+
+3.  **Enhance Secure Key Management:**
     * Implement a secure key loading mechanism for issuer private keys
-    * Add key rotation capabilities
+    * Support both JWT and Linked Data Signature formats
+    * Add key rotation capabilities and versioning
     * Ensure keys are protected in logs and error messages
-3.  **Improve JWT Security:**
+
+4.  **Improve JWT Security:**
     * Move JWT secret to a more secure storage mechanism
     * Implement proper secret rotation
     * Enhance token validation with additional checks
-4.  **Consolidate Token Revocation:**
-    * Migrate fully to database-backed token revocation
-    * Remove the in-memory implementation
-    * Add tests for token revocation scenarios
-5.  **Enhance Input Validation:**
+
+5.  **Implement Credential Verification:**
+    * Add support for verifying credential signatures
+    * Implement recipient identifier validation
+    * Add credential status checking and revocation support
+    * Support verification of both JWT and Linked Data proofs
+
+6.  **Enhance Security Headers:**
+    * Configure CORS according to Open Badges API requirements
+    * Implement Content Security Policy
+    * Add XSS and CSRF protections
+    * Implement CLR Standard API Security requirements
+
+7.  **Enhance Input Validation:**
     * Create comprehensive Zod schemas for all API endpoints
     * Implement middleware for request validation
     * Add sanitization for user inputs
-6.  **Improve Security Documentation:**
+
+8.  **Improve Security Documentation:**
+    * Document OAuth 2.0 flow and API security
     * Document authentication process in README
     * Create key management procedures documentation
     * Update security model with implementation details
@@ -89,40 +119,59 @@
 ## Proposed Implementation Plan (For Gaps)
 
 ### Feature Branch(es)
-*   `feat/authentication-strategy` (If needed)
-*   `feat/authorization-middleware` (If needed)
-*   `feat/secure-key-management` (If needed)
-*   `feat/security-headers` (If needed)
+*   `feat/oauth2-implementation` - Implement OAuth 2.0 Authorization Code Grant flow
+*   `feat/authorization-middleware` - Implement role-based authorization
+*   `feat/secure-key-management` - Implement secure key management for credential signing
+*   `feat/credential-verification` - Implement credential verification and status checking
+*   `feat/security-headers` - Implement security headers and protections
 
 ### Key Commit Points (per branch)
-*   **Branch: `feat/authentication-strategy`**
-    *   Commit 1: `feat(auth): implement authentication middleware`
-    *   Commit 2: `feat(auth): add token validation and storage`
-    *   Commit 3: `test(auth): add tests for authentication flow`
+*   **Branch: `feat/oauth2-implementation`**
+    *   Commit 1: `feat(auth): implement OAuth 2.0 authorization endpoints`
+    *   Commit 2: `feat(auth): add dynamic client registration`
+    *   Commit 3: `feat(auth): implement token refresh and revocation`
+    *   Commit 4: `test(auth): add tests for OAuth 2.0 flow`
+
 *   **Branch: `feat/authorization-middleware`**
     *   Commit 1: `feat(auth): implement role-based access control`
     *   Commit 2: `feat(auth): integrate authorization with protected routes`
-    *   Commit 3: `test(auth): add tests for authorization scenarios`
+    *   Commit 3: `feat(auth): implement scope validation`
+    *   Commit 4: `test(auth): add tests for authorization scenarios`
+
 *   **Branch: `feat/secure-key-management`**
     *   Commit 1: `feat(security): implement secure key loading mechanism`
-    *   Commit 2: `feat(security): add key rotation support`
-    *   Commit 3: `test(security): verify key protection measures`
+    *   Commit 2: `feat(security): add support for JWT and Linked Data Signatures`
+    *   Commit 3: `feat(security): add key rotation and versioning`
+    *   Commit 4: `test(security): verify key protection measures`
+
+*   **Branch: `feat/credential-verification`**
+    *   Commit 1: `feat(verify): implement credential signature verification`
+    *   Commit 2: `feat(verify): add recipient identifier validation`
+    *   Commit 3: `feat(verify): implement credential status checking`
+    *   Commit 4: `test(verify): add tests for credential verification`
+
 *   **Branch: `feat/security-headers`**
-    *   Commit 1: `feat(security): configure security headers`
-    *   Commit 2: `feat(security): implement rate limiting`
-    *   Commit 3: `test(security): verify header protections`
+    *   Commit 1: `feat(security): configure CORS and security headers`
+    *   Commit 2: `feat(security): implement CSP and XSS protections`
+    *   Commit 3: `feat(security): add rate limiting and CSRF protection`
+    *   Commit 4: `test(security): verify security header protections`
 
 ### Potential Pull Request(s)
-*   `feat: Implement authentication and authorization`
-*   `feat: Add secure key management`
+*   `feat: Implement OAuth 2.0 Authorization Code Grant flow`
+*   `feat: Add role-based authorization middleware`
+*   `feat: Implement secure key management for credential signing`
+*   `feat: Add credential verification and status checking`
 *   `feat: Configure security headers and protections`
 *   `docs: Update security documentation`
 
 ---
 
 ## Implementation Notes & Considerations
+*   **Open Badges Compliance:** Ensure implementation follows Open Badges 3.0 specification security requirements.
+*   **OAuth 2.0 Implementation:** Follow RFC 6749 and Open Badges 3.0 specific requirements for OAuth implementation.
 *   **Security Best Practices:** Follow OWASP guidelines for authentication and authorization.
 *   **Key Management:** Consider using a dedicated secrets manager for production environments.
+*   **Credential Verification:** Support both JWT and Linked Data Signature verification methods.
 *   **Testing Approach:** Include both positive and negative test cases for security features.
-*   **Compliance Requirements:** Ensure implementation meets any relevant compliance standards.
+*   **Compliance Requirements:** Ensure implementation meets CLR Standard API Security requirements.
 *   **Performance Impact:** Monitor the performance impact of added security measures.
