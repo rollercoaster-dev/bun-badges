@@ -1,0 +1,46 @@
+---
+description: 
+globs: *.test.ts
+alwaysApply: false
+---
+ # Testing Setup Guidelines
+
+## Core Principles
+
+- **Containerized Execution:** All tests (Unit, Integration, E2E) are designed to be run within Docker containers orchestrated by `docker-compose`.
+- **Dedicated Test Environment:** A specific Docker Compose file (`docker-compose.test.yml`) defines the services needed for testing (`db_test`, `redis_test`, `test_runner`). This is separate from the development environment (`docker-compose.dev.yml`).
+- **Script-Based Execution:** Use the predefined `bun run test:*` scripts in `package.json` to run tests. Do **not** run `bun test <path>` directly on the host machine for integration or E2E tests, as this will bypass the necessary container setup and likely cause connection errors.
+- **Automated Setup/Teardown:** The `test:*` scripts handle creating, migrating, running tests within, and tearing down the test environment for each run (`docker-compose run --rm ...`).
+
+## Key Scripts (`package.json`)
+
+- `bun run test`: Runs the full test suite (Unit, Integration, E2E) within the containerized environment, including DB migrations.
+- `bun run test:unit`: Runs only unit tests (`tests/unit/**/*.test.ts`) inside the container. Assumes no DB needed (doesn't run migrations).
+- `bun run test:integration`: Runs integration tests (`tests/integration/**/*.test.ts`) inside the container. **Crucially, runs DB migrations (`bun run src/db/migrate.ts`) first.**
+- `bun run test:e2e`: Runs end-to-end tests (`tests/e2e/index.ts`) inside the container. Also runs DB migrations first.
+- `bun run test:file <path/to/test>`: (Intended use) While the script exists, directly passing a file path might not work as expected. Prefer running specific test suites (`test:unit`, `test:integration`) or modifying the script if needed.
+
+## Workflow Breakdown (`test:integration` example)
+
+1.  `docker-compose -f docker-compose.test.yml down -v`: Stops and removes any previous test containers/volumes to ensure a clean slate.
+2.  `docker-compose -f docker-compose.test.yml run --entrypoint "" --build --rm -e NODE_ENV=test -e INTEGRATION_TEST=true test_runner sh -c '...'`:
+    *   Starts the services defined in `docker-compose.test.yml` (specifically `db_test`, `redis_test`, and the `test_runner` service).
+    *   `--build`: Ensures the `test_runner` image is up-to-date.
+    *   `--rm`: Removes the `test_runner` container after execution.
+    *   `-e NODE_ENV=test -e INTEGRATION_TEST=true`: Sets environment variables within the container.
+    *   `test_runner`: Specifies the service to run the command in.
+    *   `sh -c '...'`: Executes the following shell commands inside the `test_runner` container:
+        *   `bun install --prefer-offline`: Installs dependencies efficiently.
+        *   `bun run src/db/migrate.ts`: **Applies database migrations to `db_test`.**
+        *   `bun test tests/integration/**/*.test.ts`: Runs the actual test files using Bun's test runner.
+
+## Common Issues
+
+- **`ECONNREFUSED` Errors:** This typically happens when running `bun test <path>` directly on the host instead of using the `bun run test:*` scripts. The host cannot connect to the `db_test` service inside the isolated Docker test network. **Solution:** Always use the `package.json` scripts (`bun run test:integration`, etc.) to run tests requiring DB access.
+- **Migration Failures:** Ensure migrations in `src/db/migrations` are correct. Errors during the `bun run src/db/migrate.ts` step within the script will prevent tests from running.
+- **Port Conflicts:** If the ports defined in `docker-compose.test.yml` (e.g., for `db_test`) conflict with other running services (including the development stack from `docker-compose.dev.yml`), the test environment might fail to start. Ensure development and test environments use distinct ports if run concurrently, although the scripts typically manage teardown.
+
+## Development vs. Testing Databases
+
+- **Development:** Uses `docker-compose.dev.yml`, service name `db-1`. Typically accessed via a mapped port on the host (e.g., `localhost:5433` based on `start-dev.ts` logs). Managed by `bun run dev:docker`.
+- **Testing:** Uses `docker-compose.test.yml`, service name `db_test`. Typically accessed by the `test_runner` service via the Docker network hostname (`db_test:5432`). Managed automatically by the `bun run test:*` scripts. Data is ephemeral due to `down -v`.

@@ -16,10 +16,12 @@ const {
   oauthAccessTokens,
   consentRecords,
   oauthRefreshTokens,
+  issuerProfiles,
 } = schema;
 
 import type { NewRevokedToken } from "@/db/schema/auth";
 import type { InferInsertModel } from "drizzle-orm";
+import type { NewIssuer, Issuer } from "@/db/schema/issuers";
 
 // Define generateRandomString inline
 const generateRandomString = (length: number): string => {
@@ -75,6 +77,23 @@ export class DatabaseService implements IDatabaseService {
       .limit(1);
 
     return user;
+  }
+
+  async deleteUserById(userId: string): Promise<void> {
+    try {
+      this.logger.info({ userId }, "Deleting user...");
+      const result = await db.delete(users).where(eq(users.userId, userId));
+      if (result.rowCount === 0) {
+        this.logger.warn({ userId }, "Attempted to delete non-existent user.");
+        // Decide if throwing an error is appropriate, or just logging.
+        // For test cleanup, logging might be sufficient.
+      }
+      this.logger.info({ userId }, "User deleted successfully.");
+    } catch (error) {
+      this.logger.error({ userId, error }, "Failed to delete user:");
+      // Re-throw the error to signal failure
+      throw error;
+    }
   }
 
   // Verification Code Methods
@@ -586,6 +605,87 @@ export class DatabaseService implements IDatabaseService {
         "Failed to delete refresh token by user/client:",
       );
       throw new Error("Failed to delete refresh token by user/client");
+    }
+  }
+
+  // --- Issuer Profile Methods ---
+
+  async createIssuerProfile(
+    data: Omit<NewIssuer, "createdAt" | "updatedAt">,
+  ): Promise<Issuer> {
+    this.logger.info({ name: data.name }, "Creating issuer profile...");
+    try {
+      const [issuer] = await db
+        .insert(issuerProfiles)
+        .values({
+          ...data,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning();
+      this.logger.info(
+        { issuerId: issuer.issuerId },
+        "Issuer profile created successfully.",
+      );
+      return issuer;
+    } catch (error) {
+      this.logger.error(
+        { err: error, data },
+        "Failed to create issuer profile",
+      );
+      // Consider more specific error handling (e.g., unique constraint violation)
+      // Add type check for error message access
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to create issuer profile: ${message}`);
+    }
+  }
+
+  async getIssuerProfileById(issuerId: string): Promise<Issuer | undefined> {
+    this.logger.debug({ issuerId }, "Fetching issuer profile by ID...");
+    try {
+      const [issuer] = await db
+        .select()
+        .from(issuerProfiles)
+        .where(eq(issuerProfiles.issuerId, issuerId))
+        .limit(1);
+      this.logger.debug(
+        { issuerId, found: !!issuer },
+        "Issuer profile fetch result.",
+      );
+      return issuer;
+    } catch (error) {
+      this.logger.error(
+        { err: error, issuerId },
+        "Failed to fetch issuer profile by ID",
+      );
+      throw error; // Re-throw original error
+    }
+  }
+
+  async deleteIssuerProfileById(issuerId: string): Promise<void> {
+    this.logger.info({ issuerId }, "Deleting issuer profile by ID...");
+    try {
+      const result = await db
+        .delete(issuerProfiles)
+        .where(eq(issuerProfiles.issuerId, issuerId))
+        .returning({ id: issuerProfiles.issuerId });
+
+      if (result.length === 0) {
+        this.logger.warn(
+          { issuerId },
+          "Attempted to delete non-existent issuer profile.",
+        );
+        // Optionally throw an error or just return if deletion of non-existent is okay
+        // throw new NotFoundError("Issuer profile not found for deletion");
+      } else {
+        this.logger.info({ issuerId }, "Issuer profile deleted successfully.");
+      }
+    } catch (error) {
+      this.logger.error(
+        { err: error, issuerId },
+        "Failed to delete issuer profile by ID",
+      );
+      throw error; // Re-throw original error
     }
   }
 }

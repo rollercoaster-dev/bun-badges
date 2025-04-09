@@ -27,12 +27,13 @@ else
   export NODE_ENV=test
   
   # Load environment variables from .env.test if it exists
-  if [ -f ".env.test" ]; then
-    echo "📋 Loading test environment variables from .env.test"
-    export $(grep -v '^#' .env.test | xargs)
-  else
-    echo "⚠️ .env.test not found, using default environment variables"
-  fi
+  # Removed manual export - tests/setup.ts loads .env.test using dotenv library
+  # if [ -f ".env.test" ]; then
+  #   echo "📋 Loading test environment variables from .env.test"
+  #   export $(grep -v '^#' .env.test | xargs)
+  # else
+  #   echo "⚠️ .env.test not found, using default environment variables"
+  # fi
 fi
 
 echo "📊 Test Configuration:"

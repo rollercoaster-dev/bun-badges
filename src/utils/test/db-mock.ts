@@ -31,6 +31,50 @@ export class MockDatabaseService implements IDatabaseService {
     return users.get(email) || null;
   }
 
+  // Add missing Issuer Profile methods
+  async createIssuerProfile(data: any): Promise<any> {
+    console.log("Mock DB: Creating issuer profile", data);
+    // Simulate creation and return data, including an ID
+    const issuerId = data.issuerId ?? `mock-issuer-${Date.now()}`;
+    const createdData = {
+      ...data,
+      issuerId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    // Optionally store in an in-memory map if needed for getIssuerProfileById
+    // issuersMap.set(issuerId, createdData);
+    return createdData;
+  }
+
+  async getIssuerProfileById(issuerId: string): Promise<any | null> {
+    console.log("Mock DB: Getting issuer profile by ID", issuerId);
+    // Simulate finding an issuer - return a mock object or null
+    // Replace with logic to retrieve from an in-memory map if createIssuerProfile stores it
+    if (issuerId.startsWith("mock-issuer-")) {
+      return {
+        issuerId: issuerId,
+        name: "Mock Issuer Profile",
+        url: "https://mock.example.com",
+        email: "mock@example.com",
+        ownerUserId: "mock-owner-id",
+        issuerJson: { name: "Mock Issuer Profile" },
+        signingPublicKey: "mock-pub-key",
+        encryptedPrivateKey: "mock-enc-key",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+    }
+    return null;
+  }
+
+  async deleteIssuerProfileById(issuerId: string): Promise<void> {
+    console.log("Mock DB: Deleting issuer profile by ID", issuerId);
+    // Simulate deletion
+    // Optionally remove from an in-memory map if stored
+    // issuersMap.delete(issuerId);
+  }
+
   // Verification Code Methods
   async createVerificationCode(
     _data: Record<string, unknown>,

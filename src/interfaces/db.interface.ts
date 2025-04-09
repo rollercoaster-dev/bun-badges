@@ -2,6 +2,7 @@ import type { NewRevokedToken } from "@/db/schema/auth";
 import { schema } from "@/db/config";
 import type { InferInsertModel } from "drizzle-orm";
 import type { JSONWebKeySet } from "jose";
+import type { NewIssuer, Issuer } from "@/db/schema/issuers";
 // Omit db import for interface file - static props don't belong in instance interface
 
 // Define types used in DatabaseService public methods
@@ -146,4 +147,11 @@ export interface IDatabaseService {
     userId: string,
     clientId: string,
   ): Promise<void>;
+
+  // Issuer Profile Methods (NEW)
+  createIssuerProfile(
+    data: Omit<NewIssuer, "createdAt" | "updatedAt">,
+  ): Promise<Issuer>;
+  getIssuerProfileById(issuerId: string): Promise<Issuer | undefined>;
+  deleteIssuerProfileById(issuerId: string): Promise<void>;
 }

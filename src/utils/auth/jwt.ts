@@ -32,9 +32,16 @@ export interface JWTPayload {
 }
 
 // Secret key for JWT signing
-const SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "default-secret-change-me",
-);
+const jwtSecret = process.env.JWT_SECRET;
+
+if (!jwtSecret) {
+  const errorMsg = "JWT_SECRET environment variable is not set.";
+  // Log error appropriately if logger is available/imported here, otherwise just throw
+  // logger.error(errorMsg);
+  throw new Error(errorMsg);
+}
+
+const SECRET = new TextEncoder().encode(jwtSecret);
 
 // Token types and their expiration times (in seconds)
 const TOKEN_EXPIRATION = {

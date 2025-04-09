@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Test database service
   db_test:
@@ -12,129 +10,77 @@ services:
       POSTGRES_INITDB_ARGS: "--nosync"
       PGDATA: /var/lib/postgresql/data/pgdata
     command: postgres -c fsync=off -c synchronous_commit=off -c full_page_writes=off -c random_page_cost=1.0
-    ports:
-      # Use TEST_DB_PORT, default 5434 (to avoid conflict with default 5432)
-      - "${TEST_DB_PORT:-5434}:5432"
+    # ports: # Removed port mapping - connect via Docker network using service name
     volumes:
       - postgres_test_data:/var/lib/postgresql/data
-      - ./scripts/init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql
-      # Add schema files for initialization
-      - ./scripts/test-db:/docker-entrypoint-initdb.d/schema
+      # - ./scripts/init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql
+      # - ./scripts/test-db:/docker-entrypoint-initdb.d/schema
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"] # Use default user directly
       interval: 5s
       timeout: 5s
       retries: 5
     networks:
-      - test_network
+      - bun-badges-network
 
-  # Specific test service for CI workflows
-  test:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
-    environment:
-      - NODE_ENV=${NODE_ENV:-test}
-      - CI=${CI:-true}
-      - DATABASE_URL=postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db_test:5432/${POSTGRES_DB:-bun_badges_test}
-      - JWT_SECRET=${JWT_SECRET:-test-jwt-secret-for-ci-tests}
-      - LOG_LEVEL=${LOG_LEVEL:-error}
-      - TEST_MODE=${TEST_MODE:-true}
-      - TEST_RUN_ID=${TEST_RUN_ID:-ci-test-run}
-    depends_on:
-      db_test:
-        condition: service_healthy
-    volumes:
-      - .:/app
-      - node_modules:/app/node_modules
-      - ./test-results:/app/test-results
-    command: ["sh", "-c", "echo 'Running CI tests...' && bun install && bun run db:migrate && bun run test:all"]
-    networks:
-      - test_network
-
-  # Test runner service
+  # Test runner service (Consolidated)
   test_runner:
     build:
       context: .
       dockerfile: Dockerfile.dev
     environment:
+      # Keep variables potentially used by test scripts/runner logic
       - NODE_ENV=${NODE_ENV:-test}
-      - E2E_TEST=${E2E_TEST:-true}
-      - INTEGRATION_TEST=${INTEGRATION_TEST:-true}
+      - E2E_TEST=${E2E_TEST:-false}
+      - INTEGRATION_TEST=${INTEGRATION_TEST:-false}
+      - TEST_MODE=${TEST_MODE:-false}
+      - TEST_RUN_ID=${TEST_RUN_ID:-test-run}
+      # Database connection variables
       - DATABASE_URL=postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db_test:5432/${POSTGRES_DB:-bun_badges_test}
-      - JWT_SECRET=${JWT_SECRET:-test-jwt-secret-for-e2e-tests}
-      - AUTH_TOKEN_EXPIRY=${AUTH_TOKEN_EXPIRY:-1d}
-      - LOG_LEVEL=${LOG_LEVEL:-error}
-      - TEST_MODE=${TEST_MODE:-true}
+      - DB_HOST=db_test
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER:-postgres}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - DB_NAME=${POSTGRES_DB:-bun_badges_test}
+      # Other configuration
+      - JWT_SECRET=${JWT_SECRET:-test-secret-key}
+      - JWT_EXPIRY=${JWT_EXPIRY:-15m}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
       - PORT=${PORT:-3000}
       - HOST=${HOST:-0.0.0.0}
-      # Added for improved isolation between test runs
-      - TEST_RUN_ID=${TEST_RUN_ID:-test-run-1}
     depends_on:
       db_test:
         condition: service_healthy
     volumes:
       - .:/app
-      - node_modules:/app/node_modules
-      - ./test-results:/app/test-results
-    command: ["sh", "-c", "echo 'Waiting for database...' && sleep 2 && bun install && bun run db:migrate && bun test"]
+      - node_modules:/app/node_modules # Persist node_modules across runs
+      - ./test-results:/app/test-results # Mount test results volume
+    # Default command is essentially ignored when using `docker-compose run`
+    # with a specific command override, but set a simple default.
+    command: ["sh", "-c", "echo 'Test runner container ready. Use docker-compose run to execute tests.'"]
     networks:
-      - test_network
-
-  # E2E test runner service (separate from integration tests)
-  e2e_test_runner:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
-    environment:
-      - NODE_ENV=${NODE_ENV:-test}
-      - E2E_TEST=${E2E_TEST:-true}
-      - DATABASE_URL=postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db_test:5432/${POSTGRES_DB:-bun_badges_test}
-      - JWT_SECRET=${JWT_SECRET:-test-jwt-secret-for-e2e-tests}
-      - AUTH_TOKEN_EXPIRY=${AUTH_TOKEN_EXPIRY:-1d}
-      - LOG_LEVEL=${LOG_LEVEL:-error}
-      - TEST_MODE=${TEST_MODE:-true}
-      - PORT=${E2E_PORT:-3001} # Use E2E_PORT, default 3001
-      - HOST=${HOST:-0.0.0.0}
-      - TEST_RUN_ID=${TEST_RUN_ID:-e2e-run-1}
-    depends_on:
-      db_test:
-        condition: service_healthy
-    volumes:
-      - .:/app
-      - node_modules:/app/node_modules
-      - ./test-results:/app/test-results/e2e
-    command: ["sh", "-c", "echo 'Running E2E tests...' && bun test tests/e2e/index.ts --coverage"]
-    networks:
-      - test_network
+      - bun-badges-network
 
   # Redis for caching (if needed by your app)
   redis_test:
     image: redis:alpine
-    ports:
-      # Use TEST_REDIS_PORT, default 6379
-      - "${TEST_REDIS_PORT:-6379}:6379"
+    # ports: # Removed port mapping
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
-      timeout: 5s
-      retries: 5
     networks:
-      - test_network
+      - bun-badges-network
 
   # Test reports viewer service
   test_reporter:
     image: nginx:alpine
     volumes:
       - ./test-results:/usr/share/nginx/html
-    ports:
-      # Use TEST_REPORTER_PORT, default 8080
-      - "${TEST_REPORTER_PORT:-8080}:80"
+    # ports: # Removed port mapping
     depends_on:
       - test_runner
-      - e2e_test_runner
     networks:
-      - test_network
+      - bun-badges-network
 
 volumes:
   postgres_test_data:
@@ -145,5 +91,5 @@ volumes:
     driver: local
 
 networks:
-  test_network:
+  bun-badges-network: # Renamed from test_network
     driver: bridge
