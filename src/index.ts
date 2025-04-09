@@ -14,6 +14,7 @@ import { OAuthController } from "@controllers/oauth.controller";
 import { errorHandler } from "@middleware/error-handler";
 import { createAuthMiddleware } from "@middleware/auth.middleware";
 import { DatabaseService } from "@services/db.service";
+import { createProtectedRoutes } from "@routes/protected.routes";
 import { createSwaggerUI } from "./swagger";
 import logger from "@utils/logger";
 import { findAvailablePort } from "@utils/network";
@@ -57,6 +58,10 @@ app.route("/api/verify", verification);
 app.route("/status", status);
 app.route("/health", health);
 app.route("/oauth", oauthRouter);
+
+// Add protected routes with role-based access control
+const protectedRoutes = createProtectedRoutes(db);
+app.route("/protected", protectedRoutes);
 
 // Add Swagger UI in development
 if (process.env.NODE_ENV === "development") {
