@@ -57,12 +57,12 @@ jobs:
       NODE_ENV: test
       SKIP_DOCKER: true
       # Define DB config centrally (referenced by service and steps)
-      POSTGRES_USER: postgres        # Standard default user
-      POSTGRES_PASSWORD: postgres    # Use a hardcoded password for CI
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER || 'postgres' }}        # Use secret or default
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD || 'postgres_ci_password' }}    # Use secret or default
       POSTGRES_DB: bun_badges_test   # Standard test DB name
       # Database connection variables - ensure these are valid identifiers
-      DB_USER: postgres
-      DB_PASSWORD: postgres
+      DB_USER: ${{ secrets.POSTGRES_USER || 'postgres' }}
+      DB_PASSWORD: ${{ secrets.POSTGRES_PASSWORD || 'postgres_ci_password' }}
       DB_HOST: localhost
       DB_PORT: 5432
       DB_NAME: bun_badges_test
@@ -79,13 +79,13 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: bun_badges_test
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
         ports:
           - 5432:5432 # Standard port mapping
         options: >-
-          --health-cmd "pg_isready -U postgres"
+          --health-cmd "pg_isready -U ${{ env.POSTGRES_USER }}"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -105,11 +105,11 @@ jobs:
       - name: Initialize test database
         env:
           # Ensure DATABASE_URL is properly formatted with valid database name
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/bun_badges_test
+          DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
           # Explicitly set these variables to ensure they're strings
-          DB_PASSWORD: postgres
-          DB_USER: postgres
-          DB_NAME: bun_badges_test
+          DB_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          DB_USER: ${{ env.POSTGRES_USER }}
+          DB_NAME: ${{ env.POSTGRES_DB }}
           DB_HOST: localhost
           DB_PORT: 5432
         run: |
@@ -138,11 +138,11 @@ jobs:
         # Define DATABASE_URL specifically for this step as well
         env:
           # Connect to the host-mapped port (localhost) with valid database name
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/bun_badges_test
+          DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
           # Explicitly set these variables to ensure they're strings
-          DB_PASSWORD: postgres
-          DB_USER: postgres
-          DB_NAME: bun_badges_test
+          DB_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          DB_USER: ${{ env.POSTGRES_USER }}
+          DB_NAME: ${{ env.POSTGRES_DB }}
           DB_HOST: localhost
           DB_PORT: 5432
         run: |
