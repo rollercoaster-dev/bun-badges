@@ -36,6 +36,9 @@ const envSchema = z.object({
   LOGO_URI: z.string().optional(),
   ACCESS_TOKEN_EXPIRES_IN: z.string().optional(),
   REFRESH_TOKEN_EXPIRES_IN: z.string().optional(),
+
+  // Key management configuration
+  KEYS_DIR: z.string().optional(),
 });
 
 // Parse environment variables

@@ -15,6 +15,8 @@ import { errorHandler } from "@middleware/error-handler";
 import { createAuthMiddleware } from "@middleware/auth.middleware";
 import { DatabaseService } from "@services/db.service";
 import { createProtectedRoutes } from "@routes/protected.routes";
+import { createKeyManagementRoutes } from "@routes/key-management.routes";
+import { createCredentialSigningRoutes } from "@routes/credential-signing.routes";
 import { createSwaggerUI } from "./swagger";
 import logger from "@utils/logger";
 import { findAvailablePort } from "@utils/network";
@@ -62,6 +64,14 @@ app.route("/oauth", oauthRouter);
 // Add protected routes with role-based access control
 const protectedRoutes = createProtectedRoutes(db);
 app.route("/protected", protectedRoutes);
+
+// Add key management routes
+const keyManagementRoutes = createKeyManagementRoutes(db);
+app.route("/keys", keyManagementRoutes);
+
+// Add credential signing routes
+const credentialSigningRoutes = createCredentialSigningRoutes(db);
+app.route("/credentials", credentialSigningRoutes);
 
 // Add Swagger UI in development
 if (process.env.NODE_ENV === "development") {
