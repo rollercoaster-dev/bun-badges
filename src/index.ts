@@ -40,6 +40,7 @@ import { DatabaseService } from "@services/db.service";
 import { createProtectedRoutes } from "@routes/protected.routes";
 import { createKeyManagementRoutes } from "@routes/key-management.routes";
 import { createCredentialSigningRoutes } from "@routes/credential-signing.routes";
+import { createCredentialVerificationRoutes } from "@routes/credential-verification.routes";
 import { createSwaggerUI } from "./swagger";
 import logger from "@utils/logger";
 
@@ -97,6 +98,10 @@ app.route("/keys", keyManagementRoutes);
 // Add credential signing routes
 const credentialSigningRoutes = createCredentialSigningRoutes(db);
 app.route("/credentials", credentialSigningRoutes);
+
+// Add credential verification routes
+const credentialVerificationRoutes = createCredentialVerificationRoutes(db);
+app.route("/verify", credentialVerificationRoutes);
 
 // Add Swagger UI in development
 if (process.env.NODE_ENV === "development") {
