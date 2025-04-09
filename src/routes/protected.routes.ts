@@ -22,12 +22,12 @@ export const createProtectedRoutes = (db: DatabaseService) => {
   // Role-based access control examples
 
   // Admin-only route
-  protectedRoutes.get("/admin", requireRole(Role.ADMIN), (c) => {
+  protectedRoutes.get("/admin", requireRole("ADMIN" as Role), (c) => {
     return c.json({ message: "Admin access granted", user: c.get("user") });
   });
 
   // Issuer-only route
-  protectedRoutes.get("/issuer", requireRole(Role.ISSUER), (c) => {
+  protectedRoutes.get("/issuer", requireRole("ISSUER_OWNER" as Role), (c) => {
     return c.json({ message: "Issuer access granted", user: c.get("user") });
   });
 
@@ -66,7 +66,7 @@ export const createProtectedRoutes = (db: DatabaseService) => {
     (c) => {
       return c.json({
         message: "Credential read access granted",
-        tokenPayload: c.get("tokenPayload"),
+        tokenPayload: c.get("tokenPayload") as Record<string, unknown>,
       });
     },
   );
@@ -75,7 +75,7 @@ export const createProtectedRoutes = (db: DatabaseService) => {
   protectedRoutes.put("/profile", requireScope("ob:profile:write"), (c) => {
     return c.json({
       message: "Profile write access granted",
-      tokenPayload: c.get("tokenPayload"),
+      tokenPayload: c.get("tokenPayload") as Record<string, unknown>,
     });
   });
 

@@ -1,12 +1,12 @@
-import { oauthConfig } from "../config/oauth.config";
+import { oauthConfig } from "@/config/oauth.config";
 import logger from "../utils/logger";
 import { randomBytes } from "crypto";
 // Using jose instead of jsonwebtoken for better Bun compatibility
 import { SignJWT, jwtVerify } from "jose";
 import { readFileSync } from "fs";
 import { join } from "path";
-import { env } from "../utils/env";
-import { UnauthorizedError } from "../utils/errors";
+import { env } from "@utils/env";
+import { UnauthorizedError } from "@utils/errors";
 
 // Load private key for JWT signing
 const privateKeyPath =
