@@ -1,5 +1,7 @@
 # Credential Verification with Database Integration
 
+review .cursor/rules and all files
+
 ## Branch: `feat/credential-verification-db-integration`
 
 ### Current Status

@@ -1,5 +1,7 @@
 # Security Headers and Protections
 
+review .cursor/rules and all files
+
 ## Branch: `feat/security-headers`
 
 ### Current Status

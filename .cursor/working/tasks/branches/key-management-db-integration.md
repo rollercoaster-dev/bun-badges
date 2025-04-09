@@ -1,5 +1,7 @@
 # Key Management with Database Integration
 
+review .cursor/rules and all files
+
 ## Branch: `feat/key-management-db-integration`
 
 ### Current Status

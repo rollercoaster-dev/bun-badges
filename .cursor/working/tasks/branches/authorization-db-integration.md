@@ -1,5 +1,7 @@
 # Authorization with Database Integration
 
+review .cursor/rules and all files
+
 ## Branch: `feat/authorization-db-integration`
 
 ### Current Status

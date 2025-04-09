@@ -1,5 +1,7 @@
 # Database Schema Integration for Security Features
 
+review .cursor/rules and all files
+
 ## Branch: `feat/db-schema-integration`
 
 ### Current Status

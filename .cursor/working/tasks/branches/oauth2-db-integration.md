@@ -1,5 +1,7 @@
 # OAuth 2.0 with Database Integration
 
+review .cursor/rules and all files
+
 ## Branch: `feat/oauth2-db-integration`
 
 ### Current Status
