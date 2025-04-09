@@ -37,8 +37,16 @@ app.use("*", errorHandler);
 // Add the auth middleware to protected routes
 app.use("/api/*", authMiddleware);
 
-// Create the OAuth router
-const oauthRouter = createOAuthRouter(oauthController);
+// Create the OAuth router with Open Badges 3.0 endpoints
+const oauthRouter = createOAuthRouter({
+  registerClient: (c) => oauthController.registerClient(c),
+  authorize: (c) => oauthController.authorize(c),
+  token: (c) => oauthController.token(c),
+  introspect: (c) => oauthController.introspect(c),
+  revoke: (c) => oauthController.revoke(c),
+  getServiceDescription: (c) => oauthController.getServiceDescription(c),
+  getJwks: (c) => oauthController.getJwks(c),
+});
 
 // Add routes
 app.route("/auth", auth);

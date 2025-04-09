@@ -3,7 +3,7 @@ import { DatabaseService } from "../services/db.service";
 import { generateToken } from "../utils/auth/jwt";
 import { generateCode } from "../utils/auth/code";
 import { BadRequestError, UnauthorizedError } from "../utils/errors";
-import { OAUTH_SCOPES } from "../routes/oauth.routes";
+import { OAUTH_SCOPES, OAUTH_SCOPE_DESCRIPTIONS } from "../routes/oauth.routes";
 import { z } from "zod";
 import { verifyToken } from "../utils/auth/jwt";
 import { OAuthJWTBridge } from "../utils/auth/oauth-jwt-bridge";
@@ -107,12 +107,42 @@ export class OAuthController {
   private oauthJwtBridge: OAuthJWTBridge;
   private verificationService: VerificationService;
   private logger: PinoLogger;
+  private jwks: any;
 
   constructor(db: DatabaseService = new DatabaseService()) {
     this.db = db;
     this.oauthJwtBridge = new OAuthJWTBridge(db);
     this.verificationService = new VerificationService();
     this.logger = logger.child({ context: "OAuthController" });
+
+    // Load JWKs for service discovery
+    this.loadJwks();
+  }
+
+  /**
+   * Load JWKs from file or generate them
+   */
+  private loadJwks() {
+    try {
+      // In a production environment, you would load your JWKs from a secure location
+      // For now, we'll use a simple mock JWKS
+      this.jwks = {
+        keys: [
+          {
+            kty: "RSA",
+            kid: "default-key",
+            use: "sig",
+            alg: "RS256",
+            n: "sample-modulus",
+            e: "AQAB",
+          },
+        ],
+      };
+    } catch (error) {
+      this.logger.error("Failed to load JWKs", { error });
+      // Initialize with empty JWKS
+      this.jwks = { keys: [] };
+    }
   }
 
   // Utility method to validate scopes
@@ -694,7 +724,7 @@ export class OAuthController {
             <h1>Authorization Request</h1>
             <p>The application <strong>${params.clientName}</strong> wants to access your account.</p>
           </div>
-          
+
           <div class="client-info">
             ${params.logoUri ? `<img class="client-logo" src="${params.logoUri}" alt="${params.clientName} logo">` : ""}
             <div>
@@ -702,20 +732,20 @@ export class OAuthController {
               ${params.clientUri ? `<a href="${params.clientUri}" target="_blank">${params.clientUri}</a>` : ""}
             </div>
           </div>
-          
+
           <div class="scopes">
             <h3>This application will be able to:</h3>
             ${scopeHtml}
           </div>
-          
+
           <form method="post">
             ${hiddenFields}
-            
+
             <div class="remember">
               <input type="checkbox" name="remember" id="remember" value="true">
               <label for="remember">Remember this decision</label>
             </div>
-            
+
             <div class="buttons">
               <button type="submit" name="approved" value="true" class="btn btn-approve">Approve</button>
               <button type="submit" name="approved" value="false" class="btn btn-deny">Deny</button>
@@ -1138,6 +1168,83 @@ export class OAuthController {
       this.logger.error("Token revocation error:", error);
       // Always return 200 OK per RFC 7009
       return c.json({});
+    }
+  }
+
+  /**
+   * Get service description document
+   * Implements the Open Badges 3.0 service discovery endpoint
+   * @param c Hono context
+   * @returns Service description document
+   */
+  async getServiceDescription(c: Context): Promise<Response> {
+    try {
+      const baseUrl = `${c.req.url.split("/").slice(0, 3).join("/")}`;
+
+      // Return service description document
+      return c.json({
+        title: "Open Badges API",
+        description: "Open Badges 3.0 API",
+        openapi: "3.0.0",
+        info: {
+          title: "Open Badges API",
+          description: "Open Badges 3.0 API",
+          version: "3.0.0",
+          license: {
+            name: "1EdTech Open Badges 3.0",
+            url: "https://www.imsglobal.org/spec/ob/v3p0/",
+          },
+          contact: {
+            name: "Open Badges Provider",
+            url: baseUrl,
+          },
+        },
+        components: {
+          securitySchemes: {
+            oauth2: {
+              type: "oauth2",
+              flows: {
+                authorizationCode: {
+                  authorizationUrl: `${baseUrl}/oauth/authorize`,
+                  tokenUrl: `${baseUrl}/oauth/token`,
+                  scopes: OAUTH_SCOPE_DESCRIPTIONS,
+                },
+              },
+            },
+          },
+        },
+        security: [
+          {
+            oauth2: Object.values(OAUTH_SCOPES),
+          },
+        ],
+      });
+    } catch (error) {
+      this.logger.error("Service description request failed", { error });
+      return c.json(
+        {
+          error: "server_error",
+          error_description: "Service description request failed",
+        },
+        500,
+      );
+    }
+  }
+
+  /**
+   * Get JWKS (JSON Web Key Set)
+   * @param c Hono context
+   * @returns JWKS
+   */
+  async getJwks(c: Context): Promise<Response> {
+    try {
+      return c.json(this.jwks);
+    } catch (error) {
+      this.logger.error("JWKS request failed", { error });
+      return c.json(
+        { error: "server_error", error_description: "JWKS request failed" },
+        500,
+      );
     }
   }
 
