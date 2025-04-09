@@ -3,6 +3,7 @@ import { Permission, scopesToPermissions } from "../models/auth/roles";
 import { Role } from "./auth";
 import { UnauthorizedError, ForbiddenError } from "../utils/errors";
 import logger from "../utils/logger";
+import { authorizationService } from "../services/authorization.service";
 
 /**
  * Authorization middleware for role-based access control
@@ -23,14 +24,18 @@ export function requireRole(requiredRole: Role) {
         throw new UnauthorizedError("Authentication required");
       }
 
-      // Get the user's roles
-      const userRoles = user.roles;
+      // Check if the user has the required role using the database service
+      const hasRole = await authorizationService.userHasRole(
+        user.id,
+        requiredRole,
+      );
+      const isAdmin = await authorizationService.userHasRole(
+        user.id,
+        Role.ADMIN,
+      );
 
       // Check if the user has the required role
-      if (
-        !userRoles.includes(requiredRole) &&
-        !userRoles.includes(Role.ADMIN)
-      ) {
+      if (!hasRole && !isAdmin) {
         throw new ForbiddenError(`Required role: ${requiredRole}`);
       }
 
@@ -70,12 +75,14 @@ export function requirePermission(requiredPermission: Permission) {
         throw new UnauthorizedError("Authentication required");
       }
 
-      // Get the user's roles
-      const userRoles = user.roles;
+      // Check if the user has the required permission using the database service
+      const hasPermission = await authorizationService.userHasPermission(
+        user.id,
+        requiredPermission,
+      );
 
       // Check if the user has the required permission
-      // For now, we'll just check if the user is an admin
-      if (!userRoles.includes(Role.ADMIN)) {
+      if (!hasPermission) {
         throw new ForbiddenError(`Required permission: ${requiredPermission}`);
       }
 
