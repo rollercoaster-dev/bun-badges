@@ -111,18 +111,17 @@ export class CredentialVerificationController {
         throw new BadRequestError(`Invalid request body: ${error.message}`);
       }
 
+      // Return 401 for JWT verification errors
       return c.json(
         {
           status: "error",
           error: {
-            code: "VERIFICATION_ERROR",
+            code: "JWT_VERIFICATION_ERROR",
             message:
-              error instanceof Error
-                ? error.message
-                : "Unknown error during JWT verification",
+              error instanceof Error ? error.message : "Invalid or expired JWT",
           },
         },
-        500,
+        401,
       );
     }
   }

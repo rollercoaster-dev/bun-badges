@@ -158,7 +158,7 @@ describe("Credential Verification API", () => {
       // This test will likely fail because the JWT is not properly signed
       // But we're just testing the API endpoint structure
       const res = await app.fetch(req);
-      expect(res.status).toBe(500); // Expect error due to invalid JWT
+      expect(res.status).toBe(401); // Expect unauthorized due to invalid JWT
     });
   });
 
