@@ -107,7 +107,7 @@ export class OAuthController {
   private oauthJwtBridge: OAuthJWTBridge;
   private verificationService: VerificationService;
   private logger: PinoLogger;
-  private jwks: any;
+  private jwks: { keys: Array<Record<string, string>> };
 
   constructor(db: DatabaseService = new DatabaseService()) {
     this.db = db;
@@ -630,7 +630,7 @@ export class OAuthController {
       [OAUTH_SCOPES.ASSERTION_CREATE]: "Issue badge assertions on your behalf",
       [OAUTH_SCOPES.ASSERTION_UPDATE]: "Update your badge assertions",
       [OAUTH_SCOPES.ASSERTION_DELETE]: "Delete your badge assertions",
-      [OAUTH_SCOPES.PROFILE_UPDATE]: "Update your profile information",
+      [OAUTH_SCOPES.LEGACY_PROFILE_UPDATE]: "Update your profile information",
       [OAUTH_SCOPES.OFFLINE_ACCESS]:
         "Access your data when you're not using the app",
     };
