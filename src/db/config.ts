@@ -15,9 +15,11 @@ if (!DATABASE_URL) {
 }
 
 // Extract credentials from environment variables or DATABASE_URL
-const dbUser = process.env.DB_USER || process.env.POSTGRES_USER || "postgres";
+const dbUser = process.env.DB_USER || process.env.POSTGRES_USER || "dev_user"; // Non-credential placeholder for development
 const dbPassword =
-  process.env.DB_PASSWORD || process.env.POSTGRES_PASSWORD || "postgres";
+  process.env.DB_PASSWORD ||
+  process.env.POSTGRES_PASSWORD ||
+  "dev_password_placeholder"; // Non-credential placeholder for development
 const dbHost = process.env.DB_HOST || "localhost";
 const dbPort = process.env.DB_PORT || "5432";
 
