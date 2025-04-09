@@ -20,8 +20,8 @@ Key design decisions:
 - Support for hierarchical roles with permission inheritance
 
 ### Current Status
-- [x] Created permission/role model
-- [x] Implemented role-based access control middleware
+- [x] Created permission/role model (in `src/models/auth/roles.ts`)
+- [x] Implemented role-based access control middleware (in `src/middleware/authorization.middleware.ts`)
 - [x] Integrated authorization with protected routes
 - [ ] Updated database schema to store user roles and permissions
 - [ ] Implemented database service methods for role and permission management
@@ -32,14 +32,17 @@ Key design decisions:
 1. Update database schema to store user roles and permissions
    - Create tables for roles, permissions, and user-role assignments
    - Add relationships between users, roles, and permissions
+   - Create a migration file for the new schema
 2. Implement database service methods for role and permission management
-   - Assign roles to users
-   - Check user permissions
-   - Manage roles and permissions
+   - Create an authorization service with methods to:
+     - Assign roles to users
+     - Check user permissions
+     - Manage roles and permissions
 3. Add caching for frequently accessed permissions
    - Implement cache invalidation on role/permission changes
    - Configure cache TTL for optimal performance
 4. Update authorization middleware to use database service
+   - Modify the existing middleware to fetch roles and permissions from the database
 5. Write tests for authorization middleware and service
 
 ### Learnings
@@ -55,9 +58,10 @@ Key design decisions:
 - Update authorization middleware to use database service
 
 ### Related Code Sections
-- `src/db/schema/roles.schema.ts` - Database schema for roles and permissions
-- `src/services/authorization.service.ts` - Authorization service implementation
-- `src/middleware/auth.middleware.ts` - Authorization middleware
+- `src/models/auth/roles.ts` - Existing role and permission definitions
+- `src/middleware/authorization.middleware.ts` - Existing authorization middleware
+- `src/db/schema/` - Database schema directory (need to add roles schema)
+- `src/services/` - Services directory (need to create authorization service)
 - `src/routes/` - Protected routes using authorization
 
 ### Testing Strategy

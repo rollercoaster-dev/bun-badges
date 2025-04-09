@@ -7,6 +7,7 @@ import * as migration_008 from "./0008_add_token_mappings";
 import * as migration_009 from "./0009_add_pkce_consent";
 import * as migration_010 from "./0010_add_jar_support";
 import * as migration_011 from "./0011_fix_revoked_tokens_migration";
+import * as migration_012 from "./0012_add_roles_permissions";
 
 // List of migrations to run, in order
 export const migrations = [
@@ -19,4 +20,5 @@ export const migrations = [
   migration_009,
   migration_010,
   migration_011,
+  migration_012,
 ];
