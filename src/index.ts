@@ -12,19 +12,19 @@ if (nodeEnv === "development") {
     path: path.resolve(process.cwd(), ".env.development"),
     override: true,
   });
-  console.log("Loaded environment variables from .env.development");
+  // Will use logger after import
 } else if (nodeEnv === "test") {
   dotenv.config({
     path: path.resolve(process.cwd(), ".env.test"),
     override: true,
   });
-  console.log("Loaded environment variables from .env.test");
+  // Will use logger after import
 } else {
   // In production or other environments, rely on system environment variables
   // or potentially a base .env file loaded elsewhere if needed.
   // We could optionally load the base .env here as a fallback:
   dotenv.config(); // Load base .env if it exists
-  console.log("Attempted to load base .env file (if exists)");
+  // Will use logger after import
 }
 // --- End environment loading ---
 
@@ -45,6 +45,15 @@ import { createKeyManagementRoutes } from "@routes/key-management.routes";
 import { createCredentialSigningRoutes } from "@routes/credential-signing.routes";
 import { createSwaggerUI } from "./swagger";
 import logger from "@utils/logger";
+
+// Log environment loading
+if (process.env.NODE_ENV === "development") {
+  logger.info("Loaded environment variables from .env.development");
+} else if (process.env.NODE_ENV === "test") {
+  logger.info("Loaded environment variables from .env.test");
+} else {
+  logger.info("Attempted to load base .env file (if exists)");
+}
 
 // Create the Hono app instance
 const app = new Hono();

@@ -3,12 +3,12 @@
 
 # Run lint-staged but don't block on failure
 echo "Running linters and formatters..."
-npx lint-staged || echo "Linting failed, but allowing commit to proceed"
+npx lint-staged
 
 # Run TypeScript check but don't block commit on failure
 echo "Running TypeScript checks..."
-bun tsc || echo "TypeScript check failed, but allowing commit to proceed"
-bun lint || echo "Linting failed, but allowing commit to proceed"
+bun tsc
+bun lint
 
 # Inform the user they can bypass with --no-verify if needed
 echo "Note: You can bypass all pre-commit hooks with 'git commit --no-verify'"
