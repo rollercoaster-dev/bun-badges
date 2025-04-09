@@ -15,11 +15,16 @@ if (!DATABASE_URL) {
 }
 
 // Extract credentials from environment variables or DATABASE_URL
-const dbUser = process.env.DB_USER || process.env.POSTGRES_USER || "dev_user"; // Non-credential placeholder for development
+// Use environment variables with clear fallback messages for development
+const DB_USER_MISSING_MESSAGE = "DATABASE_USER_NOT_SET";
+const DB_PASSWORD_MISSING_MESSAGE = "DATABASE_PASSWORD_NOT_SET";
+
+const dbUser =
+  process.env.DB_USER || process.env.POSTGRES_USER || DB_USER_MISSING_MESSAGE;
 const dbPassword =
   process.env.DB_PASSWORD ||
   process.env.POSTGRES_PASSWORD ||
-  "dev_password_placeholder"; // Non-credential placeholder for development
+  DB_PASSWORD_MISSING_MESSAGE;
 const dbHost = process.env.DB_HOST || "localhost";
 const dbPort = process.env.DB_PORT || "5432";
 
