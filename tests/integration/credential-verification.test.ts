@@ -4,8 +4,8 @@
 
 import { describe, expect, it, beforeAll, afterAll } from "bun:test";
 import { honoApp as app } from "../../src/index";
-import { db } from "../../src/db/config";
-import { credentials } from "../../src/db/schema/credentials.schema";
+import { db } from "@/db/config";
+import { credentials } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { createId } from "@paralleldrive/cuid2";
 
