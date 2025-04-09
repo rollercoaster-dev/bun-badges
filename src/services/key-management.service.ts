@@ -8,7 +8,7 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
-import { generateKeyPair, exportJWK } from "jose";
+import * as crypto from "crypto";
 import { env } from "../utils/env";
 import logger from "../utils/logger";
 
@@ -117,33 +117,33 @@ export class KeyManagementService {
       const keyId = id || `${type}-${algorithm}-${Date.now()}`;
 
       // Generate key pair based on algorithm
-      let keyPair;
+      let publicKey: string;
+      let privateKey: string;
 
-      switch (algorithm) {
-        case KeyAlgorithm.RS256:
-          keyPair = await generateKeyPair("RS256");
-          break;
-        case KeyAlgorithm.ES256:
-          keyPair = await generateKeyPair("ES256");
-          break;
-        case KeyAlgorithm.EdDSA:
-          keyPair = await generateKeyPair("EdDSA");
-          break;
-        default:
-          throw new Error(`Unsupported algorithm: ${algorithm}`);
-      }
+      // Generate key pair using Node.js crypto module
+      const { publicKey: pubKey, privateKey: privKey } =
+        crypto.generateKeyPairSync("rsa", {
+          modulusLength: 2048,
+          publicKeyEncoding: {
+            type: "spki",
+            format: "pem",
+          },
+          privateKeyEncoding: {
+            type: "pkcs8",
+            format: "pem",
+          },
+        });
 
-      // Export keys to JWK format
-      const publicJwk = await exportJWK(keyPair.publicKey);
-      const privateJwk = await exportJWK(keyPair.privateKey);
+      publicKey = pubKey;
+      privateKey = privKey;
 
       // Create key pair object
       const newKeyPair: KeyPair = {
         id: keyId,
         type,
         algorithm,
-        publicKey: JSON.stringify(publicJwk),
-        privateKey: JSON.stringify(privateJwk),
+        publicKey: publicKey,
+        privateKey: privateKey,
         createdAt: new Date().toISOString(),
         isRevoked: false,
       };
@@ -230,19 +230,19 @@ export class KeyManagementService {
   }
 
   /**
-   * Import a key pair from JWK format
+   * Import a key pair from PEM format
    * @param type Key type
    * @param algorithm Key algorithm
-   * @param publicJwk Public key in JWK format
-   * @param privateJwk Private key in JWK format
+   * @param publicKeyPem Public key in PEM format
+   * @param privateKeyPem Private key in PEM format
    * @param id Optional key ID
    * @returns Key pair
    */
   async importKey(
     type: KeyType,
     algorithm: KeyAlgorithm,
-    publicJwk: object,
-    privateJwk: object,
+    publicKeyPem: string,
+    privateKeyPem: string,
     id?: string,
   ): Promise<KeyPair> {
     try {
@@ -254,8 +254,8 @@ export class KeyManagementService {
         id: keyId,
         type,
         algorithm,
-        publicKey: JSON.stringify(publicJwk),
-        privateKey: JSON.stringify(privateJwk),
+        publicKey: publicKeyPem,
+        privateKey: privateKeyPem,
         createdAt: new Date().toISOString(),
         isRevoked: false,
       };
@@ -277,11 +277,11 @@ export class KeyManagementService {
   }
 
   /**
-   * Export a key pair to JWK format
+   * Export a key pair in PEM format
    * @param id Key ID
-   * @returns Key pair in JWK format
+   * @returns Key pair in PEM format
    */
-  exportKey(id: string): { publicKey: object; privateKey: object } | undefined {
+  exportKey(id: string): { publicKey: string; privateKey: string } | undefined {
     try {
       const keyPair = this.keysCache.get(id);
 
@@ -290,8 +290,8 @@ export class KeyManagementService {
       }
 
       return {
-        publicKey: JSON.parse(keyPair.publicKey),
-        privateKey: JSON.parse(keyPair.privateKey),
+        publicKey: keyPair.publicKey,
+        privateKey: keyPair.privateKey,
       };
     } catch (error) {
       logger.error("Failed to export key pair", { error, keyId: id });

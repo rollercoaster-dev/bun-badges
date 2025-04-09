@@ -1,13 +1,18 @@
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { CredentialSigningService } from "../../src/services/credential-signing.service";
-import { KeyManagementService, KeyType, KeyAlgorithm } from "../../src/services/key-management.service";
+import {
+  KeyManagementService,
+  KeyType,
+  KeyAlgorithm,
+  keyManagementService,
+} from "../../src/services/key-management.service";
 import { existsSync, mkdirSync, rmSync } from "fs";
 import { join } from "path";
 
 describe("Credential Signing Service", () => {
   // Create a temporary directory for test keys
   const testKeysDir = join(process.cwd(), "tests", "temp", "keys");
-  let keyManagementService: KeyManagementService;
+  let testKeyManagementService: KeyManagementService;
   let credentialSigningService: CredentialSigningService;
   let testKeyId: string;
 
@@ -18,19 +23,27 @@ describe("Credential Signing Service", () => {
     }
 
     // Create a new key management service instance for testing
-    keyManagementService = new KeyManagementService(testKeysDir);
-    
+    testKeyManagementService = new KeyManagementService(testKeysDir);
+
     // Create a new credential signing service instance
     credentialSigningService = new CredentialSigningService();
-    
+
     // Generate a test key
-    const keyPair = await keyManagementService.generateKey(
+    const keyPair = await testKeyManagementService.generateKey(
       KeyType.SIGNING,
       KeyAlgorithm.RS256,
-      "test-signing-key"
+      "test-signing-key",
     );
-    
+
     testKeyId = keyPair.id;
+
+    // Mock the keyManagementService.getKey and getDefaultSigningKey methods
+    // @ts-ignore - we're mocking the methods
+    keyManagementService.getKey = (id: string) =>
+      testKeyManagementService.getKey(id);
+    // @ts-ignore - we're mocking the methods
+    keyManagementService.getDefaultSigningKey = () =>
+      testKeyManagementService.getDefaultSigningKey();
   });
 
   afterAll(() => {
@@ -48,21 +61,24 @@ describe("Credential Signing Service", () => {
         type: ["VerifiableCredential", "OpenBadgeCredential"],
         issuer: {
           id: "https://example.com",
-          name: "Example Issuer"
+          name: "Example Issuer",
         },
         credentialSubject: {
           id: "recipient-123",
           achievement: {
             id: "https://example.com/badges/123",
             name: "Test Badge",
-            description: "A test badge for unit testing"
-          }
-        }
-      }
+            description: "A test badge for unit testing",
+          },
+        },
+      },
     };
 
     // Sign the credential
-    const jwt = await credentialSigningService.signCredentialJwt(payload, testKeyId);
+    const jwt = await credentialSigningService.signCredentialJwt(
+      payload,
+      testKeyId,
+    );
 
     // Verify the JWT format
     expect(jwt).toBeDefined();
@@ -80,24 +96,28 @@ describe("Credential Signing Service", () => {
         type: ["VerifiableCredential", "OpenBadgeCredential"],
         issuer: {
           id: "https://example.com",
-          name: "Example Issuer"
+          name: "Example Issuer",
         },
         credentialSubject: {
           id: "recipient-123",
           achievement: {
             id: "https://example.com/badges/123",
             name: "Test Badge",
-            description: "A test badge for unit testing"
-          }
-        }
-      }
+            description: "A test badge for unit testing",
+          },
+        },
+      },
     };
 
     // Sign the credential
-    const jwt = await credentialSigningService.signCredentialJwt(payload, testKeyId);
+    const jwt = await credentialSigningService.signCredentialJwt(
+      payload,
+      testKeyId,
+    );
 
     // Verify the credential
-    const verifiedPayload = await credentialSigningService.verifyCredentialJwt(jwt);
+    const verifiedPayload =
+      await credentialSigningService.verifyCredentialJwt(jwt);
 
     // Verify the payload
     expect(verifiedPayload).toBeDefined();
@@ -111,13 +131,13 @@ describe("Credential Signing Service", () => {
     const credential = {
       "@context": [
         "https://www.w3.org/2018/credentials/v1",
-        "https://w3id.org/security/suites/ed25519-2020/v1"
+        "https://w3id.org/security/suites/ed25519-2020/v1",
       ],
       id: "https://example.com/credentials/123",
       type: ["VerifiableCredential", "OpenBadgeCredential"],
       issuer: {
         id: "https://example.com",
-        name: "Example Issuer"
+        name: "Example Issuer",
       },
       issuanceDate: new Date().toISOString(),
       credentialSubject: {
@@ -125,20 +145,28 @@ describe("Credential Signing Service", () => {
         achievement: {
           id: "https://example.com/badges/123",
           name: "Test Badge",
-          description: "A test badge for unit testing"
-        }
-      }
+          description: "A test badge for unit testing",
+        },
+      },
     };
 
     // Sign the credential
-    const signedCredential = await credentialSigningService.signCredentialLd(credential, testKeyId);
+    const signedCredential = await credentialSigningService.signCredentialLd(
+      credential,
+      testKeyId,
+    );
 
     // Verify the signed credential
     expect(signedCredential).toBeDefined();
-    expect(signedCredential.proof).toBeDefined();
-    expect(signedCredential.proof.type).toBe("Ed25519Signature2020");
-    expect(signedCredential.proof.proofPurpose).toBe("assertionMethod");
-    expect(signedCredential.proof.verificationMethod).toContain(testKeyId);
+    const proof = signedCredential.proof as {
+      type: string;
+      proofPurpose: string;
+      verificationMethod: string;
+    };
+    expect(proof).toBeDefined();
+    expect(proof.type).toBe("Ed25519Signature2020");
+    expect(proof.proofPurpose).toBe("assertionMethod");
+    expect(proof.verificationMethod).toContain(testKeyId);
   });
 
   test("should verify a credential with Linked Data Signatures", async () => {
@@ -146,13 +174,13 @@ describe("Credential Signing Service", () => {
     const credential = {
       "@context": [
         "https://www.w3.org/2018/credentials/v1",
-        "https://w3id.org/security/suites/ed25519-2020/v1"
+        "https://w3id.org/security/suites/ed25519-2020/v1",
       ],
       id: "https://example.com/credentials/123",
       type: ["VerifiableCredential", "OpenBadgeCredential"],
       issuer: {
         id: "https://example.com",
-        name: "Example Issuer"
+        name: "Example Issuer",
       },
       issuanceDate: new Date().toISOString(),
       credentialSubject: {
@@ -160,16 +188,20 @@ describe("Credential Signing Service", () => {
         achievement: {
           id: "https://example.com/badges/123",
           name: "Test Badge",
-          description: "A test badge for unit testing"
-        }
-      }
+          description: "A test badge for unit testing",
+        },
+      },
     };
 
     // Sign the credential
-    const signedCredential = await credentialSigningService.signCredentialLd(credential, testKeyId);
+    const signedCredential = await credentialSigningService.signCredentialLd(
+      credential,
+      testKeyId,
+    );
 
     // Verify the credential
-    const isValid = await credentialSigningService.verifyCredentialLd(signedCredential);
+    const isValid =
+      await credentialSigningService.verifyCredentialLd(signedCredential);
 
     // Verify the result
     expect(isValid).toBe(true);

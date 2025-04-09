@@ -1,6 +1,9 @@
-import { describe, test, expect, beforeAll, afterAll } from "bun:test";
-import { app } from "../../src/index";
-import { KeyType, KeyAlgorithm } from "../../src/services/key-management.service";
+import { describe, test, expect, beforeAll } from "bun:test";
+import { honoApp as app } from "../../src/index";
+import {
+  KeyType,
+  KeyAlgorithm,
+} from "../../src/services/key-management.service";
 import { generateToken } from "../../src/utils/auth/jwt";
 
 describe("API Endpoints", () => {
@@ -31,7 +34,7 @@ describe("API Endpoints", () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${adminToken}`,
+          Authorization: `Bearer ${adminToken}`,
         },
         body: JSON.stringify({
           type: KeyType.SIGNING,
@@ -42,7 +45,12 @@ describe("API Endpoints", () => {
 
       // Verify the response
       expect(response.status).toBe(201);
-      const data = await response.json();
+      const data = (await response.json()) as {
+        id: string;
+        type: string;
+        algorithm: string;
+        isRevoked: boolean;
+      };
       expect(data.id).toBe("api-test-key");
       expect(data.type).toBe(KeyType.SIGNING);
       expect(data.algorithm).toBe(KeyAlgorithm.RS256);
@@ -54,17 +62,21 @@ describe("API Endpoints", () => {
       const response = await app.request("/keys", {
         method: "GET",
         headers: {
-          "Authorization": `Bearer ${adminToken}`,
+          Authorization: `Bearer ${adminToken}`,
         },
       });
 
       // Verify the response
       expect(response.status).toBe(200);
-      const data = await response.json();
+      const data = (await response.json()) as {
+        keys: Array<{ id: string; type: string; algorithm: string }>;
+      };
       expect(data.keys).toBeDefined();
       expect(Array.isArray(data.keys)).toBe(true);
       expect(data.keys.length).toBeGreaterThan(0);
-      expect(data.keys.some((key: any) => key.id === "api-test-key")).toBe(true);
+      expect(data.keys.some((key: any) => key.id === "api-test-key")).toBe(
+        true,
+      );
     });
 
     test("should get a key by ID", async () => {
@@ -72,13 +84,17 @@ describe("API Endpoints", () => {
       const response = await app.request("/keys/api-test-key", {
         method: "GET",
         headers: {
-          "Authorization": `Bearer ${adminToken}`,
+          Authorization: `Bearer ${adminToken}`,
         },
       });
 
       // Verify the response
       expect(response.status).toBe(200);
-      const data = await response.json();
+      const data = (await response.json()) as {
+        id: string;
+        type: string;
+        algorithm: string;
+      };
       expect(data.id).toBe("api-test-key");
       expect(data.type).toBe(KeyType.SIGNING);
       expect(data.algorithm).toBe(KeyAlgorithm.RS256);
@@ -89,13 +105,18 @@ describe("API Endpoints", () => {
       const response = await app.request("/keys/api-test-key/rotate", {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${adminToken}`,
+          Authorization: `Bearer ${adminToken}`,
         },
       });
 
       // Verify the response
       expect(response.status).toBe(200);
-      const data = await response.json();
+      const data = (await response.json()) as {
+        id: string;
+        type: string;
+        algorithm: string;
+        isRevoked: boolean;
+      };
       expect(data.id).not.toBe("api-test-key");
       expect(data.id).toContain("api-test-key-rotated-");
       expect(data.type).toBe(KeyType.SIGNING);
@@ -109,7 +130,7 @@ describe("API Endpoints", () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${adminToken}`,
+          Authorization: `Bearer ${adminToken}`,
         },
         body: JSON.stringify({
           type: KeyType.SIGNING,
@@ -122,13 +143,13 @@ describe("API Endpoints", () => {
       const response = await app.request("/keys/api-delete-test-key", {
         method: "DELETE",
         headers: {
-          "Authorization": `Bearer ${adminToken}`,
+          Authorization: `Bearer ${adminToken}`,
         },
       });
 
       // Verify the response
       expect(response.status).toBe(200);
-      const data = await response.json();
+      const data = (await response.json()) as { message: string };
       expect(data.message).toBe("Key deleted successfully");
     });
 
@@ -137,7 +158,7 @@ describe("API Endpoints", () => {
       const response = await app.request("/keys", {
         method: "GET",
         headers: {
-          "Authorization": `Bearer ${issuerToken}`,
+          Authorization: `Bearer ${issuerToken}`,
         },
       });
 
@@ -157,17 +178,17 @@ describe("API Endpoints", () => {
           type: ["VerifiableCredential", "OpenBadgeCredential"],
           issuer: {
             id: "https://example.com",
-            name: "Example Issuer"
+            name: "Example Issuer",
           },
           credentialSubject: {
             id: "recipient-123",
             achievement: {
               id: "https://example.com/badges/123",
               name: "Test Badge",
-              description: "A test badge for unit testing"
-            }
-          }
-        }
+              description: "A test badge for unit testing",
+            },
+          },
+        },
       };
 
       // Sign the credential
@@ -175,7 +196,7 @@ describe("API Endpoints", () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${issuerToken}`,
+          Authorization: `Bearer ${issuerToken}`,
         },
         body: JSON.stringify({
           payload,
@@ -184,7 +205,7 @@ describe("API Endpoints", () => {
 
       // Verify the response
       expect(response.status).toBe(200);
-      const data = await response.json();
+      const data = (await response.json()) as { jwt: string };
       expect(data.jwt).toBeDefined();
       expect(typeof data.jwt).toBe("string");
       expect(data.jwt.split(".").length).toBe(3); // Header, payload, signature
@@ -200,17 +221,17 @@ describe("API Endpoints", () => {
           type: ["VerifiableCredential", "OpenBadgeCredential"],
           issuer: {
             id: "https://example.com",
-            name: "Example Issuer"
+            name: "Example Issuer",
           },
           credentialSubject: {
             id: "recipient-123",
             achievement: {
               id: "https://example.com/badges/123",
               name: "Test Badge",
-              description: "A test badge for unit testing"
-            }
-          }
-        }
+              description: "A test badge for unit testing",
+            },
+          },
+        },
       };
 
       // Sign the credential
@@ -218,14 +239,14 @@ describe("API Endpoints", () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${issuerToken}`,
+          Authorization: `Bearer ${issuerToken}`,
         },
         body: JSON.stringify({
           payload,
         }),
       });
 
-      const signData = await signResponse.json();
+      const signData = (await signResponse.json()) as { jwt: string };
       const jwt = signData.jwt;
 
       // Verify the credential
@@ -233,7 +254,7 @@ describe("API Endpoints", () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${issuerToken}`,
+          Authorization: `Bearer ${issuerToken}`,
         },
         body: JSON.stringify({
           jwt,
@@ -242,7 +263,10 @@ describe("API Endpoints", () => {
 
       // Verify the response
       expect(verifyResponse.status).toBe(200);
-      const verifyData = await verifyResponse.json();
+      const verifyData = (await verifyResponse.json()) as {
+        isValid: boolean;
+        payload: { iss: string; sub: string };
+      };
       expect(verifyData.isValid).toBe(true);
       expect(verifyData.payload).toBeDefined();
       expect(verifyData.payload.iss).toBe(payload.iss);
@@ -254,13 +278,13 @@ describe("API Endpoints", () => {
       const credential = {
         "@context": [
           "https://www.w3.org/2018/credentials/v1",
-          "https://w3id.org/security/suites/ed25519-2020/v1"
+          "https://w3id.org/security/suites/ed25519-2020/v1",
         ],
         id: "https://example.com/credentials/123",
         type: ["VerifiableCredential", "OpenBadgeCredential"],
         issuer: {
           id: "https://example.com",
-          name: "Example Issuer"
+          name: "Example Issuer",
         },
         issuanceDate: new Date().toISOString(),
         credentialSubject: {
@@ -268,9 +292,9 @@ describe("API Endpoints", () => {
           achievement: {
             id: "https://example.com/badges/123",
             name: "Test Badge",
-            description: "A test badge for unit testing"
-          }
-        }
+            description: "A test badge for unit testing",
+          },
+        },
       };
 
       // Sign the credential
@@ -278,7 +302,7 @@ describe("API Endpoints", () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${issuerToken}`,
+          Authorization: `Bearer ${issuerToken}`,
         },
         body: JSON.stringify({
           credential,
@@ -287,7 +311,9 @@ describe("API Endpoints", () => {
 
       // Verify the response
       expect(response.status).toBe(200);
-      const data = await response.json();
+      const data = (await response.json()) as {
+        credential: { proof: { type: string; proofPurpose: string } };
+      };
       expect(data.credential).toBeDefined();
       expect(data.credential.proof).toBeDefined();
       expect(data.credential.proof.type).toBe("Ed25519Signature2020");
@@ -299,13 +325,13 @@ describe("API Endpoints", () => {
       const credential = {
         "@context": [
           "https://www.w3.org/2018/credentials/v1",
-          "https://w3id.org/security/suites/ed25519-2020/v1"
+          "https://w3id.org/security/suites/ed25519-2020/v1",
         ],
         id: "https://example.com/credentials/123",
         type: ["VerifiableCredential", "OpenBadgeCredential"],
         issuer: {
           id: "https://example.com",
-          name: "Example Issuer"
+          name: "Example Issuer",
         },
         issuanceDate: new Date().toISOString(),
         credentialSubject: {
@@ -313,9 +339,9 @@ describe("API Endpoints", () => {
           achievement: {
             id: "https://example.com/badges/123",
             name: "Test Badge",
-            description: "A test badge for unit testing"
-          }
-        }
+            description: "A test badge for unit testing",
+          },
+        },
       };
 
       // Sign the credential
@@ -323,14 +349,16 @@ describe("API Endpoints", () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${issuerToken}`,
+          Authorization: `Bearer ${issuerToken}`,
         },
         body: JSON.stringify({
           credential,
         }),
       });
 
-      const signData = await signResponse.json();
+      const signData = (await signResponse.json()) as {
+        credential: Record<string, unknown>;
+      };
       const signedCredential = signData.credential;
 
       // Verify the credential
@@ -338,7 +366,7 @@ describe("API Endpoints", () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${issuerToken}`,
+          Authorization: `Bearer ${issuerToken}`,
         },
         body: JSON.stringify({
           credential: signedCredential,
@@ -347,7 +375,7 @@ describe("API Endpoints", () => {
 
       // Verify the response
       expect(verifyResponse.status).toBe(200);
-      const verifyData = await verifyResponse.json();
+      const verifyData = (await verifyResponse.json()) as { isValid: boolean };
       expect(verifyData.isValid).toBe(true);
     });
 
@@ -364,7 +392,7 @@ describe("API Endpoints", () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${nonIssuerToken}`,
+          Authorization: `Bearer ${nonIssuerToken}`,
         },
         body: JSON.stringify({
           payload: {},
