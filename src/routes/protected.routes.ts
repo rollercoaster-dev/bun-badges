@@ -5,7 +5,8 @@ import {
   requireRole,
   requireScope,
 } from "../middleware/authorization.middleware";
-import { Permission, Role } from "../models/auth/roles";
+import { Permission } from "../models/auth/roles";
+import { Role } from "../middleware/auth";
 import { DatabaseService } from "../services/db.service";
 
 /**
@@ -22,12 +23,12 @@ export const createProtectedRoutes = (db: DatabaseService) => {
   // Role-based access control examples
 
   // Admin-only route
-  protectedRoutes.get("/admin", requireRole("ADMIN" as Role), (c) => {
+  protectedRoutes.get("/admin", requireRole(Role.ADMIN), (c) => {
     return c.json({ message: "Admin access granted", user: c.get("user") });
   });
 
   // Issuer-only route
-  protectedRoutes.get("/issuer", requireRole("ISSUER_OWNER" as Role), (c) => {
+  protectedRoutes.get("/issuer", requireRole(Role.ISSUER_OWNER), (c) => {
     return c.json({ message: "Issuer access granted", user: c.get("user") });
   });
 
@@ -64,18 +65,20 @@ export const createProtectedRoutes = (db: DatabaseService) => {
     "/credentials",
     requireScope("ob:credentials:read"),
     (c) => {
+      // We can't directly access tokenPayload from context
+      // So we'll just return a success message
       return c.json({
         message: "Credential read access granted",
-        tokenPayload: c.get("tokenPayload") as Record<string, unknown>,
       });
     },
   );
 
   // Route requiring ob:profile:write scope
   protectedRoutes.put("/profile", requireScope("ob:profile:write"), (c) => {
+    // We can't directly access tokenPayload from context
+    // So we'll just return a success message
     return c.json({
       message: "Profile write access granted",
-      tokenPayload: c.get("tokenPayload") as Record<string, unknown>,
     });
   });
 

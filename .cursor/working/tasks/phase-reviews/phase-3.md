@@ -175,3 +175,4 @@
 *   **Testing Approach:** Include both positive and negative test cases for security features.
 *   **Compliance Requirements:** Ensure implementation meets CLR Standard API Security requirements.
 *   **Performance Impact:** Monitor the performance impact of added security measures.
+*   **Code Cleanup:** Remove ESLint disable comments and @ts-ignore directives when implementing the actual database integration for OAuth service. These are currently used as placeholders for variables that will be used in the future.

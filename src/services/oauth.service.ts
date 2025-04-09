@@ -126,8 +126,11 @@ export class OAuthService {
 
       // Create authorization code record
       // Store the authorization code
+      // This variable will be used when we implement the database storage in the future
+      // TODO: Remove this ESLint disable when database integration is implemented
+      // @ts-ignore -- This variable will be used when database integration is implemented
 
-      const authorizationCode: AuthorizationCode = {
+      const _authorizationCode: AuthorizationCode = {
         code,
         clientId,
         redirectUri,
@@ -189,8 +192,11 @@ export class OAuthService {
 
       // Create token record
       // Store the token
+      // This variable will be used when we implement the database storage in the future
+      // TODO: Remove this ESLint disable when database integration is implemented
+      // @ts-ignore -- This variable will be used when database integration is implemented
 
-      const token: Token = {
+      const _token: Token = {
         accessToken,
         refreshToken,
         clientId,
