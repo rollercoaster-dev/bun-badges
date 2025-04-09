@@ -463,6 +463,59 @@ export class MockDatabaseService implements IDatabaseService {
     console.log("Mock DB: Deleting OAuth client by ID", id);
     // No-op for mock
   }
+
+  // Credential Methods
+  async createCredential(data: any): Promise<any> {
+    console.log("Mock DB: Creating credential", data);
+    return { id: "mock-credential-id", ...data };
+  }
+
+  async getCredentialById(credentialId: string): Promise<any> {
+    console.log("Mock DB: Getting credential by ID", credentialId);
+    return { id: credentialId, status: "active", isActive: true };
+  }
+
+  async getCredentialsByIssuerId(issuerId: string): Promise<any[]> {
+    console.log("Mock DB: Getting credentials by issuer ID", issuerId);
+    return [{ id: "mock-credential-id", issuerId }];
+  }
+
+  async getCredentialsByRecipientId(recipientId: string): Promise<any[]> {
+    console.log("Mock DB: Getting credentials by recipient ID", recipientId);
+    return [{ id: "mock-credential-id", recipientId }];
+  }
+
+  async updateCredentialStatus(
+    credentialId: string,
+    status: string,
+    reason?: string,
+  ): Promise<boolean> {
+    console.log(
+      "Mock DB: Updating credential status",
+      credentialId,
+      status,
+      reason,
+    );
+    return true;
+  }
+
+  async revokeCredential(
+    credentialId: string,
+    reason?: string,
+  ): Promise<boolean> {
+    console.log("Mock DB: Revoking credential", credentialId, reason);
+    return true;
+  }
+
+  async verifyCredential(credentialId: string): Promise<any> {
+    console.log("Mock DB: Verifying credential", credentialId);
+    return { valid: true, checks: {}, errors: [] };
+  }
+
+  async isCredentialRevoked(credentialId: string): Promise<boolean> {
+    console.log("Mock DB: Checking if credential is revoked", credentialId);
+    return false;
+  }
 }
 
 // Create and export a mock database instance

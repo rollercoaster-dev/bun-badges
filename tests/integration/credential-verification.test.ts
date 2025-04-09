@@ -3,9 +3,10 @@
  */
 
 import { describe, expect, it, beforeAll, afterAll } from "bun:test";
-import { app } from "../../src/index";
+import { honoApp as app } from "../../src/index";
 import { db } from "../../src/db/config";
 import { credentials } from "../../src/db/schema/credentials.schema";
+import { eq } from "drizzle-orm";
 import { createId } from "@paralleldrive/cuid2";
 
 describe("Credential Verification API", () => {
@@ -72,7 +73,14 @@ describe("Credential Verification API", () => {
       const res = await app.fetch(req);
       expect(res.status).toBe(200);
 
-      const data = await res.json();
+      const data = (await res.json()) as {
+        status: string;
+        data: {
+          valid: boolean;
+          checks: Record<string, boolean>;
+          errors?: string[];
+        };
+      };
       expect(data.status).toBe("success");
       expect(data.data.valid).toBe(true);
       expect(data.data.checks.structure).toBe(true);
@@ -87,7 +95,10 @@ describe("Credential Verification API", () => {
       const res = await app.fetch(req);
       expect(res.status).toBe(200);
 
-      const data = await res.json();
+      const data = (await res.json()) as {
+        status: string;
+        data: { valid: boolean; errors: string[] };
+      };
       expect(data.status).toBe("success");
       expect(data.data.valid).toBe(false);
       expect(data.data.errors).toContain("Credential not found in database");
@@ -102,7 +113,14 @@ describe("Credential Verification API", () => {
       const res = await app.fetch(req);
       expect(res.status).toBe(200);
 
-      const data = await res.json();
+      const data = (await res.json()) as {
+        status: string;
+        data: {
+          credentialId: string;
+          isRevoked: boolean;
+          statusMessage: string;
+        };
+      };
       expect(data.status).toBe("success");
       expect(data.data.credentialId).toBe(testCredentialId);
       expect(data.data.isRevoked).toBe(false);
@@ -113,7 +131,10 @@ describe("Credential Verification API", () => {
       const res = await app.fetch(req);
       expect(res.status).toBe(200);
 
-      const data = await res.json();
+      const data = (await res.json()) as {
+        status: string;
+        data: { isRevoked: boolean };
+      };
       expect(data.status).toBe("success");
       expect(data.data.isRevoked).toBe(true);
     });
@@ -183,7 +204,7 @@ describe("Credential Verification API", () => {
       const res = await app.fetch(req);
       expect(res.status).toBe(200);
 
-      const data = await res.json();
+      const data = (await res.json()) as { status: string; data: unknown };
       expect(data.status).toBe("success");
     });
   });

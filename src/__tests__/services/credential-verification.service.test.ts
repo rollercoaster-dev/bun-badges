@@ -64,7 +64,10 @@ class TestCredentialVerificationService extends CredentialVerificationService {
     return credentialId === "revoked-credential-id";
   }
 
-  async revokeCredential(credentialId: string) {
+  async revokeCredential(
+    _credentialId: string,
+    _reason?: string,
+  ): Promise<boolean> {
     return true;
   }
 }
@@ -127,10 +130,7 @@ describe("CredentialVerificationService", () => {
 
   describe("revokeCredential", () => {
     it("should revoke a credential", async () => {
-      const result = await service.revokeCredential(
-        "test-credential-id",
-        "Test reason",
-      );
+      const result = await service.revokeCredential("test-credential-id");
       expect(result).toBe(true);
     });
   });

@@ -402,7 +402,9 @@ export class CredentialVerificationService {
         })
         .where(eq(credentials.id, credentialId));
 
-      return result.rowCount > 0;
+      return result && typeof result.rowCount === "number"
+        ? result.rowCount > 0
+        : false;
     } catch (error) {
       this.logger.error(error, "Error revoking credential:");
       return false;

@@ -806,7 +806,9 @@ export class DatabaseService implements IDatabaseService {
         .set(updateData)
         .where(eq(credentials.id, credentialId));
 
-      return result.rowCount > 0;
+      return result && typeof result.rowCount === "number"
+        ? result.rowCount > 0
+        : false;
     } catch (error) {
       this.logger.error(error, "Failed to update credential status:");
       return false;
