@@ -1,40 +1,117 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import {
+  describe,
+  test,
+  expect,
+  beforeEach,
+  afterEach,
+  beforeAll,
+  afterAll,
+} from "bun:test";
 import { KeysService, KeyStatus } from "@/services/keys.service";
 import { db } from "@/db/config";
 import { keys } from "@/db/schema/keys.schema";
 import { eq } from "drizzle-orm";
+import { sql } from "drizzle-orm";
+import "@/utils/test/integration-setup";
 
 describe("KeysService Integration", () => {
   let keysService: KeysService;
   let testKeyId: string;
 
+  // Create the keys table if it doesn't exist
+  beforeAll(async () => {
+    try {
+      // Check if the keys table exists
+      const result = await db.execute(sql`
+        SELECT EXISTS (
+          SELECT FROM pg_tables
+          WHERE schemaname = 'public'
+          AND tablename = 'keys'
+        );
+      `);
+
+      const tableExists = result.rows[0]?.exists;
+      if (!tableExists) {
+        console.log("Creating keys table for tests...");
+        await db.execute(sql`
+          CREATE TABLE IF NOT EXISTS keys (
+            id TEXT PRIMARY KEY,
+            type TEXT NOT NULL,
+            algorithm TEXT NOT NULL,
+            public_key TEXT NOT NULL,
+            private_key TEXT,
+            name TEXT,
+            description TEXT,
+            version TEXT,
+            previous_key_id TEXT,
+            expires_at TIMESTAMP WITH TIME ZONE,
+            revoked_at TIMESTAMP WITH TIME ZONE,
+            revocation_reason TEXT,
+            is_active BOOLEAN NOT NULL DEFAULT true,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE
+          );
+        `);
+        console.log("✅ Keys table created successfully");
+      } else {
+        console.log("Keys table already exists");
+      }
+    } catch (error) {
+      console.error("Error setting up keys table:", error);
+      throw error;
+    }
+  });
+
   beforeEach(async () => {
     keysService = new KeysService();
 
     // Clean up any existing test keys
-    await db.delete(keys).where(eq(keys.name, "Test Key"));
+    try {
+      await db.delete(keys).where(eq(keys.name, "Test Key"));
+    } catch (error) {
+      console.error("Error cleaning up existing test keys:", error);
+    }
 
     // Create a test key for use in tests
-    const [testKey] = await db
-      .insert(keys)
-      .values({
-        type: "signing",
-        algorithm: "RS256",
-        publicKey: "test-public-key",
-        privateKey: "test-private-key",
-        name: "Test Key",
-        description: "Test key for integration tests",
-        version: "1.0.0",
-        isActive: true,
-      })
-      .returning();
+    try {
+      const [testKey] = await db
+        .insert(keys)
+        .values({
+          type: "signing",
+          algorithm: "RS256",
+          publicKey: "test-public-key",
+          privateKey: "test-private-key",
+          name: "Test Key",
+          description: "Test key for integration tests",
+          version: "1.0.0",
+          isActive: true,
+        })
+        .returning();
 
-    testKeyId = testKey.id;
+      testKeyId = testKey.id;
+    } catch (error) {
+      console.error("Error creating test key:", error);
+      throw error;
+    }
   });
 
   afterEach(async () => {
     // Clean up test keys
-    await db.delete(keys).where(eq(keys.name, "Test Key"));
+    try {
+      await db.delete(keys).where(eq(keys.name, "Test Key"));
+    } catch (error) {
+      console.error("Error cleaning up test keys:", error);
+    }
+  });
+
+  // Clean up after all tests
+  afterAll(async () => {
+    try {
+      // Delete all test data
+      await db.delete(keys).where(eq(keys.name, "Test Key"));
+    } catch (error) {
+      console.error("Error cleaning up after tests:", error);
+    }
   });
 
   test("should create a new key", async () => {

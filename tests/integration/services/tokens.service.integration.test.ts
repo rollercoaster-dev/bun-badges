@@ -1,8 +1,18 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import {
+  describe,
+  test,
+  expect,
+  beforeEach,
+  afterEach,
+  beforeAll,
+  afterAll,
+} from "bun:test";
 import { TokensService, TokenStatus } from "@/services/tokens.service";
 import { db } from "@/db/config";
 import { tokens } from "@/db/schema/tokens.schema";
 import { eq } from "drizzle-orm";
+import { sql } from "drizzle-orm";
+import "@/utils/test/integration-setup";
 
 describe("TokensService Integration", () => {
   let tokensService: TokensService;
@@ -11,34 +21,98 @@ describe("TokensService Integration", () => {
   const testUserId = "test-user-id";
   const testClientId = "test-client-id";
 
+  // Create the tokens table if it doesn't exist
+  beforeAll(async () => {
+    try {
+      // Check if the tokens table exists
+      const result = await db.execute(sql`
+        SELECT EXISTS (
+          SELECT FROM pg_tables
+          WHERE schemaname = 'public'
+          AND tablename = 'tokens'
+        );
+      `);
+
+      const tableExists = result.rows[0]?.exists;
+      if (!tableExists) {
+        console.log("Creating tokens table for tests...");
+        await db.execute(sql`
+          CREATE TABLE IF NOT EXISTS tokens (
+            id TEXT PRIMARY KEY,
+            type TEXT NOT NULL,
+            token_hash TEXT NOT NULL,
+            client_id TEXT,
+            user_id TEXT,
+            scope TEXT,
+            jwt_id TEXT,
+            expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+            revoked_at TIMESTAMP WITH TIME ZONE,
+            revocation_reason TEXT,
+            is_active BOOLEAN NOT NULL DEFAULT true,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+          );
+        `);
+        console.log("✅ Tokens table created successfully");
+      } else {
+        console.log("Tokens table already exists");
+      }
+    } catch (error) {
+      console.error("Error setting up tokens table:", error);
+      throw error;
+    }
+  });
+
   beforeEach(async () => {
     tokensService = new TokensService();
     testTokenHash = tokensService.hashToken("test-token");
 
     // Clean up any existing test tokens
-    await db.delete(tokens).where(eq(tokens.userId, testUserId));
+    try {
+      await db.delete(tokens).where(eq(tokens.userId, testUserId));
+    } catch (error) {
+      console.error("Error cleaning up existing test tokens:", error);
+    }
 
     // Create a test token for use in tests
-    const [testToken] = await db
-      .insert(tokens)
-      .values({
-        type: "access",
-        tokenHash: testTokenHash,
-        clientId: testClientId,
-        userId: testUserId,
-        scope: "read write",
-        jwtId: "test-jwt-id",
-        expiresAt: new Date(Date.now() + 3600000), // 1 hour from now
-        isActive: true,
-      })
-      .returning();
+    try {
+      const [testToken] = await db
+        .insert(tokens)
+        .values({
+          type: "access",
+          tokenHash: testTokenHash,
+          clientId: testClientId,
+          userId: testUserId,
+          scope: "read write",
+          jwtId: "test-jwt-id",
+          expiresAt: new Date(Date.now() + 3600000), // 1 hour from now
+          isActive: true,
+        })
+        .returning();
 
-    testTokenId = testToken.id;
+      testTokenId = testToken.id;
+    } catch (error) {
+      console.error("Error creating test token:", error);
+      throw error;
+    }
   });
 
   afterEach(async () => {
     // Clean up test tokens
-    await db.delete(tokens).where(eq(tokens.userId, testUserId));
+    try {
+      await db.delete(tokens).where(eq(tokens.userId, testUserId));
+    } catch (error) {
+      console.error("Error cleaning up test tokens:", error);
+    }
+  });
+
+  // Clean up after all tests
+  afterAll(async () => {
+    try {
+      // Delete all test data
+      await db.delete(tokens).where(eq(tokens.userId, testUserId));
+    } catch (error) {
+      console.error("Error cleaning up after tests:", error);
+    }
   });
 
   test("should create a new token", async () => {

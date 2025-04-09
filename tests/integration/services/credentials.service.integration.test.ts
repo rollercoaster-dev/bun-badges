@@ -1,4 +1,12 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import {
+  describe,
+  test,
+  expect,
+  beforeEach,
+  afterEach,
+  beforeAll,
+  afterAll,
+} from "bun:test";
 import {
   CredentialsService,
   CredentialStatus,
@@ -6,6 +14,8 @@ import {
 import { db } from "@/db/config";
 import { credentials } from "@/db/schema/credentials.schema";
 import { eq } from "drizzle-orm";
+import { sql } from "drizzle-orm";
+import "@/utils/test/integration-setup";
 
 describe("CredentialsService Integration", () => {
   let credentialsService: CredentialsService;
@@ -14,35 +24,108 @@ describe("CredentialsService Integration", () => {
   const testRecipientId = "test-recipient-id";
   const testKeyId = "test-key-id";
 
+  // Create the credentials table if it doesn't exist
+  beforeAll(async () => {
+    try {
+      // Check if the credentials table exists
+      const result = await db.execute(sql`
+        SELECT EXISTS (
+          SELECT FROM pg_tables
+          WHERE schemaname = 'public'
+          AND tablename = 'credentials'
+        );
+      `);
+
+      const tableExists = result.rows[0]?.exists;
+      if (!tableExists) {
+        console.log("Creating credentials table for tests...");
+        await db.execute(sql`
+          CREATE TABLE IF NOT EXISTS credentials (
+            id TEXT PRIMARY KEY,
+            type TEXT NOT NULL,
+            issuer_id TEXT NOT NULL,
+            recipient_id TEXT NOT NULL,
+            credential_hash TEXT NOT NULL,
+            data JSONB,
+            proof JSONB,
+            key_id TEXT,
+            status TEXT NOT NULL,
+            expires_at TIMESTAMP WITH TIME ZONE,
+            revoked_at TIMESTAMP WITH TIME ZONE,
+            revocation_reason TEXT,
+            is_active BOOLEAN NOT NULL DEFAULT true,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+            issued_at TIMESTAMP WITH TIME ZONE NOT NULL
+          );
+        `);
+        console.log("✅ Credentials table created successfully");
+      } else {
+        console.log("Credentials table already exists");
+      }
+    } catch (error) {
+      console.error("Error setting up credentials table:", error);
+      throw error;
+    }
+  });
+
   beforeEach(async () => {
     credentialsService = new CredentialsService();
 
     // Clean up any existing test credentials
-    await db.delete(credentials).where(eq(credentials.issuerId, testIssuerId));
+    try {
+      await db
+        .delete(credentials)
+        .where(eq(credentials.issuerId, testIssuerId));
+    } catch (error) {
+      console.error("Error cleaning up existing test credentials:", error);
+    }
 
     // Create a test credential for use in tests
-    const [testCredential] = await db
-      .insert(credentials)
-      .values({
-        type: "OpenBadgeCredential",
-        issuerId: testIssuerId,
-        recipientId: testRecipientId,
-        credentialHash: "test-credential-hash",
-        data: { test: "data" },
-        proof: { test: "proof" },
-        keyId: testKeyId,
-        status: "active",
-        issuedAt: new Date(),
-        isActive: true,
-      })
-      .returning();
+    try {
+      const [testCredential] = await db
+        .insert(credentials)
+        .values({
+          type: "OpenBadgeCredential",
+          issuerId: testIssuerId,
+          recipientId: testRecipientId,
+          credentialHash: "test-credential-hash",
+          data: { test: "data" },
+          proof: { test: "proof" },
+          keyId: testKeyId,
+          status: "active",
+          issuedAt: new Date(),
+          isActive: true,
+        })
+        .returning();
 
-    testCredentialId = testCredential.id;
+      testCredentialId = testCredential.id;
+    } catch (error) {
+      console.error("Error creating test credential:", error);
+      throw error;
+    }
   });
 
   afterEach(async () => {
     // Clean up test credentials
-    await db.delete(credentials).where(eq(credentials.issuerId, testIssuerId));
+    try {
+      await db
+        .delete(credentials)
+        .where(eq(credentials.issuerId, testIssuerId));
+    } catch (error) {
+      console.error("Error cleaning up test credentials:", error);
+    }
+  });
+
+  // Clean up after all tests
+  afterAll(async () => {
+    try {
+      // Delete all test data
+      await db
+        .delete(credentials)
+        .where(eq(credentials.issuerId, testIssuerId));
+    } catch (error) {
+      console.error("Error cleaning up after tests:", error);
+    }
   });
 
   test("should store a new credential", async () => {
