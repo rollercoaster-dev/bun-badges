@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { authorizationService } from "../../../src/services/authorization.service";
 import { db } from "../../../src/db/config";
 import { users } from "../../../src/db/schema";
-import { Role } from "../../../src/middleware/auth";
+// Role enum is not needed as we're using string literals
 import { Permission } from "../../../src/models/auth/roles";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "crypto";
+import { eq } from "drizzle-orm";
 
 describe("AuthorizationService Integration Tests", () => {
   let testUserId: string;
@@ -15,7 +16,7 @@ describe("AuthorizationService Integration Tests", () => {
     const result = await db
       .insert(users)
       .values({
-        email: `test-auth-${uuidv4()}@example.com`,
+        email: `test-auth-${randomUUID()}@example.com`,
         name: "Test Auth User",
       })
       .returning({ userId: users.userId });
@@ -27,7 +28,7 @@ describe("AuthorizationService Integration Tests", () => {
   afterAll(async () => {
     // Delete the test user
     if (testUserId) {
-      await db.delete(users).where({ userId: testUserId });
+      await db.delete(users).where(eq(users.userId, testUserId));
     }
   });
 
@@ -36,14 +37,14 @@ describe("AuthorizationService Integration Tests", () => {
       // Assign the ISSUER role to the test user
       const result = await authorizationService.assignRoleToUser(
         testUserId,
-        Role.ISSUER,
+        "issuer",
       );
       expect(result).toBe(true);
 
       // Verify the user has the role
       const hasRole = await authorizationService.userHasRole(
         testUserId,
-        Role.ISSUER,
+        "issuer",
       );
       expect(hasRole).toBe(true);
     });
@@ -51,21 +52,21 @@ describe("AuthorizationService Integration Tests", () => {
     it("should get all roles for a user", async () => {
       // Get the user's roles
       const roles = await authorizationService.getUserRoles(testUserId);
-      expect(roles).toContain(Role.ISSUER);
+      expect(roles).toContain("issuer");
     });
 
     it("should remove a role from a user", async () => {
       // Remove the ISSUER role from the test user
       const result = await authorizationService.removeRoleFromUser(
         testUserId,
-        Role.ISSUER,
+        "issuer",
       );
       expect(result).toBe(true);
 
       // Verify the user no longer has the role
       const hasRole = await authorizationService.userHasRole(
         testUserId,
-        Role.ISSUER,
+        "issuer",
       );
       expect(hasRole).toBe(false);
     });
@@ -172,11 +173,11 @@ describe("AuthorizationService Integration Tests", () => {
   describe("Role-Permission Relationship", () => {
     it("should assign a permission to a role and check user permissions", async () => {
       // Assign the ISSUER role to the test user
-      await authorizationService.assignRoleToUser(testUserId, Role.ISSUER);
+      await authorizationService.assignRoleToUser(testUserId, "issuer");
 
       // Assign the CREATE_CREDENTIALS permission to the ISSUER role
       const result = await authorizationService.assignPermissionToRole(
-        Role.ISSUER,
+        "issuer",
         Permission.CREATE_CREDENTIALS,
       );
       expect(result).toBe(true);
@@ -192,7 +193,7 @@ describe("AuthorizationService Integration Tests", () => {
     it("should remove a permission from a role and check user permissions", async () => {
       // Remove the CREATE_CREDENTIALS permission from the ISSUER role
       const result = await authorizationService.removePermissionFromRole(
-        Role.ISSUER,
+        "issuer",
         Permission.CREATE_CREDENTIALS,
       );
       expect(result).toBe(true);
