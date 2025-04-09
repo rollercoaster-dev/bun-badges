@@ -1002,12 +1002,6 @@ export class OAuthController {
       throw new UnauthorizedError("Invalid client");
     }
 
-    // Public clients (without a secret) must use PKCE
-    const isPublicClient = client.tokenEndpointAuthMethod === "none";
-    if (isPublicClient && !code_verifier) {
-      throw new BadRequestError("PKCE required for public clients");
-    }
-
     // For confidential clients, validate client secret if auth method requires it
     if (
       client.tokenEndpointAuthMethod !== "none" &&

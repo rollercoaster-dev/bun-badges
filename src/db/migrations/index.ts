@@ -6,6 +6,7 @@ import * as migration_007 from "./0007_add_headless_oauth";
 import * as migration_008 from "./0008_add_token_mappings";
 import * as migration_009 from "./0009_add_pkce_consent";
 import * as migration_010 from "./0010_add_jar_support";
+import * as migration_011 from "./0011_fix_revoked_tokens_migration";
 
 // List of migrations to run, in order
 export const migrations = [
@@ -17,4 +18,5 @@ export const migrations = [
   migration_008,
   migration_009,
   migration_010,
+  migration_011,
 ];

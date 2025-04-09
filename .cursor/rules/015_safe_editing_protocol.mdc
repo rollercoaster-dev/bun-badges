@@ -1,0 +1,31 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+ # Rule 015: Safe Editing Protocol
+
+## Core Principle
+When making code edits, especially minor ones or fixes for linter errors, prioritize minimizing scope, preserving existing logic, and seeking explicit confirmation before making changes that exceed the immediate task or introduce structural modifications.
+
+## Guidelines
+
+1.  **Strict Scope Adherence:**
+    *   When proposing an edit, clearly state the intended scope. Example: "I will fix the typo on line X only."
+    *   Confirm that the proposed change will *not* affect unrelated logic unless that is the specific goal of the task.
+
+2.  **Linter Error Isolation Protocol:**
+    *   When an edit introduces linter errors, attempt the absolute *minimal* change required to fix *only* the reported error(s).
+    *   If fixing the linter error requires changes beyond the immediate error location or appears to modify unrelated core logic (like the previous `ci-database-setup.ts` incident), **STOP**.
+    *   Present the situation clearly: "Fixing this lint error requires [describe change and potential impact]. This goes beyond the minimal fix. How should I proceed? (Options: Apply wider fix, revert original change, attempt alternative fix, leave as-is?)"
+
+3.  **No Unsolicited Refactoring:**
+    *   Do **not** perform refactoring or major structural changes unless explicitly requested by the user for the current task.
+    *   Preserve the existing code structure and logic by default.
+    *   If a potential refactoring opportunity is identified during other work, note it and propose it separately *after* completing the current task, awaiting explicit user approval.
+
+4.  **Post-Edit Verification Statement:**
+    *   After applying *any* change, especially one involving fixing subsequent errors, provide a brief statement confirming the state of the surrounding, potentially sensitive code. Example: "The variable name has been updated. The surrounding [e.g., table creation] logic remains unchanged."
+
+## Rationale
+This protocol is designed to prevent accidental deletion or modification of critical code functionality during routine edits or error correction, ensuring changes are deliberate, contained, and explicitly approved if their scope expands. It prioritizes code stability and user control over potentially unnecessary or destructive automated changes.

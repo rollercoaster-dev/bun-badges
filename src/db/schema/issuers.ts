@@ -1,4 +1,11 @@
-import { pgTable, uuid, varchar, timestamp, jsonb } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  uuid,
+  varchar,
+  timestamp,
+  jsonb,
+  text,
+} from "drizzle-orm/pg-core";
 import { users } from "./index";
 
 // Issuer profiles for credential issuance
@@ -13,6 +20,8 @@ export const issuerProfiles = pgTable("issuer_profiles", {
     .notNull(),
   issuerJson: jsonb("issuer_json").notNull(), // Full Open Badges issuer JSON
   publicKey: jsonb("public_key"),
+  signingPublicKey: text("signing_public_key"),
+  encryptedPrivateKey: text("encrypted_private_key"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

@@ -1,5 +1,24 @@
 # Phase 3: Security Implementation Review
 
+## Definition of Done (DoD) Checklist (Based on Benchmark Plan)
+1.  **Authentication Strategy Implemented:**
+    *   [`~`] Chosen strategy (API Keys, JWT, OAuth2) implemented. *(Current: JWT Bearer, but conflicts with Rule 005: OAuth 2.0)*
+    *   [`~`] Middleware exists to validate credentials (`src/middleware/auth.ts`, `src/middleware/auth.middleware.ts` - **REDUNDANT**).
+    *   [`~`] Secure storage/handling of primary secrets (e.g., API key hashes, JWT secret). *(Uses `JWT_SECRET` from env var - handling needs verification)*.
+2.  **Authorization Strategy Implemented:**
+    *   [`✅`] Middleware exists for authorization if needed (RBAC implemented in `src/middleware/auth.ts` - `requireRole`, `requireOwnership`).
+3.  **Secure Key Loading Implemented (for OB 3.0):**
+    *   [`❌`] Functions exist to securely load issuer private keys based on chosen strategy (Vault, Secrets Mgr, encrypted DB, etc.). **MAJOR GAP.**
+    *   [`❌`] Keys are not exposed in logs or errors. *(No implementation found)*.
+4.  **Auth Middleware Applied:**
+    *   [`?`] Relevant Hono routes are protected by AuthN/AuthZ middleware. *(Needs verification by checking route definitions)*.
+5.  **Testing:**
+    *   [`❌`] Unit tests for key loading logic (mocking secret stores), JWT validation/signing. *(No specific tests found)*.
+    *   [`~`] Integration tests for AuthN/AuthZ middleware (valid/invalid credentials, permissions), protected endpoints. *(Some likely exist but need review for completeness)*.
+6.  **Documentation:**
+    *   [`~`] README/API Docs explain authentication. *(Needs update based on consolidated/chosen strategy)*.
+    *   [`❌`] Key management procedures documented for operators.
+    *   [`~`] Security Model document updated. *(Needs creation/update)*.
 ## Definition of Done (DoD) Checklist
 1.  **Authentication Strategy with Database Integration:**
     *   [x] Database schema for OAuth clients and tokens.

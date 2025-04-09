@@ -27,6 +27,36 @@ describe("OAuthController Integration Tests", () => {
     // Setup mock DB service
     mockDb = mockOAuthDbService();
 
+    // *** ADD MOCKS FOR MISSING DB METHODS ***
+    mockDb.getAccessToken = mock((token: string) => {
+      // Return a mock active token for testing introspection success
+      if (token === "valid-access-token") {
+        return Promise.resolve({
+          token: token,
+          clientId: testData.oauthClient.id,
+          userId: testData.user.id,
+          scope: "profile:read badge:read",
+          expiresAt: new Date(Date.now() + 3600 * 1000),
+          createdAt: new Date(),
+          isRevoked: false,
+        });
+      }
+      // Return null for revoked/invalid tokens to test inactive introspection
+      if (token === "revoked-token" || token === "invalid-token") {
+        return Promise.resolve(null); // Simulate not found or revoked
+      }
+      return Promise.resolve(null);
+    });
+    mockDb.revokeAccessToken = mock((token: string) => {
+      console.log(`[Mock DB] revokeAccessToken called for token: ${token}`);
+      return Promise.resolve(); // Simulate successful revocation
+    });
+    mockDb.storeAccessToken = mock((data: any) => {
+      console.log(`[Mock DB] storeAccessToken called with:`, data);
+      return Promise.resolve(); // Simulate successful storage
+    });
+    // *** END ADDED MOCKS ***
+
     // Setup mock JWT utilities
     mockJwtUtils = mockJwt();
 

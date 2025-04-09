@@ -2,6 +2,18 @@ import { swaggerUI } from "@hono/swagger-ui";
 import { Hono } from "hono";
 import type { Context } from "hono";
 
+// Environment variables for server URL construction
+const hostEnv = process.env.HOST || "localhost"; // Use HOST env var or default to localhost for Swagger URL
+const portEnv = process.env.PORT;
+if (!portEnv) {
+  throw new Error(
+    "PORT environment variable is not set (required for Swagger URL).",
+  );
+}
+const port = parseInt(portEnv, 10);
+const protocol = process.env.USE_HTTPS === "true" ? "https" : "http";
+const serverUrl = `${protocol}://${hostEnv}:${port}`;
+
 export const swaggerDefinition = {
   openapi: "3.0.0",
   info: {
@@ -15,8 +27,8 @@ export const swaggerDefinition = {
   },
   servers: [
     {
-      url: "http://localhost:3000",
-      description: "Development server",
+      url: serverUrl,
+      description: process.env.NODE_ENV || "development",
     },
   ],
   tags: [
@@ -232,13 +244,12 @@ export const swaggerDefinition = {
   },
 };
 
-export const createSwaggerUI = (basePath: string) => {
+export const createSwaggerUI = () => {
   const app = new Hono();
-  app.basePath(basePath);
 
   app.get("/openapi.json", (c) => c.json(swaggerDefinition));
-  app.get("/", (c: Context) => c.redirect(`${basePath}/ui`));
-  app.use("/ui", swaggerUI({ url: `${basePath}/openapi.json` }));
+  app.get("/", (c: Context) => c.redirect(`${serverUrl}/ui`));
+  app.use("/ui", swaggerUI({ url: `${serverUrl}/openapi.json` }));
 
   return app;
 };

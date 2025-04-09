@@ -61,8 +61,11 @@ export async function registerAndLoginUser(
   );
 
   if (registerResponse.status !== 201) {
+    // Log the actual status and raw text response for debugging
+    console.error("Registration failed! Status:", registerResponse.status);
+    console.error("Raw response text:", registerResponse.text); // Log raw text
     throw new Error(
-      `Failed to register user: ${JSON.stringify(registerResponse.body)}`,
+      `Failed to register user (Status: ${registerResponse.status}): ${registerResponse.text}`, // Use raw text in error
     );
   }
 
