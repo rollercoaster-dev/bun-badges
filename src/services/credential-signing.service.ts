@@ -6,7 +6,7 @@
  * Open Badges 3.0 specification.
  */
 
-import { SignJWT, jwtVerify, importJWK } from "jose";
+import * as crypto from "crypto";
 import { keyManagementService } from "./key-management.service";
 import logger from "../utils/logger";
 
@@ -34,25 +34,37 @@ export class CredentialSigningService {
         throw new Error("Signing key not found");
       }
 
-      // Parse the private key
-      const privateKeyJwk = JSON.parse(signingKey.privateKey);
-
-      // Import the private key
-      const privateKey = await importJWK(privateKeyJwk, signingKey.algorithm);
-
-      // Create JWT header
+      // Create JWT header and payload
       const header = {
-        alg: signingKey.algorithm,
+        alg: "RS256",
         kid: signingKey.id,
         typ: "JWT",
       };
 
-      // Sign the JWT
-      const jwt = await new SignJWT(payload)
-        .setProtectedHeader(header)
-        .setIssuedAt()
-        .setExpirationTime("1h")
-        .sign(privateKey);
+      // Add issuedAt and expiration to payload
+      const now = Math.floor(Date.now() / 1000);
+      const enhancedPayload = {
+        ...payload,
+        iat: now,
+        exp: now + 3600, // 1 hour
+      };
+
+      // Combine header and payload
+      const headerBase64 = Buffer.from(JSON.stringify(header)).toString(
+        "base64url",
+      );
+      const payloadBase64 = Buffer.from(
+        JSON.stringify(enhancedPayload),
+      ).toString("base64url");
+      const dataToSign = `${headerBase64}.${payloadBase64}`;
+
+      // Sign the data
+      const signer = crypto.createSign("RSA-SHA256");
+      signer.update(dataToSign);
+      const signature = signer.sign(signingKey.privateKey, "base64url");
+
+      // Create the JWT
+      const jwt = `${dataToSign}.${signature}`;
 
       logger.info("Signed credential JWT", { keyId: signingKey.id });
 
@@ -70,9 +82,13 @@ export class CredentialSigningService {
    */
   async verifyCredentialJwt(jwt: string): Promise<Record<string, unknown>> {
     try {
-      // Extract the header to get the key ID
-      const [headerBase64] = jwt.split(".");
-      const headerJson = Buffer.from(headerBase64, "base64").toString("utf8");
+      // Split the JWT into parts
+      const [headerBase64, payloadBase64, signatureBase64] = jwt.split(".");
+
+      // Decode the header to get the key ID
+      const headerJson = Buffer.from(headerBase64, "base64url").toString(
+        "utf8",
+      );
       const header = JSON.parse(headerJson);
 
       // Get the key
@@ -82,14 +98,30 @@ export class CredentialSigningService {
         throw new Error(`Key not found: ${header.kid}`);
       }
 
-      // Parse the public key
-      const publicKeyJwk = JSON.parse(key.publicKey);
+      // Verify the signature
+      const dataToVerify = `${headerBase64}.${payloadBase64}`;
+      const verifier = crypto.createVerify("RSA-SHA256");
+      verifier.update(dataToVerify);
+      const isValid = verifier.verify(
+        key.publicKey,
+        signatureBase64,
+        "base64url",
+      );
 
-      // Import the public key
-      const publicKey = await importJWK(publicKeyJwk, key.algorithm);
+      if (!isValid) {
+        throw new Error("Invalid signature");
+      }
 
-      // Verify the JWT
-      const { payload } = await jwtVerify(jwt, publicKey);
+      // Decode the payload
+      const payload = JSON.parse(
+        Buffer.from(payloadBase64, "base64url").toString("utf8"),
+      );
+
+      // Check expiration
+      const now = Math.floor(Date.now() / 1000);
+      if (payload.exp && payload.exp < now) {
+        throw new Error("Token expired");
+      }
 
       logger.info("Verified credential JWT", { keyId: key.id });
 
