@@ -105,11 +105,11 @@ Test cases to cover:
 - [x] Integrated schemas with main schema index
 - [x] Verified migration files exist for these tables
 - [x] Created service files for keys, tokens, and credentials
-- [x] Created unit tests for the service methods
+- [x] Created integration tests for the service methods
 
 ### Context Resume Point
-- Last working on: Writing unit tests for the service methods
-- Next planned action: Run the unit tests to verify functionality
+- Last working on: Writing integration tests for the service methods
+- Next planned action: Run the integration tests to verify functionality
 - Current blockers: None
 
 ### Next Actions & Blockers
@@ -117,8 +117,8 @@ Test cases to cover:
   - [x] Create service file for keys (`src/services/keys.service.ts`) (40 mins)
   - [x] Create service file for tokens (`src/services/tokens.service.ts`) (40 mins)
   - [x] Create service file for credentials (`src/services/credentials.service.ts`) (40 mins)
-  - [x] Write unit tests for the service methods (60 mins)
-  - [ ] Run the unit tests to verify functionality (15 mins)
+  - [x] Write integration tests for the service methods (60 mins)
+  - [ ] Run the integration tests to verify functionality (15 mins)
   - [ ] Update documentation with information about the new services (30 mins)
 - **Current Blockers:**
   - None currently identified
