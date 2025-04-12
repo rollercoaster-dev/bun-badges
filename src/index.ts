@@ -4,6 +4,10 @@ import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import * as dotenv from "dotenv";
 import * as path from "path";
+import { createSecurityMiddleware } from "@/middleware/security.middleware";
+import { securityConfig } from "@/config/security.config";
+import { createCSPReportRoutes } from "@/routes/csp-report.routes";
+import { createCSRFRoutes } from "@/routes/csrf.routes";
 
 // --- Load environment-specific .env file ---
 const nodeEnv = process.env.NODE_ENV;
@@ -59,11 +63,45 @@ const authMiddleware = createAuthMiddleware(db);
 
 // Middleware
 app.use("*", honoLogger());
-app.use("*", cors());
+
+// Configure CORS with security settings
+app.use(
+  "*",
+  cors({
+    origin: securityConfig.cors.origin,
+    allowMethods: securityConfig.cors.methods,
+    allowHeaders: securityConfig.cors.allowedHeaders,
+    exposeHeaders: securityConfig.cors.exposedHeaders,
+    credentials: securityConfig.cors.credentials,
+    maxAge: securityConfig.cors.maxAge,
+  }),
+);
+
+// Add basic security headers
 app.use("*", secureHeaders());
+
+// Add enhanced security middleware
+app.use(
+  "*",
+  createSecurityMiddleware({
+    enableCSP: securityConfig.csp.enabled,
+    cspReportOnly: securityConfig.csp.reportOnly,
+    cspReportUri: securityConfig.csp.reportUri,
+    enableXSSProtection: true,
+    enableCSRF: securityConfig.csrf.enabled,
+  }),
+);
+
+// Add error handling middleware
 app.use("*", errorHandler);
 
-// Add the auth middleware to protected routes
+// Add CSP report endpoint (public)
+app.route("/api/csp-report", createCSPReportRoutes());
+
+// Add CSRF token endpoint (public)
+app.route("/api/csrf", createCSRFRoutes());
+
+// Add the auth middleware to protected routes (after public endpoints)
 app.use("/api/*", authMiddleware);
 
 // Create the OAuth router with Open Badges 3.0 endpoints

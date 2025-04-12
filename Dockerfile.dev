@@ -32,7 +32,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Set environment variables
-ENV PORT=3000 \
+# Note: PORT will be overridden by .env if present
+ENV PORT=6669 \
     HOST="0.0.0.0" \
     NODE_ENV=development
 

@@ -20,9 +20,11 @@ bun install
 
 # Set development environment variables if not already set
 export NODE_ENV=${NODE_ENV:-development}
-export PORT=${PORT:-3000}
+export PORT=${PORT:-6669}
 export HOST=${HOST:-0.0.0.0}
 export LOG_LEVEL=${LOG_LEVEL:-debug}
+# Set Bun server port for hot reload (different from main app port)
+export BUN_SERVER_PORT=${BUN_SERVER_PORT:-6670}
 
 echo "Starting development server on ${HOST}:${PORT}"
 echo "Environment: ${NODE_ENV}"
@@ -56,4 +58,4 @@ else
   echo "Using BitSet preload script: $PRELOAD_SCRIPT"
   # Start with preload script
   exec bun --preload "$PRELOAD_SCRIPT" --watch src/index.ts
-fi 
+fi
