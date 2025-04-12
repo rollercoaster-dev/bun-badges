@@ -18,21 +18,11 @@ fi
 echo "Installing dependencies..."
 bun install
 
-# Run database initialization
-echo "Initializing database..."
-bun run scripts/db-init.ts --env=development
-
 # Set development environment variables if not already set
 export NODE_ENV=${NODE_ENV:-development}
-# PORT should be set by docker-compose
+export PORT=${PORT:-3000}
 export HOST=${HOST:-0.0.0.0}
 export LOG_LEVEL=${LOG_LEVEL:-debug}
-
-# Ensure PORT is set
-if [ -z "$PORT" ]; then
-  echo "ERROR: PORT environment variable is not set"
-  exit 1
-fi
 
 echo "Starting development server on ${HOST}:${PORT}"
 echo "Environment: ${NODE_ENV}"
@@ -66,4 +56,4 @@ else
   echo "Using BitSet preload script: $PRELOAD_SCRIPT"
   # Start with preload script
   exec bun --preload "$PRELOAD_SCRIPT" --watch src/index.ts
-fi
+fi 

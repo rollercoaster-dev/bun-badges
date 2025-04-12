@@ -1,15 +1,9 @@
 import { findAvailablePort } from "../src/utils/network";
 import { $ } from "bun";
 
-import * as dotenv from "dotenv";
-
-// Load port configuration
-dotenv.config({ path: ".env.ports" });
-
 // Base ports, potentially overridden by environment variables
-const baseServerPort = parseInt(process.env.APP_PORT || "3000", 10);
+const baseServerPort = parseInt(process.env.PORT || "7777", 10);
 const baseDbPort = parseInt(process.env.DB_PORT || "5432", 10);
-const appInternalPort = parseInt(process.env.APP_INTERNAL_PORT || "6669", 10);
 
 async function startDevEnvironment() {
   try {
@@ -35,15 +29,7 @@ async function startDevEnvironment() {
       ...process.env, // Inherit existing environment variables
       PORT: serverPort.toString(),
       DB_PORT: dbPort.toString(),
-      APP_INTERNAL_PORT: appInternalPort.toString(),
     });
-
-    console.log(
-      `\nApplication is running at http://localhost:${serverPort} (mapped to internal port ${appInternalPort})`,
-    );
-    console.log(
-      `Database is available at localhost:${dbPort} (mapped to internal port 5432)`,
-    );
   } catch (error) {
     if (error instanceof Error) {
       console.error(`Error during startup: ${error.message}`);

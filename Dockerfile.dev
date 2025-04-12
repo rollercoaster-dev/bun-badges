@@ -32,9 +32,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Set environment variables
-ENV HOST="0.0.0.0" \
+ENV PORT=3000 \
+    HOST="0.0.0.0" \
     NODE_ENV=development
-# PORT will be set by docker-compose
 
 # Expose ports for development
 EXPOSE ${PORT}

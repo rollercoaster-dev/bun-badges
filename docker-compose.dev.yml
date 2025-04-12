@@ -4,19 +4,10 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     ports:
-      - "${PORT:-3000}:${APP_INTERNAL_PORT:-6669}"
+      - "${PORT:-3000}:${PORT:-3000}"
     environment:
       # Set node environment, default to development
       - NODE_ENV=${NODE_ENV:-development}
-      - PORT=${APP_INTERNAL_PORT:-6669}
-      - HOST=0.0.0.0
-      # Database connection variables
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:${DB_INTERNAL_PORT:-5432}/${POSTGRES_DB:-badges_dev}
-      - DB_HOST=db
-      - DB_PORT=${DB_INTERNAL_PORT:-5432}
-      - DB_USER=${POSTGRES_USER:-postgres}
-      - DB_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      - DB_NAME=${POSTGRES_DB:-badges_dev}
     depends_on:
       db:
         condition: service_healthy
@@ -37,8 +28,8 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
     ports:
-      # Expose DB port for dev tools
-      - "${DB_PORT:-5432}:${DB_INTERNAL_PORT:-5432}"
+      # Expose DB port for dev tools, default to 5433
+      - "${DB_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -56,4 +47,4 @@ volumes:
 
 networks:
   bun-badges-network:
-    driver: bridge
+    driver: bridge 
