@@ -148,6 +148,7 @@ export class CredentialsService {
           structure: true,
           revocation: true,
           expiration: true,
+          proof: true, // Initialize proof check to true
         },
         errors: [],
         details: {

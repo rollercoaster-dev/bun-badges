@@ -11,55 +11,16 @@ import { KeysService, KeyStatus } from "@/services/keys.service";
 import { db } from "@/db/config";
 import { keys } from "@/db/schema/keys.schema";
 import { eq } from "drizzle-orm";
-import { sql } from "drizzle-orm";
 import "@/utils/test/integration-setup";
 
 describe("KeysService Integration", () => {
   let keysService: KeysService;
   let testKeyId: string;
 
-  // Create the keys table if it doesn't exist
+  // Setup before all tests
   beforeAll(async () => {
-    try {
-      // Check if the keys table exists
-      const result = await db.execute(sql`
-        SELECT EXISTS (
-          SELECT FROM pg_tables
-          WHERE schemaname = 'public'
-          AND tablename = 'keys'
-        );
-      `);
-
-      const tableExists = result.rows[0]?.exists;
-      if (!tableExists) {
-        console.log("Creating keys table for tests...");
-        await db.execute(sql`
-          CREATE TABLE IF NOT EXISTS keys (
-            id TEXT PRIMARY KEY,
-            type TEXT NOT NULL,
-            algorithm TEXT NOT NULL,
-            public_key TEXT NOT NULL,
-            private_key TEXT,
-            name TEXT,
-            description TEXT,
-            version TEXT,
-            previous_key_id TEXT,
-            expires_at TIMESTAMP WITH TIME ZONE,
-            revoked_at TIMESTAMP WITH TIME ZONE,
-            revocation_reason TEXT,
-            is_active BOOLEAN NOT NULL DEFAULT true,
-            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE
-          );
-        `);
-        console.log("✅ Keys table created successfully");
-      } else {
-        console.log("Keys table already exists");
-      }
-    } catch (error) {
-      console.error("Error setting up keys table:", error);
-      throw error;
-    }
+    // We'll use the existing database setup from the test environment
+    // No need to create tables manually as they should already exist
   });
 
   beforeEach(async () => {

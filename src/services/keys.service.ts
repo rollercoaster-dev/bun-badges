@@ -76,13 +76,9 @@ export class KeysService {
    */
   async getKeyById(id: string): Promise<Key | null> {
     try {
-      const [key] = await db
-        .select()
-        .from(keys)
-        .where(eq(keys.id, id))
-        .limit(1);
+      const result = await db.select().from(keys).where(eq(keys.id, id));
 
-      return key || null;
+      return result[0] || null;
     } catch (error) {
       this.logger.error({ error, id }, "Failed to get key by ID");
       throw new Error(

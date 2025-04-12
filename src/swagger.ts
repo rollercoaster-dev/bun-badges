@@ -1,6 +1,5 @@
 import { swaggerUI } from "@hono/swagger-ui";
 import { Hono } from "hono";
-import type { Context } from "hono";
 
 // Environment variables for server URL construction
 const hostEnv = process.env.HOST || "localhost"; // Use HOST env var or default to localhost for Swagger URL
@@ -247,9 +246,17 @@ export const swaggerDefinition = {
 export const createSwaggerUI = () => {
   const app = new Hono();
 
+  // Serves the raw OpenAPI JSON spec (relative path: ./openapi.json)
   app.get("/openapi.json", (c) => c.json(swaggerDefinition));
-  app.get("/", (c: Context) => c.redirect(`${serverUrl}/ui`));
-  app.use("/ui", swaggerUI({ url: `${serverUrl}/openapi.json` }));
+
+  // Serves the Swagger UI interface at the root of this sub-app ('/')
+  // When mounted at /docs, this becomes the handler for /docs
+  app.get(
+    "/", // Serve UI at the root of this Hono instance
+    swaggerUI({
+      url: "/docs/openapi.json", // Absolute path to the JSON spec
+    }),
+  );
 
   return app;
 };

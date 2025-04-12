@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
-import { authorizationService } from "../../../src/services/authorization.service";
-import { db } from "../../../src/db/config";
-import { users } from "../../../src/db/schema";
+import { authorizationService } from "@services/authorization.service";
+import { db } from "@/db/config";
+import { users } from "@/db/schema";
+import { userRoles, userPermissions } from "@/db/schema/roles.schema";
 // Role enum is not needed as we're using string literals
-import { Permission } from "../../../src/models/auth/roles";
+import { Permission } from "@models/auth/roles";
 import { randomUUID } from "crypto";
 import { eq } from "drizzle-orm";
 
@@ -26,8 +27,16 @@ describe("AuthorizationService Integration Tests", () => {
 
   // Clean up after all tests
   afterAll(async () => {
-    // Delete the test user
     if (testUserId) {
+      // Delete associated roles first
+      await db.delete(userRoles).where(eq(userRoles.userId, testUserId));
+
+      // Delete associated direct permissions
+      await db
+        .delete(userPermissions)
+        .where(eq(userPermissions.userId, testUserId));
+
+      // Finally, delete the test user
       await db.delete(users).where(eq(users.userId, testUserId));
     }
   });

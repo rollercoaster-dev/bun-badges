@@ -8,6 +8,34 @@
       "when": 1743970780857,
       "tag": "0000_fluffy_unicorn",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1743970780858,
+      "tag": "0001_authorization_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1743970780859,
+      "tag": "0002_seed_roles_permissions",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1743970780860,
+      "tag": "0004_keys_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1743970780861,
+      "tag": "0005_keys_schema_fix",
+      "breakpoints": true
     }
   ]
 }
