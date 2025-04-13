@@ -4,6 +4,10 @@ import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import * as dotenv from "dotenv";
 import * as path from "path";
+import { createSecurityMiddleware } from "@/middleware/security.middleware";
+import { securityConfig } from "@/config/security.config";
+import { createCSPReportRoutes } from "@/routes/csp-report.routes";
+import { createCSRFRoutes } from "@/routes/csrf.routes";
 
 // --- Load environment-specific .env file ---
 const nodeEnv = process.env.NODE_ENV;
@@ -43,6 +47,7 @@ import { createCredentialSigningRoutes } from "@routes/credential-signing.routes
 import { createCredentialVerificationRoutes } from "@routes/credential-verification.routes";
 import { createSwaggerUI } from "./swagger";
 import logger from "@utils/logger";
+import { createServerConfig } from "./server-config";
 
 // Log environment configuration
 logger.info(`Server starting in ${process.env.NODE_ENV || "production"} mode`);
@@ -59,11 +64,45 @@ const authMiddleware = createAuthMiddleware(db);
 
 // Middleware
 app.use("*", honoLogger());
-app.use("*", cors());
+
+// Configure CORS with security settings
+app.use(
+  "*",
+  cors({
+    origin: securityConfig.cors.origin,
+    allowMethods: securityConfig.cors.methods,
+    allowHeaders: securityConfig.cors.allowedHeaders,
+    exposeHeaders: securityConfig.cors.exposedHeaders,
+    credentials: securityConfig.cors.credentials,
+    maxAge: securityConfig.cors.maxAge,
+  }),
+);
+
+// Add basic security headers
 app.use("*", secureHeaders());
+
+// Add enhanced security middleware
+app.use(
+  "*",
+  createSecurityMiddleware({
+    enableCSP: securityConfig.csp.enabled,
+    cspReportOnly: securityConfig.csp.reportOnly,
+    cspReportUri: securityConfig.csp.reportUri,
+    enableXSSProtection: true,
+    enableCSRF: securityConfig.csrf.enabled,
+  }),
+);
+
+// Add error handling middleware
 app.use("*", errorHandler);
 
-// Add the auth middleware to protected routes
+// Add CSP report endpoint (public)
+app.route("/api/csp-report", createCSPReportRoutes());
+
+// Add CSRF token endpoint (public)
+app.route("/api/csrf", createCSRFRoutes());
+
+// Add the auth middleware to protected routes (after public endpoints)
 app.use("/api/*", authMiddleware);
 
 // Create the OAuth router with Open Badges 3.0 endpoints
@@ -113,15 +152,38 @@ const portEnv = process.env.PORT;
 if (!portEnv) {
   throw new Error("PORT environment variable is not set.");
 }
-const port = parseInt(portEnv, 10);
+const basePort = parseInt(portEnv, 10);
 const environment = process.env.NODE_ENV || "development";
 
-// Start server
-const server = Bun.serve({
-  port,
-  hostname: process.env.HOST,
-  fetch: app.fetch,
-});
+// Create the server configuration
+const serverConfig = createServerConfig(
+  app,
+  basePort,
+  process.env.HOST,
+  environment === "development",
+);
+
+// Create a server instance that can be reused across hot reloads
+let server: ReturnType<typeof Bun.serve> | null = null;
+
+// Function to stop the server if it's running
+function stopServer() {
+  if (server) {
+    try {
+      server.stop(true); // Force close all connections
+      logger.info("Server stopped for reload");
+    } catch (err) {
+      logger.error("Error stopping server:", err);
+    }
+    server = null;
+  }
+}
+
+// Stop any existing server before starting a new one
+stopServer();
+
+// Start the server
+server = Bun.serve(serverConfig);
 
 logger.info(`🚀 Server running at http://${server.hostname}:${server.port}`);
 logger.info(`Environment: ${environment}`);
@@ -132,7 +194,27 @@ if (environment === "development") {
   );
 }
 
-export default server;
+// Handle process termination
+process.on("SIGINT", () => {
+  logger.info("Received SIGINT signal, shutting down server...");
+  stopServer();
+  process.exit(0);
+});
+
+process.on("SIGTERM", () => {
+  logger.info("Received SIGTERM signal, shutting down server...");
+  stopServer();
+  process.exit(0);
+});
+
+// Export a fetch function for Bun's HMR system
+export default {
+  port: serverConfig.port,
+  hostname: serverConfig.hostname,
+  fetch: serverConfig.fetch,
+  development: serverConfig.development,
+  error: serverConfig.error,
+};
 
 // Export the app instance directly for testing purposes
 export { app as honoApp };

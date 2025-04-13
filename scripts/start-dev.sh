@@ -20,9 +20,11 @@ bun install
 
 # Set development environment variables if not already set
 export NODE_ENV=${NODE_ENV:-development}
-export PORT=${PORT:-3000}
+export PORT=${PORT:-6669}
 export HOST=${HOST:-0.0.0.0}
 export LOG_LEVEL=${LOG_LEVEL:-debug}
+# Set Bun server port for hot reload (different from main app port)
+export BUN_SERVER_PORT=${BUN_SERVER_PORT:-6670}
 
 echo "Starting development server on ${HOST}:${PORT}"
 echo "Environment: ${NODE_ENV}"
@@ -50,10 +52,10 @@ done
 if [ -z "$PRELOAD_SCRIPT" ]; then
   echo "Warning: BitSet preload script not found in any of the expected locations"
   echo "Falling back to default behavior without preload"
-  # Start the development server directly
+  # Start the development server directly with watch mode
   exec bun --watch src/index.ts
 else
   echo "Using BitSet preload script: $PRELOAD_SCRIPT"
-  # Start with preload script
-  exec bun --preload "$PRELOAD_SCRIPT" --watch src/index.ts
-fi 
+  # Start with preload script and watch mode
+  exec bun --watch --preload "$PRELOAD_SCRIPT" src/index.ts
+fi
