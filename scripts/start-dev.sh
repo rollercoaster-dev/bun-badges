@@ -52,10 +52,10 @@ done
 if [ -z "$PRELOAD_SCRIPT" ]; then
   echo "Warning: BitSet preload script not found in any of the expected locations"
   echo "Falling back to default behavior without preload"
-  # Start the development server directly
+  # Start the development server directly with watch mode
   exec bun --watch src/index.ts
 else
   echo "Using BitSet preload script: $PRELOAD_SCRIPT"
-  # Start with preload script
-  exec bun --preload "$PRELOAD_SCRIPT" --watch src/index.ts
+  # Start with preload script and watch mode
+  exec bun --watch --preload "$PRELOAD_SCRIPT" src/index.ts
 fi
