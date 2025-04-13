@@ -22,9 +22,9 @@ Key design decisions:
 - [x] Created database schema for keys
 - [x] Created database schema for tokens
 - [x] Created database schema for credentials
-- [ ] Added schemas to main schema index
-- [ ] Generated and applied migrations
-- [ ] Created database service methods for basic CRUD operations
+- [x] Added schemas to main schema index
+- [x] Generated and applied migrations
+- [x] Created database service methods for basic CRUD operations
 
 ### Implementation Plan
 1. Create database schemas for security features
@@ -43,10 +43,12 @@ Key design decisions:
 - Including timestamps for creation, expiration, and revocation helps with auditing and security management
 
 ### Next Steps
-- Complete the integration of schemas with the main schema index
-- Generate and apply migrations
-- Create database service methods for basic CRUD operations
-- Write tests for database service methods
+- ✅ Integration of schemas with the main schema index - Completed
+- ✅ Migrations generated and applied - Completed
+- ✅ Database service methods for basic CRUD operations - Completed
+- ✅ Tests for database service methods - Completed
+- Consider adding additional documentation for the schema design
+- Review security practices for sensitive data storage
 
 ### Related Code Sections
 - `src/db/schema/index.ts` - Main schema index file
@@ -71,10 +73,11 @@ Test cases to cover:
 - Backup of database before applying migrations
 
 ### Definition of Done
-- All security-related schemas are created and integrated
-- Migrations are generated and can be applied successfully
-- Basic database service methods are implemented and tested
-- Documentation is updated with schema details
+- ✅ All security-related schemas are created and integrated
+- ✅ Migrations are generated and can be applied successfully
+- ✅ Basic database service methods are implemented and tested
+- ✅ Tests for database services are written and passing
+- ✅ Documentation is updated with schema details
 - Performance meets requirements (queries complete in < 100ms)
 
 ### References

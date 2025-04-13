@@ -22,7 +22,7 @@ Key design decisions:
 ### Current Status
 - [x] Created database schema for keys
 - [ ] Implemented key management service with database integration
-- [ ] Added encryption for private keys
+- [x] Added encryption for private keys
 - [ ] Implemented key rotation with database tracking
 - [ ] Implemented key revocation with database tracking
 - [ ] Created API endpoints for key management
@@ -51,10 +51,15 @@ Key design decisions:
 - Access to key management should be restricted to administrators only
 
 ### Next Steps
+- ✅ Database schema for keys - Completed
+- ✅ Encryption for private keys - Completed
 - Implement key management service with database integration
-- Add encryption for private keys
 - Implement key rotation with database tracking
+- Implement key revocation with database tracking
 - Create API endpoints for key management
+- Add role-based access control for key management
+- Write tests for key management service
+- Consider implementing additional key types and algorithms if needed
 
 ### Related Code Sections
 - `src/db/schema/keys.schema.ts` - Database schema for keys
@@ -81,13 +86,16 @@ Test cases to cover:
 - API versioning allows for gradual deployment
 
 ### Definition of Done
-- All key management operations are implemented with database integration
-- Private keys are properly encrypted in the database
-- Key rotation and revocation are fully functional
-- All tests pass with good coverage
-- API endpoints are properly secured with role-based access control
-- Documentation is updated with key management details
-- Performance meets requirements (key operations complete in < 500ms)
+- [ ] All key management operations are implemented with database integration
+- [x] Private keys are properly encrypted in the database
+- [ ] Key rotation and revocation are fully functional
+- [ ] API endpoints for key management are implemented
+- [ ] Role-based access control for key management is implemented
+- [ ] Tests for key management service are written and passing
+- [ ] All tests pass with good coverage
+- [ ] API endpoints are properly secured with role-based access control
+- [ ] Documentation is updated with key management details
+- [ ] Performance meets requirements (key operations complete in < 500ms)
 
 ### References
 - [NIST Key Management Guidelines](https://csrc.nist.gov/Projects/Key-Management/Key-Management-Guidelines)
