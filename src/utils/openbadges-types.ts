@@ -22,7 +22,7 @@ export function toIRI(url: string): Shared.IRI {
   try {
     new URL(url);
     return url as Shared.IRI;
-  } catch (e) {
+  } catch (_) {
     throw new Error(`Invalid IRI: ${url}`);
   }
 }
