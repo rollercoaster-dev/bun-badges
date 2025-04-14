@@ -103,3 +103,20 @@ export function getAchievementName(
  * };
  * ```
  */
+
+// --- Centralized Project-Specific Type Aliases ---
+
+/** Alias for OB3 Verifiable Credential */
+export type OpenBadgeCredential = OB3.VerifiableCredential;
+
+/** Alias for OB3 Evidence */
+export type OpenBadgeEvidence = OB3.Evidence;
+
+/** Alias for OB3 Credential Status */
+export type OpenBadgeCredentialStatus = OB3.CredentialStatus;
+
+/** Alias for OB3 Proof */
+export type OpenBadgeProof = OB3.Proof;
+
+/** Alias for OB3 Achievement */
+export type OpenBadgeAchievement = OB3.Achievement;

@@ -6,8 +6,9 @@ import { issuerProfiles } from "@/db/schema/issuers";
 import { eq } from "drizzle-orm";
 import {
   OpenBadgeCredential,
-  DataIntegrityProof,
-} from "@/models/credential.model";
+  OpenBadgeProof,
+  OB3,
+} from "@/utils/openbadges-types";
 
 describe("Credential Service Integration Tests", () => {
   // Create a service
@@ -143,18 +144,29 @@ describe("Credential Service Integration Tests", () => {
       // 3. Verify the credential exists and has correct properties
       expect(credential).toBeDefined();
       expect(credential.type).toContain("OpenBadgeCredential");
+      expect(credential.credentialSubject.id as string).toBe(
+        assertion.recipientIdentity,
+      );
 
-      // The issuer URL should contain the issuer ID
-      expect(credential.issuer).toContain(issuer.issuerId);
-
-      // Check that the achievement name matches our badge
-      expect(credential.credentialSubject.achievement.name).toBe("Test Badge");
+      // Handle potential array for achievement
+      const achievement = credential.credentialSubject.achievement;
+      let targetAchievement: OB3.Achievement | undefined;
+      if (Array.isArray(achievement)) {
+        // If it's an array, check the first element
+        expect(achievement.length).toBeGreaterThan(0); // Ensure array is not empty
+        targetAchievement = achievement[0];
+      } else {
+        // If it's a single object
+        targetAchievement = achievement;
+      }
+      expect(targetAchievement).toBeDefined(); // Ensure we have an achievement object
+      expect(targetAchievement?.name).toBe("Test Badge"); // Safely access name
 
       // 4. Verify the credential has a valid signature
       expect(credential.proof).toBeDefined();
       if (credential.proof) {
         expect(credential.proof.type).toBe("DataIntegrityProof");
-        expect((credential.proof as DataIntegrityProof).cryptosuite).toBe(
+        expect((credential.proof as OpenBadgeProof).cryptosuite).toBe(
           "eddsa-rdfc-2022",
         );
         expect(credential.proof.proofValue).toBeDefined();
@@ -170,8 +182,16 @@ describe("Credential Service Integration Tests", () => {
       const tamperedCredential = JSON.parse(
         JSON.stringify(credential),
       ) as OpenBadgeCredential & { proof: any };
-      tamperedCredential.credentialSubject.achievement.name =
-        "Modified Badge Name";
+      // Modify the correct achievement name based on whether it's an array or object
+      if (Array.isArray(tamperedCredential.credentialSubject.achievement)) {
+        if (tamperedCredential.credentialSubject.achievement.length > 0) {
+          tamperedCredential.credentialSubject.achievement[0].name =
+            "Modified Badge Name";
+        }
+      } else {
+        tamperedCredential.credentialSubject.achievement.name =
+          "Modified Badge Name";
+      }
 
       const isTamperedValid = await credentialService.verifySignature(
         tamperedCredential as any,

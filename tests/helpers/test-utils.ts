@@ -14,8 +14,10 @@ import { mock } from "bun:test";
 import { OB2BadgeAssertion } from "@/services/verification.service";
 import {
   OpenBadgeCredential,
-  DataIntegrityProof,
-} from "@/models/credential.model";
+  OpenBadgeProof,
+  toIRI,
+  toDateTime,
+} from "@/utils/openbadges-types";
 import { createMockContext } from "@/utils/test/mock-context";
 
 // Re-export the mock context
@@ -40,20 +42,11 @@ export function createTestServer(app: Hono) {
 /**
  * Test data helper class
  */
-export class TestData {
-  private data: Record<string, any>;
-
-  constructor() {
-    this.data = {};
-  }
-
-  set(key: string, value: any) {
-    this.data[key] = value;
-  }
-
-  get(key: string) {
-    return this.data[key];
-  }
+export interface TestData {
+  credential?: OpenBadgeCredential;
+  proof?: OpenBadgeProof;
+  publicKey?: string;
+  privateKey?: string;
 }
 
 /**
@@ -95,44 +88,48 @@ export function getOB2AssertionJson(assertionId: string): OB2BadgeAssertion {
  * Get OB3 credential JSON for testing
  */
 export function getOB3CredentialJson(assertionId: string): OpenBadgeCredential {
+  const now = new Date();
   return {
     "@context": [
       "https://www.w3.org/2018/credentials/v1",
       "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json",
     ],
-    id: `https://example.com/assertions/${assertionId}`,
+    id: toIRI(`https://example.com/assertions/${assertionId}`),
     type: ["VerifiableCredential", "OpenBadgeCredential"],
     issuer: {
-      id: "https://example.com/issuers/789",
+      id: toIRI("https://example.com/issuers/789"),
       type: "Profile",
       name: "Test Issuer",
     },
-    issuanceDate: "2023-01-01T00:00:00Z",
+    issuanceDate: toDateTime("2023-01-01T00:00:00Z"),
     credentialSubject: {
-      id: "test@example.com",
+      id: toIRI(`urn:email:${encodeURIComponent("test@example.com")}`),
       type: "email",
       achievement: {
-        id: "https://example.com/badges/123",
+        id: toIRI("https://example.com/badges/123"),
         type: ["Achievement"],
         name: "Test Badge",
         description: "A test badge",
-        image: {
-          id: "https://example.com/badges/123/image",
-          type: "Image",
-        },
+        image: toIRI("https://example.com/badges/123/image"),
         criteria: {
           narrative: "The criteria for earning this badge",
         },
       },
     },
+    credentialSchema: {
+      id: toIRI(
+        "https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json",
+      ),
+      type: "JsonSchemaValidator2018",
+    },
     proof: {
       type: "DataIntegrityProof",
       cryptosuite: "eddsa-rdfc-2022",
-      created: "2023-01-01T00:00:00Z",
-      verificationMethod: "https://example.com/issuers/789#key-1",
+      created: toDateTime(now.toISOString()),
+      verificationMethod: toIRI("did:example:123#key-1"),
       proofPurpose: "assertionMethod",
-      proofValue: "TEST_BASE64_SIGNATURE",
-    } as DataIntegrityProof,
+      proofValue: "TEST_SIGNATURE",
+    } as OpenBadgeProof,
   };
 }
 
@@ -230,4 +227,54 @@ export async function runMiddlewareChain(
   };
 
   await runNext();
+}
+
+/**
+ * Create a mock OpenBadgeCredential V3 for testing
+ */
+export function createMockCredential(): OpenBadgeCredential {
+  const issuerId = "iss_test_123";
+  const badgeId = "bcls_test_456";
+  const assertionId = "asrt_test_789";
+  const recipientId = "recp_test_abc";
+  const now = new Date();
+
+  return {
+    "@context": [
+      "https://www.w3.org/2018/credentials/v1",
+      "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json",
+    ],
+    id: toIRI(`urn:uuid:${assertionId}`),
+    type: ["VerifiableCredential", "OpenBadgeCredential"],
+    issuer: toIRI(`https://example.com/issuers/${issuerId}`),
+    issuanceDate: toDateTime(now.toISOString()),
+    credentialSubject: {
+      id: toIRI(`mailto:${recipientId}@example.com`),
+      type: ["AssertionSubject"],
+      achievement: {
+        id: toIRI(`https://example.com/badges/${badgeId}`),
+        type: ["Achievement"],
+        name: "Mock Badge",
+        description: "A mock badge for testing purposes",
+        criteria: {
+          narrative: "Complete the mock test.",
+        },
+        image: toIRI(`https://example.com/badges/${badgeId}/image`),
+      },
+    },
+    credentialSchema: {
+      id: "https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json",
+      type: "JsonSchemaValidator2018",
+    },
+    proof: {
+      type: "DataIntegrityProof",
+      cryptosuite: "eddsa-rdfc-2022",
+      created: toDateTime(now.toISOString()),
+      verificationMethod: toIRI(
+        `https://example.com/issuers/${issuerId}#key-1`,
+      ),
+      proofPurpose: "assertionMethod",
+      proofValue: "TEST_SIGNATURE",
+    } as OpenBadgeProof,
+  };
 }

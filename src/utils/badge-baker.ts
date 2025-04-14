@@ -1,9 +1,7 @@
 import * as pngitxt from "png-itxt";
 import { readTextFromBlob } from "@larswander/png-text";
-import {
-  OpenBadgeCredential,
-  isOpenBadgeCredential,
-} from "@/models/credential.model";
+import { isOpenBadgeCredential } from "@/models/credential.model";
+import { OpenBadgeCredential } from "@/utils/openbadges-types";
 
 /**
  * Types of badge assertion metadata

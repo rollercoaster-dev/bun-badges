@@ -10,7 +10,7 @@ import {
 import { eq, type InferSelectModel } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { OB2BadgeAssertion } from "@/services/verification.service";
-import { OpenBadgeCredential } from "@/models/credential.model";
+import { OpenBadgeCredential } from "@/utils/openbadges-types";
 import {
   getOB2AssertionJson,
   getOB3CredentialJson,

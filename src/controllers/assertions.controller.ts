@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { CredentialService } from "@/services/credential.service";
 import { isValidUuid } from "@/utils/validation";
 import { OB2BadgeAssertion } from "@/services/verification.service";
-import { OpenBadgeCredential } from "@/models/credential.model";
+import { OpenBadgeCredential } from "@/utils/openbadges-types";
 import { toJsonb } from "@/utils/db-helpers";
 import logger from "@/utils/logger";
 
