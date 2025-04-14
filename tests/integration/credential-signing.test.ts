@@ -23,7 +23,8 @@ describe("Credential Signing Service", () => {
     }
 
     // Create a new key management service instance for testing
-    testKeyManagementService = new KeyManagementService(testKeysDir);
+    testKeyManagementService = new KeyManagementService();
+    await testKeyManagementService.initialize();
 
     // Create a new credential signing service instance
     credentialSigningService = new CredentialSigningService();
@@ -39,11 +40,11 @@ describe("Credential Signing Service", () => {
 
     // Mock the keyManagementService.getKey and getDefaultSigningKey methods
     // @ts-ignore - we're mocking the methods
-    keyManagementService.getKey = (id: string) =>
-      testKeyManagementService.getKey(id);
+    keyManagementService.getKey = async (id: string) =>
+      await testKeyManagementService.getKey(id);
     // @ts-ignore - we're mocking the methods
-    keyManagementService.getDefaultSigningKey = () =>
-      testKeyManagementService.getDefaultSigningKey();
+    keyManagementService.getDefaultSigningKey = async () =>
+      await testKeyManagementService.getDefaultSigningKey();
   });
 
   afterAll(() => {

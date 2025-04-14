@@ -27,8 +27,8 @@ export class CredentialSigningService {
     try {
       // Get the signing key
       const signingKey = keyId
-        ? keyManagementService.getKey(keyId)
-        : keyManagementService.getDefaultSigningKey();
+        ? await keyManagementService.getKey(keyId)
+        : await keyManagementService.getDefaultSigningKey();
 
       if (!signingKey) {
         throw new Error("Signing key not found");
@@ -61,6 +61,12 @@ export class CredentialSigningService {
       // Sign the data
       const signer = crypto.createSign("RSA-SHA256");
       signer.update(dataToSign);
+
+      // Make sure we have the private key
+      if (!signingKey.privateKey) {
+        throw new Error("Private key not available for signing");
+      }
+
       const signature = signer.sign(signingKey.privateKey, "base64url");
 
       // Create the JWT
@@ -92,7 +98,7 @@ export class CredentialSigningService {
       const header = JSON.parse(headerJson);
 
       // Get the key
-      const key = keyManagementService.getKey(header.kid);
+      const key = await keyManagementService.getKey(header.kid);
 
       if (!key) {
         throw new Error(`Key not found: ${header.kid}`);
@@ -145,8 +151,8 @@ export class CredentialSigningService {
     try {
       // Get the signing key
       const signingKey = keyId
-        ? keyManagementService.getKey(keyId)
-        : keyManagementService.getDefaultSigningKey();
+        ? await keyManagementService.getKey(keyId)
+        : await keyManagementService.getDefaultSigningKey();
 
       if (!signingKey) {
         throw new Error("Signing key not found");
@@ -203,7 +209,7 @@ export class CredentialSigningService {
       const keyId = verificationMethod.split("#")[1];
 
       // Get the key
-      const key = keyManagementService.getKey(keyId);
+      const key = await keyManagementService.getKey(keyId);
 
       if (!key) {
         throw new Error(`Key not found: ${keyId}`);

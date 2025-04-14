@@ -58,8 +58,16 @@ export class KeyManagementService {
     this.keysService = new KeysService();
     this.keyService = new KeyService();
 
+    // Note: Keys will be loaded via the initialize method
+  }
+
+  /**
+   * Initialize the service
+   * This must be called before using any other methods
+   */
+  public async initialize(): Promise<void> {
     // Load existing keys
-    this.loadKeys();
+    await this.loadKeys();
   }
 
   /**
@@ -450,5 +458,21 @@ export class KeyManagementService {
   }
 }
 
-// Export singleton instance
-export const keyManagementService = new KeyManagementService();
+// Create singleton instance
+const keyManagementService = new KeyManagementService();
+
+// Initialize the service
+// This is an immediately invoked async function to initialize the service
+// It will run when the module is first imported
+(async () => {
+  try {
+    logger.info("Initializing KeyManagementService...");
+    await keyManagementService.initialize();
+    logger.info("KeyManagementService initialized successfully");
+  } catch (error) {
+    logger.error("Failed to initialize KeyManagementService", { error });
+  }
+})();
+
+// Export the singleton instance
+export { keyManagementService };
