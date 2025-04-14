@@ -5,18 +5,18 @@ import { nanoid } from "nanoid";
 const JWT_EXPIRES_IN = "24h";
 const REFRESH_TOKEN_EXPIRES_IN = "7d";
 
-// In-memory store for revoked tokens (replace with database in production)
-const revokedTokens = new Map<string, number>();
+// Removed in-memory store for revoked tokens
+// const revokedTokens = new Map<string, number>();
 
-// Clean up expired entries from revoked tokens periodically
-setInterval(() => {
-  const now = Date.now();
-  for (const [token, expiry] of revokedTokens.entries()) {
-    if (expiry < now) {
-      revokedTokens.delete(token);
-    }
-  }
-}, 3600000); // Clean up every hour
+// Removed interval cleanup for in-memory store
+// setInterval(() => {
+//   const now = Date.now();
+//   for (const [token, expiry] of revokedTokens.entries()) {
+//     if (expiry < now) {
+//       revokedTokens.delete(token);
+//     }
+//   }
+// }, 3600000); // Clean up every hour
 
 export interface JWTPayload {
   sub: string; // username or user ID
@@ -129,27 +129,4 @@ export function getTokenExpirySeconds(
   const [, value, unit] = match;
   const multipliers = { d: 86400, h: 3600, m: 60, s: 1 };
   return parseInt(value) * multipliers[unit as keyof typeof multipliers];
-}
-
-export async function revokeToken(token: string): Promise<void> {
-  try {
-    // Verify the token first to ensure it's valid and get its expiry
-    const payload = await verifyToken(token);
-    if (!payload.exp) {
-      throw new Error("Token has no expiry");
-    }
-
-    // Store the token in revoked tokens until its original expiry
-    revokedTokens.set(token, payload.exp * 1000);
-  } catch (error) {
-    // If token is invalid or already revoked, we can ignore
-    if (error instanceof Error && error.message === "Token has been revoked") {
-      return;
-    }
-    throw error;
-  }
-}
-
-export function isTokenRevoked(token: string): boolean {
-  return revokedTokens.has(token);
 }

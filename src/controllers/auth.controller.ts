@@ -151,7 +151,7 @@ export class AuthController {
       }
 
       // Generate tokens
-      const accessToken = generateToken({
+      const accessToken = await generateToken({
         sub: user.userId,
         type: "access",
         // Include additional claims for Open Badges 3.0 compatibility
@@ -159,10 +159,16 @@ export class AuthController {
         name: user.name || undefined,
       });
 
+      const refreshToken = await generateToken({
+        sub: user.userId,
+        type: "refresh",
+      });
+
       // Return a format that matches the test expectations and OB3 needs
       return c.json(
         {
-          token: accessToken,
+          accessToken: accessToken,
+          refreshToken: refreshToken,
           user: {
             id: user.userId,
             email: user.email,

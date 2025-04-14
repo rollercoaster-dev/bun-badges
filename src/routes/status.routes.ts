@@ -3,10 +3,8 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db/config";
 import { statusLists, badgeAssertions } from "@/db/schema";
 import { isValidUuid } from "@/utils/validation";
-import {
-  isStatusList2021Credential,
-  StatusList2021Entry,
-} from "@/models/credential.model";
+import { isStatusList2021Credential } from "@/models/credential.model";
+import { OB3, toIRI } from "@/utils/openbadges-types";
 import { CredentialService } from "@/services/credential.service";
 import {
   getIndexFromUuid,
@@ -175,12 +173,12 @@ status.get(STATUS_ROUTES.GET_STATUS, async (c) => {
           // Create a status entry for clients to verify
           const hostUrl = new URL(c.req.url).origin;
           statusListInfo = {
-            id: `${hostUrl}/status/${assertionId}`,
+            id: toIRI(`${hostUrl}/status/${assertionId}`),
             type: "StatusList2021Entry",
             statusPurpose: "revocation",
             statusListIndex: index.toString(),
-            statusListCredential: `${hostUrl}/status/list/${issuerId}`,
-          } as StatusList2021Entry;
+            statusListCredential: toIRI(`${hostUrl}/status/list/${issuerId}`),
+          } as OB3.CredentialStatus;
         } catch (error) {
           baseLogger.error(error, "Status list verification error:");
         }

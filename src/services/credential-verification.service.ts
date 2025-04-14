@@ -10,11 +10,8 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db/config";
 import { credentials } from "@/db/schema/credentials.schema";
 import { isValidUuid } from "@/utils/validation";
-import {
-  OpenBadgeCredential,
-  isOpenBadgeCredential,
-  StatusList2021Entry,
-} from "@/models/credential.model";
+import { isOpenBadgeCredential } from "@/models/credential.model";
+import { OpenBadgeCredential, OB3 } from "@/utils/openbadges-types";
 import * as jose from "jose";
 import logger from "@/utils/logger";
 import { type Logger as PinoLogger } from "pino";
@@ -174,7 +171,7 @@ export class CredentialVerificationService {
       // Check credential status list if available
       if (credentialData.credentialStatus) {
         const statusEntry =
-          credentialData.credentialStatus as StatusList2021Entry;
+          credentialData.credentialStatus as OB3.CredentialStatus;
         if (statusEntry.type === "StatusList2021Entry") {
           result.details.statusListCredential =
             statusEntry.statusListCredential;

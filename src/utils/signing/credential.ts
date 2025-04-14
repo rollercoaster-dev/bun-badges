@@ -2,9 +2,9 @@
  * Credential signing and verification utilities for Open Badges 3.0
  * Based on the W3C Data Integrity EdDSA Cryptosuites v1.0 specification
  */
-import { CredentialProof } from "@/models/credential.model";
 import * as ed from "@noble/ed25519";
 import { base64url } from "@scure/base";
+import { OpenBadgeProof, toIRI, toDateTime } from "@/utils/openbadges-types";
 import * as crypto from "crypto";
 import logger from "@/utils/logger";
 
@@ -50,7 +50,7 @@ export async function signCredential<T extends Record<string, unknown>>(
     verificationMethod: string;
     proofPurpose: string;
   },
-): Promise<T & { proof: CredentialProof }> {
+): Promise<T & { proof: OpenBadgeProof }> {
   // Create a copy of the credential without proof
   const documentToSign = { ...credential };
 
@@ -76,11 +76,11 @@ export async function signCredential<T extends Record<string, unknown>>(
     proof: {
       type: "DataIntegrityProof",
       cryptosuite: "eddsa-rdfc-2022",
-      created: new Date().toISOString(),
-      verificationMethod: options.verificationMethod,
+      created: toDateTime(new Date().toISOString()),
+      verificationMethod: toIRI(options.verificationMethod),
       proofPurpose: options.proofPurpose,
       proofValue,
-    },
+    } as OpenBadgeProof,
   };
 }
 
@@ -101,7 +101,7 @@ export async function verifyCredential<T extends Record<string, unknown>>(
   }
 
   // Extract the proof
-  const { proof } = credential as T & { proof: CredentialProof };
+  const { proof } = credential as T & { proof: OpenBadgeProof };
 
   // Check proof type
   if (
@@ -116,8 +116,7 @@ export async function verifyCredential<T extends Record<string, unknown>>(
 
   // For DataIntegrityProof, check cryptosuite
   if (proof.type === "DataIntegrityProof") {
-    const dataIntegrityProof =
-      proof as import("@/models/credential.model").DataIntegrityProof;
+    const dataIntegrityProof = proof as OpenBadgeProof;
 
     if (!dataIntegrityProof.cryptosuite) {
       return {

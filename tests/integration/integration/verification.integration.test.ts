@@ -5,27 +5,24 @@ import {
   beforeAll,
   beforeEach,
   afterAll,
+  afterEach,
 } from "bun:test";
 import { db } from "@/db/config";
-import {
-  issuerProfiles,
-  badgeClasses,
-  users,
-  badgeAssertions,
-  signingKeys,
-} from "@/db/schema";
+import { badgeAssertions } from "@/db/schema";
 import { VerificationController } from "@/controllers/verification.controller";
 import crypto from "crypto";
 import {
+  CredentialService,
+  SignableCredential,
+} from "@/services/credential.service";
+import {
   createMockContext,
-  TestData,
   getOB2AssertionJson,
   getOB3CredentialJson,
   updateOB2AssertionJson,
   updateOB3CredentialJson,
 } from "../../helpers/test-utils";
-import { eq, ilike } from "drizzle-orm";
-import { sql } from "drizzle-orm";
+import { seedTestData, clearTestData } from "@/utils/test/db-helpers";
 
 interface ApiResponse<T> {
   status: string;
@@ -48,117 +45,22 @@ interface VerificationResponse {
 
 describe("VerificationController Integration Tests", () => {
   let controller: VerificationController;
-  let testData: TestData;
+  let testData: any;
   const testRunId = crypto.randomUUID().substring(0, 8);
 
   beforeAll(async () => {
     controller = new VerificationController();
-    testData = new TestData();
-
-    // Clean up any existing test data
-    try {
-      // Delete in the correct order to respect foreign key constraints
-      await db.delete(badgeAssertions);
-      await db.delete(badgeClasses);
-      // Delete signing_keys before issuer_profiles
-      await db.delete(signingKeys);
-      await db.delete(issuerProfiles);
-      await db
-        .delete(users)
-        .where(ilike(users.email, `%verification-test-${testRunId}%`));
-
-      // Create test data
-      const issuerId = crypto.randomUUID();
-      const badgeId = crypto.randomUUID();
-      const userId = crypto.randomUUID();
-
-      // Create test user with unique email
-      await db.insert(users).values({
-        userId,
-        email: `verification-test-${testRunId}@example.com`,
-        name: "Test User",
-      });
-
-      // Create test issuer
-      await db.insert(issuerProfiles).values({
-        issuerId,
-        name: "Test Issuer",
-        url: "https://example.com",
-        email: `issuer-verification-test-${testRunId}@example.com`,
-        ownerUserId: userId,
-        issuerJson: {
-          "@context": "https://w3id.org/openbadges/v2",
-          type: "Issuer",
-          id: `https://example.com/issuers/${issuerId}`,
-          name: "Test Issuer",
-          url: "https://example.com",
-          email: `issuer-verification-test-${testRunId}@example.com`,
-        },
-      });
-
-      // Create test badge
-      await db.insert(badgeClasses).values({
-        badgeId,
-        issuerId,
-        name: "Test Badge",
-        description: "Test badge description",
-        imageUrl: "https://example.com/badge.png",
-        criteria: JSON.stringify({ narrative: "Test criteria" }),
-        badgeJson: {
-          "@context": "https://w3id.org/openbadges/v2",
-          type: "BadgeClass",
-          id: `https://example.com/badges/${badgeId}`,
-          name: "Test Badge",
-          description: "Test badge description",
-          image: "https://example.com/badge.png",
-          criteria: { narrative: "Test criteria" },
-          issuer: `https://example.com/issuers/${issuerId}`,
-        },
-      });
-
-      testData.set("issuerId", issuerId);
-      testData.set("badgeId", badgeId);
-    } catch (error) {
-      console.error("Setup error:", error);
-      throw error;
-    }
   });
 
-  afterAll(async () => {
-    // Clean up test data properly following foreign key constraints
-    try {
-      await db.delete(badgeAssertions);
-      await db
-        .delete(badgeClasses)
-        .where(eq(badgeClasses.badgeId, testData.get("badgeId")));
-
-      // Make sure to delete signing_keys first, as it depends on issuer_profiles
-      await db.execute(sql`
-        DELETE FROM signing_keys 
-        WHERE issuer_id = ${testData.get("issuerId")}
-      `);
-
-      // Now safe to delete issuer_profiles
-      await db
-        .delete(issuerProfiles)
-        .where(eq(issuerProfiles.issuerId, testData.get("issuerId")));
-
-      await db
-        .delete(users)
-        .where(ilike(users.email, `%verification-test-${testRunId}%`));
-    } catch (error) {
-      console.error("Cleanup error:", error);
-    }
-  });
-
-  // Clear assertions between tests
   beforeEach(async () => {
-    try {
-      await db.delete(badgeAssertions);
-    } catch (error) {
-      console.error("beforeEach cleanup error:", error);
-    }
+    testData = await seedTestData();
   });
+
+  afterEach(async () => {
+    await clearTestData();
+  });
+
+  afterAll(async () => {});
 
   test("should verify an OB2 assertion", async () => {
     const assertionId = crypto.randomUUID();
@@ -167,8 +69,8 @@ describe("VerificationController Integration Tests", () => {
     // Save the assertion to the database
     await db.insert(badgeAssertions).values({
       assertionId,
-      badgeId: testData.get("badgeId"),
-      issuerId: testData.get("issuerId"),
+      badgeId: testData.badge.badgeId,
+      issuerId: testData.issuer.issuerId,
       recipientType: "email",
       recipientIdentity: `recipient-ob2-${testRunId}@example.com`,
       recipientHashed: false,
@@ -184,7 +86,6 @@ describe("VerificationController Integration Tests", () => {
     const result = await controller.verifyAssertion(ctx);
     const data = (await result.json()) as ApiResponse<VerificationResponse>;
     expect(data.status).toBe("success");
-    // Update expectations to match actual implementation behavior
     expect(data.data.valid).toBe(true);
     expect(data.data.checks.signature).toBe(true);
     expect(data.data.checks.revocation).toBe(true);
@@ -193,30 +94,45 @@ describe("VerificationController Integration Tests", () => {
 
   test("should verify an OB3 credential", async () => {
     const assertionId = crypto.randomUUID();
-    const credentialJson = getOB3CredentialJson(assertionId);
+    // 1. Get base credential structure (without proof)
+    const unsignedCredentialJson = getOB3CredentialJson(assertionId);
+    // Remove the placeholder proof if it exists
+    delete unsignedCredentialJson.proof;
 
-    // Save the assertion to the database
+    // 2. Instantiate CredentialService
+    const credentialService = new CredentialService();
+
+    // 3. Sign the credential using the test issuer's key
+    const signedCredentialJson = await credentialService.signCredential(
+      testData.issuer.issuerId,
+      // Use type assertion to satisfy SignableCredential expectation
+      unsignedCredentialJson as unknown as SignableCredential,
+    );
+
+    // 4. Save the *signed* credential to the database
     await db.insert(badgeAssertions).values({
       assertionId,
-      badgeId: testData.get("badgeId"),
-      issuerId: testData.get("issuerId"),
+      badgeId: testData.badge.badgeId,
+      issuerId: testData.issuer.issuerId,
       recipientType: "email",
       recipientIdentity: `recipient-ob3-${testRunId}@example.com`,
       recipientHashed: false,
       issuedOn: new Date(),
       revoked: false,
-      assertionJson: credentialJson,
+      assertionJson: signedCredentialJson, // Save the signed version
     });
 
+    // 5. Run verification
     const ctx = createMockContext({
       params: { assertionId },
     });
 
     const result = await controller.verifyAssertion(ctx);
     const data = (await result.json()) as ApiResponse<VerificationResponse>;
+
+    // 6. Assert validity is true
     expect(data.status).toBe("success");
-    // Update expectations to match actual implementation behavior
-    expect(data.data.valid).toBe(true);
+    expect(data.data.valid).toBe(true); // Should now be true
     expect(data.data.checks.signature).toBe(true);
     expect(data.data.checks.revocation).toBe(true);
     expect(data.data.checks.structure).toBe(true);

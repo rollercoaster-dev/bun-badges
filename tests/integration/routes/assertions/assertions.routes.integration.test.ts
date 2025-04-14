@@ -6,7 +6,6 @@ import crypto from "crypto";
 import { executeSql } from "@/utils/test/integration-setup";
 import { AssertionController } from "@/controllers/assertions.controller";
 import { VerificationController } from "@/controllers/verification.controller";
-import { TestData } from "../../../helpers/test-utils";
 
 // Define interfaces for the API responses
 interface ApiResponse<T> {
@@ -89,7 +88,6 @@ interface VerificationResponse {
 }
 
 describe("Assertions Routes Integration", () => {
-  let testData: TestData;
   let assertionId: string;
   let app: Hono;
   let assertionController: AssertionController;
@@ -97,8 +95,6 @@ describe("Assertions Routes Integration", () => {
   const baseUrl = "http://example.org"; // Using a fixed base URL for tests
 
   beforeEach(async () => {
-    testData = new TestData();
-
     // Create test data
     const issuerId = crypto.randomUUID();
     const badgeId = crypto.randomUUID();
@@ -167,10 +163,6 @@ describe("Assertions Routes Integration", () => {
       },
       revoked: false,
     });
-
-    testData.set("issuerId", issuerId);
-    testData.set("badgeId", badgeId);
-    testData.set("assertionId", assertionId);
 
     // Initialize controllers directly for testing
     assertionController = new AssertionController();

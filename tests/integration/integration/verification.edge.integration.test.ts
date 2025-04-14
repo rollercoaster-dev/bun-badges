@@ -1,14 +1,19 @@
-import { describe, expect, test, beforeAll } from "bun:test";
-import { db } from "@/db/config";
-import { issuerProfiles, badgeClasses, users } from "@/db/schema";
+import {
+  describe,
+  expect,
+  test,
+  beforeAll,
+  beforeEach,
+  afterEach,
+} from "bun:test";
 import { VerificationController } from "@/controllers/verification.controller";
 import crypto from "crypto";
 import {
   createMockContext,
-  TestData,
   updateOB2AssertionJson,
   updateOB3CredentialJson,
 } from "../../helpers/test-utils";
+import { seedTestData, clearTestData } from "@/utils/test/db-helpers";
 
 interface ApiResponse<T> {
   status: string;
@@ -31,63 +36,17 @@ interface VerificationResponse {
 
 describe("VerificationController Edge Cases", () => {
   let controller: VerificationController;
-  let testData: TestData;
 
   beforeAll(async () => {
     controller = new VerificationController();
-    testData = new TestData();
+  });
 
-    // Create test data
-    const issuerId = crypto.randomUUID();
-    const badgeId = crypto.randomUUID();
-    const userId = crypto.randomUUID();
+  beforeEach(async () => {
+    await seedTestData();
+  });
 
-    // Create test user
-    await db.insert(users).values({
-      userId,
-      email: "test@example.com",
-      name: "Test User",
-    });
-
-    // Create test issuer
-    await db.insert(issuerProfiles).values({
-      issuerId,
-      name: "Test Issuer",
-      url: "https://example.com",
-      email: "test@example.com",
-      ownerUserId: userId,
-      issuerJson: {
-        "@context": "https://w3id.org/openbadges/v2",
-        type: "Issuer",
-        id: `https://example.com/issuers/${issuerId}`,
-        name: "Test Issuer",
-        url: "https://example.com",
-        email: "test@example.com",
-      },
-    });
-
-    // Create test badge
-    await db.insert(badgeClasses).values({
-      badgeId,
-      issuerId,
-      name: "Test Badge",
-      description: "Test badge description",
-      imageUrl: "https://example.com/badge.png",
-      criteria: JSON.stringify({ narrative: "Test criteria" }),
-      badgeJson: {
-        "@context": "https://w3id.org/openbadges/v2",
-        type: "BadgeClass",
-        id: `https://example.com/badges/${badgeId}`,
-        name: "Test Badge",
-        description: "Test badge description",
-        image: "https://example.com/badge.png",
-        criteria: { narrative: "Test criteria" },
-        issuer: `https://example.com/issuers/${issuerId}`,
-      },
-    });
-
-    testData.set("issuerId", issuerId);
-    testData.set("badgeId", badgeId);
+  afterEach(async () => {
+    await clearTestData();
   });
 
   test("should handle missing context in OB2 assertion", async () => {

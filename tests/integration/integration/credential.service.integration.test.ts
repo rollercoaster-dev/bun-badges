@@ -6,16 +6,15 @@ import {
   tableExists as checkTableExists,
   pool,
 } from "@/utils/test/integration-setup";
-import {
-  DataIntegrityProof,
-  CredentialProof,
-  StatusList2021Entry,
-} from "@/models/credential.model";
 import { seedTestData, clearTestData } from "@/utils/test/db-helpers";
 import { OB3_CREDENTIAL_CONTEXT } from "@/constants/context-urls";
 import { SignableCredential } from "@/services/credential.service";
 import { sql } from "drizzle-orm";
 import { toJsonb, normalizeJsonb } from "@/utils/db-helpers";
+import { OpenBadgeProof, OB3, toIRI } from "@/utils/openbadges-types";
+import { eq } from "drizzle-orm";
+import { db } from "@/db/config";
+import { statusLists } from "@/db/schema";
 
 /**
  * Note on PostgreSQL & Drizzle-ORM (v0.41.0) Test Compatibility
@@ -151,9 +150,14 @@ describe("CredentialService Integration Tests", () => {
 
       // Verify results
       expect(achievementResult).toBeDefined();
-      expect(achievementResult.id).toEqual(`${hostUrl}/badges/${badgeId}`);
+      expect(achievementResult.id).toEqual(
+        toIRI(`${hostUrl}/badges/${badgeId}`),
+      );
       expect(achievementResult.name).toEqual("Achievement Test Badge");
       expect(achievementResult.type).toContain("AchievementCredential");
+      expect(achievementResult.issuer).toEqual(
+        toIRI(`${hostUrl}/issuers/${testData.issuer.issuerId}`),
+      );
     } catch (error) {
       console.error("Error in achievement test:", error);
       throw error;
@@ -191,7 +195,7 @@ describe("CredentialService Integration Tests", () => {
       expect(result).toBeDefined();
       expect(result.proof).toBeDefined();
       expect(result.proof.type).toEqual("DataIntegrityProof");
-      expect((result.proof as DataIntegrityProof).cryptosuite).toEqual(
+      expect((result.proof as OpenBadgeProof).cryptosuite).toEqual(
         "eddsa-rdfc-2022",
       );
       expect(result.proof.proofValue).toBeDefined();
@@ -259,8 +263,8 @@ describe("CredentialService Integration Tests", () => {
         id: "test-recipient@example.com",
         type: "EmailCredentialSubject",
       },
-      proof: undefined as unknown as CredentialProof,
-    } as SignableCredential & { proof: CredentialProof };
+      proof: undefined as unknown as OpenBadgeProof,
+    } as SignableCredential & { proof: OpenBadgeProof };
 
     try {
       const result = await service.verifySignature(credential);
@@ -377,8 +381,7 @@ describe("CredentialService Integration Tests", () => {
             "StatusList2021Entry",
           );
           // Type assertion to access the StatusList2021Entry-specific property
-          const statusEntry =
-            credential.credentialStatus as StatusList2021Entry;
+          const statusEntry = credential.credentialStatus;
           expect(statusEntry.statusPurpose).toEqual("revocation");
         }
       } finally {
@@ -493,6 +496,117 @@ describe("CredentialService Integration Tests", () => {
       }
     } catch (error) {
       console.error("Error in issuer key test:", error);
+      if (DEBUG_SQL) {
+        const errorString = String(error);
+        if (errorString.includes("syntax error at or near")) {
+          console.error(
+            "SQL syntax error detected in position:",
+            errorString.match(/position: "(\d+)"/)?.[1],
+          );
+        }
+      }
+      throw error;
+    }
+  });
+
+  it("should create a status list credential", async () => {
+    // Skip if test data doesn't exist
+    if (!testData || !testData.issuer) {
+      console.log("Test issuer not found, skipping test");
+      return;
+    }
+
+    const issuerId = testData.issuer.issuerId;
+
+    try {
+      // Create a status list credential
+      const statusListCredential = await service.createOrUpdateStatusList(
+        hostUrl,
+        issuerId,
+      );
+
+      expect(statusListCredential).toBeDefined();
+      expect(statusListCredential.type).toContain("StatusList2021Credential");
+      expect(statusListCredential.issuer).toEqual(
+        toIRI(`${hostUrl}/issuers/${issuerId}`),
+      );
+      expect(statusListCredential.credentialSubject.type).toBe(
+        "StatusList2021",
+      );
+      expect(statusListCredential.proof).toBeDefined();
+      // Cast proof to check properties
+      const proof = statusListCredential.proof as OpenBadgeProof;
+      expect(proof.type).toBe("DataIntegrityProof");
+    } catch (error) {
+      console.error("Error in status list credential test:", error);
+      if (DEBUG_SQL) {
+        const errorString = String(error);
+        if (errorString.includes("syntax error at or near")) {
+          console.error(
+            "SQL syntax error detected in position:",
+            errorString.match(/position: "(\d+)"/)?.[1],
+          );
+        }
+      }
+      throw error;
+    }
+  });
+
+  it("should update credential revocation status", async () => {
+    // Skip if test data doesn't exist
+    if (!testData || !testData.assertion) {
+      console.log("Test assertion not found, skipping test");
+      return;
+    }
+
+    const assertionId = testData.assertion.assertionId;
+    const issuerId = testData.issuer.issuerId;
+
+    try {
+      // --- FIX: Create the credential object *before* updating its status ---
+      const credentialToRevoke = await service.createCredential(
+        hostUrl,
+        assertionId,
+      );
+      expect(credentialToRevoke).toBeDefined(); // Ensure credential was created
+
+      // Create an initial status list (or ensure one exists)
+      await service.createOrUpdateStatusList(hostUrl, issuerId);
+
+      // Revoke the assertion
+      await service.updateCredentialRevocationStatus(
+        hostUrl,
+        assertionId,
+        true, // revoked = true
+        "Test revocation reason",
+      );
+
+      // Verify status list credential was updated in DB
+      const updatedStatusLists = await db
+        .select()
+        .from(statusLists)
+        .where(eq(statusLists.issuerId, issuerId));
+      expect(updatedStatusLists.length).toBe(1);
+      const updatedListJson = updatedStatusLists[0]
+        .statusListJson as OB3.VerifiableCredential;
+      expect(updatedListJson.credentialSubject.encodedList).toBeDefined(); // Check if encoded list is present
+      // TODO: More specific check by decoding the list and checking the bit
+
+      // --- FIX: Use the credential object created before the update ---
+      const credentialToCheck = credentialToRevoke;
+
+      // Check status - should be true (revoked)
+      const isRevoked = await service.checkCredentialRevocationStatus(
+        credentialToCheck, // Pass the *correct* credential object
+      );
+      expect(isRevoked).toBe(true);
+
+      // ... optionally test un-revoking and checking again ...
+    } catch (error) {
+      console.error(
+        "Error in update credential revocation status test:",
+        error,
+      );
       if (DEBUG_SQL) {
         const errorString = String(error);
         if (errorString.includes("syntax error at or near")) {

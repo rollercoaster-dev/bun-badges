@@ -2,6 +2,7 @@ import { expect, test, describe, beforeEach, afterEach } from "bun:test";
 import { IssuerController } from "@/controllers/issuer.controller";
 import { seedTestData, clearTestData } from "@/utils/test/db-helpers";
 import { IssuerJsonLdV2 } from "@/models/issuer.model";
+import { toIRI } from "@/utils/openbadges-types";
 
 // Add explicit mock for tests
 if (!IssuerController.prototype.verifyIssuer) {
@@ -65,9 +66,9 @@ describe("IssuerController - Verify Issuer", () => {
       const issuerJson: IssuerJsonLdV2 = {
         "@context": "https://w3id.org/openbadges/v2",
         type: "Profile",
-        id: "https://example.com/issuers/test",
+        id: toIRI("https://example.com/issuers/test"),
         name: "Test Issuer",
-        url: "https://example.com/issuer",
+        url: toIRI("https://example.com/issuer"),
       };
 
       const result = controller.verifyIssuer(issuerJson, "2.0");

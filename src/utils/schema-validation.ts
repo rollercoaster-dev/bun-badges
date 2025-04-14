@@ -1,12 +1,18 @@
 /**
  * Schema validation for Open Badges 3.0 credentials
  */
-import { OpenBadgeCredential } from "@/models/credential.model";
+import { OpenBadgeCredential, OB3 } from "@/utils/openbadges-types";
 import { OB3_CREDENTIAL_SCHEMA_URL } from "@/constants/context-urls";
 import Ajv, { AnySchema } from "ajv";
+import { Context } from "hono";
 // Import logger
 // import { createLogger } from "@/utils/logger";
 import logger from "@/utils/logger";
+import {
+  type AnyValidateFunction,
+  ErrorObject as AjvErrorObject,
+} from "ajv/dist/types";
+import * as Zod from "zod";
 
 // Create logger instance
 // const logger = createLogger("SchemaValidation");
@@ -185,23 +191,37 @@ export function validateOB3CredentialBasic(
       if (!subject.achievement) {
         errors.push("Missing required property: credentialSubject.achievement");
       } else {
-        // Check achievement properties
+        // Handle both single achievement and array of achievements
         const achievement = subject.achievement;
+        let targetAchievement: OB3.Achievement | undefined;
 
-        if (!achievement.id) {
-          errors.push(
-            "Missing required property: credentialSubject.achievement.id",
-          );
+        if (Array.isArray(achievement)) {
+          if (achievement.length === 0) {
+            errors.push("credentialSubject.achievement array cannot be empty");
+          } else {
+            targetAchievement = achievement[0]; // Validate the first achievement in the array
+          }
+        } else {
+          targetAchievement = achievement; // It's a single object
         }
 
-        if (!Array.isArray(achievement.type)) {
-          errors.push("credentialSubject.achievement.type must be an array");
-        }
+        if (targetAchievement) {
+          // Check achievement properties on the target object
+          if (!targetAchievement.id) {
+            errors.push(
+              "Missing required property: credentialSubject.achievement.id",
+            );
+          }
 
-        if (!achievement.name) {
-          errors.push(
-            "Missing required property: credentialSubject.achievement.name",
-          );
+          if (!Array.isArray(targetAchievement.type)) {
+            errors.push("credentialSubject.achievement.type must be an array");
+          }
+
+          if (!targetAchievement.name) {
+            errors.push(
+              "Missing required property: credentialSubject.achievement.name",
+            );
+          }
         }
       }
     }
@@ -228,3 +248,95 @@ export function validateOB3CredentialBasic(
     };
   }
 }
+
+// Validation middleware for Hono
+export const validate = (
+  schema: AnyValidateFunction | Zod.ZodTypeAny,
+  target: "body" | "query" | "param" = "body",
+) => {
+  return async (ctx: Context, next: () => Promise<void>) => {
+    try {
+      let dataToValidate;
+      if (target === "body") {
+        dataToValidate = await ctx.req.json();
+      } else if (target === "query") {
+        dataToValidate = ctx.req.query();
+      } else {
+        // target === "param"
+        dataToValidate = ctx.req.param();
+      }
+
+      let isValid = false;
+      let errors: AjvErrorObject[] | Zod.ZodIssue[] | null = null;
+
+      if (typeof schema === "function") {
+        // AJV schema
+        isValid = await schema(dataToValidate);
+        if (!isValid) errors = schema.errors ?? null;
+      } else {
+        // Zod schema
+        const parseResult = await schema.safeParseAsync(dataToValidate);
+        isValid = parseResult.success;
+        if (!isValid) {
+          if (parseResult.error) {
+            errors = parseResult.error.errors;
+          } else {
+            logger.error("Zod validation failed but no error object found");
+            errors = [
+              { message: "Unknown Zod validation error" },
+            ] as Zod.ZodIssue[];
+          }
+        }
+      }
+
+      if (!isValid) {
+        logger.error(
+          `Validation failed (${typeof schema === "function" ? "AJV" : "Zod"}):`,
+          errors,
+        );
+        return ctx.json(
+          {
+            status: "error",
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "Invalid request data",
+              details: errors,
+            },
+          },
+          400,
+        );
+      }
+
+      // If validation passed, proceed to next middleware/handler
+      await next();
+      return; // Explicitly return after next() completes
+    } catch (error) {
+      logger.error(error, `Validation error in ${target}:`);
+      // Ensure catch block also returns explicitly
+      return ctx.json(
+        {
+          status: "error",
+          error: {
+            code: "INVALID_REQUEST",
+            message: `Failed to parse request ${target}`,
+          },
+        },
+        400,
+      );
+    }
+  };
+};
+
+// Specific validation middleware examples
+export const validateCreateIssuer = (
+  target: "body" | "query" | "param" = "body",
+) => {
+  return async (ctx: Context, next: () => Promise<void>) => {
+    // Placeholder - actual schema should be imported and used
+    const schema = Zod.object({ name: Zod.string(), url: Zod.string().url() });
+    // Re-use the generic validate logic (or implement specific logic)
+    // This example re-uses the generic one for demonstration
+    const validationMiddleware = validate(schema, target);
+    await validationMiddleware(ctx, next);
+  };
+};
