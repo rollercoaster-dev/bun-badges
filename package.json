@@ -47,7 +47,7 @@
     "verify:credential": "docker-compose -f docker-compose.test.yml down -v && docker-compose -f docker-compose.test.yml run --entrypoint \"\" --rm test_runner sh -c 'bun install --prefer-offline && bun run src/db/migrate.ts && bun --preload ./tests/setup.ts ./tools/verification/verify-credential-service.ts'",
     "test": "bun test",
     "test:all": "bun test:unit && bun test:integration && bun test:e2e",
-    "test:watch": "echo \"Watching via docker-compose run is complex, consider alternative setup or running directly in container.\"",
+    "test:watch": "bun test --watch",
     "test:unit": "node scripts/run-tests.js unit",
     "test:integration": "node scripts/run-tests.js integration",
     "test:file": "node scripts/run-tests.js file",
