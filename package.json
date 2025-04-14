@@ -103,6 +103,7 @@
     "multiformats": "^13.1.0",
     "n3": "^1.17.2",
     "nanoid": "^5.1.4",
+    "openbadges-types": "^1.0.1",
     "pg": "^8.11.3",
     "pino": "^9.6.0",
     "png-itxt": "^2.0.0",
