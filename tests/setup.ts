@@ -88,6 +88,8 @@ if (process.env.DATABASE_URL) {
 // Create a shared poolEnd function that will be called at the very end
 let poolEnd: (() => Promise<void>) | undefined;
 
+// Track whether the pool has been closed
+let poolClosed = false;
 
 // Determine test type based on environment variables and command line arguments
 const isIntegrationTest =
