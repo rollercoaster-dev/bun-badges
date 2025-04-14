@@ -50,6 +50,7 @@
     "test:watch": "bun test --watch",
     "test:unit": "node scripts/run-tests.js unit",
     "test:integration": "node scripts/run-tests.js integration",
+    "test:integration:file": "node scripts/run-tests.js integration",
     "test:file": "node scripts/run-tests.js file",
     "test:e2e": "node scripts/run-tests.js e2e",
     "test:unit:docker": "bun test tests/unit/**/*.test.ts",

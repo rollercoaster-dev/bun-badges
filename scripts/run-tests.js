@@ -18,10 +18,13 @@
 
 import { execSync } from 'child_process';
 
-// Get the test type from command line arguments
+// Get the test type and optional file path from command line arguments
 const testType = process.argv[2];
+const testFile = process.argv[3];
+
 if (!testType) {
   console.error('Error: Test type is required. Use one of: unit, integration, e2e, file');
+  console.error('For integration tests with a specific file: node scripts/run-tests.js integration path/to/test.ts');
   process.exit(1);
 }
 
@@ -78,7 +81,14 @@ function runTests() {
     else if ((testType === 'integration' || testType === 'e2e') && isDockerComposeAvailable()) {
       console.log(`Using Docker Compose for ${testType} tests`);
       try {
-        execSync(`npm run test:${testType}:docker`, { stdio: 'inherit' });
+        if (testType === 'integration' && testFile) {
+          // Run a specific integration test file
+          console.log(`Running specific test file: ${testFile}`);
+          execSync(`docker-compose -f docker-compose.test.yml down -v && docker-compose -f docker-compose.test.yml run --entrypoint "" --build --rm -e NODE_ENV=test -e INTEGRATION_TEST=true test_runner sh -c 'bun install --prefer-offline && bun run src/db/migrate.ts && bun test ${testFile}'`, { stdio: 'inherit' });
+        } else {
+          // Run all tests for the test type
+          execSync(`npm run test:${testType}:docker`, { stdio: 'inherit' });
+        }
       } catch (error) {
         console.error(`Failed to run ${testType} tests using Docker Compose:`, error.message);
         console.error('Please ensure Docker Compose is installed and configured correctly.');
@@ -105,7 +115,13 @@ function runTests() {
       let testCommand;
       switch (testType) {
         case 'integration':
-          testCommand = 'bun run src/db/migrate.ts && bun test tests/integration/**/*.test.ts';
+          if (testFile) {
+            // Run a specific integration test file
+            console.log(`Running specific test file: ${testFile}`);
+            testCommand = `bun run src/db/migrate.ts && bun test ${testFile}`;
+          } else {
+            testCommand = 'bun run src/db/migrate.ts && bun test tests/integration/**/*.test.ts';
+          }
           break;
         case 'e2e':
           testCommand = 'bun run src/db/migrate.ts && bun test ./tests/e2e/index.ts';

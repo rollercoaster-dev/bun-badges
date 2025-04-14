@@ -25,7 +25,10 @@ export class KeyManagementController {
    */
   async getKeys(c: Context): Promise<Response> {
     try {
-      const keys = keyManagementService.listKeys().map((key) => ({
+      const keys = await keyManagementService.listKeys();
+
+      // Map to a safe response format (don't expose private keys)
+      const safeKeys = keys.map((key) => ({
         id: key.id,
         type: key.type,
         algorithm: key.algorithm,
@@ -34,7 +37,7 @@ export class KeyManagementController {
         isRevoked: key.isRevoked,
       }));
 
-      return c.json({ keys });
+      return c.json({ keys: safeKeys });
     } catch (error) {
       logger.error("Failed to get keys", { error });
       throw new BadRequestError("Failed to get keys");
@@ -49,12 +52,13 @@ export class KeyManagementController {
   async getKey(c: Context): Promise<Response> {
     try {
       const id = c.req.param("id");
-      const key = keyManagementService.getKey(id);
+      const key = await keyManagementService.getKey(id);
 
       if (!key) {
         throw new NotFoundError(`Key not found: ${id}`);
       }
 
+      // Return a safe version of the key (don't expose private key)
       return c.json({
         id: key.id,
         type: key.type,
@@ -89,15 +93,16 @@ export class KeyManagementController {
           KeyAlgorithm.ES256,
           KeyAlgorithm.EdDSA,
         ]),
-        id: z.string().optional(),
+        name: z.string().optional(),
       });
 
       const body = await c.req.json();
-      const { type, algorithm, id } = schema.parse(body);
+      const { type, algorithm, name } = schema.parse(body);
 
       // Generate key
-      const key = await keyManagementService.generateKey(type, algorithm, id);
+      const key = await keyManagementService.generateKey(type, algorithm, name);
 
+      // Return a safe version of the key (don't expose private key)
       return c.json(
         {
           id: key.id,
@@ -130,6 +135,7 @@ export class KeyManagementController {
       const id = c.req.param("id");
       const key = await keyManagementService.rotateKey(id);
 
+      // Return a safe version of the key (don't expose private key)
       return c.json({
         id: key.id,
         type: key.type,
@@ -157,7 +163,7 @@ export class KeyManagementController {
   async deleteKey(c: Context): Promise<Response> {
     try {
       const id = c.req.param("id");
-      const success = keyManagementService.deleteKey(id);
+      const success = await keyManagementService.deleteKey(id);
 
       if (!success) {
         throw new NotFoundError(`Key not found: ${id}`);
