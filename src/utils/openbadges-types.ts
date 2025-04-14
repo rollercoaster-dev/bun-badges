@@ -37,7 +37,7 @@ export function toIRI(url: string): Shared.IRI {
 export function toDateTime(dateTime: string): Shared.DateTime {
   // Basic ISO 8601 validation
   if (
-    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(.\d+)?(Z|[+-]\d{2}:\d{2})?$/.test(
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?$/.test(
       dateTime,
     )
   ) {
