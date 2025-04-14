@@ -31,15 +31,27 @@ const skipDocker = process.env.SKIP_DOCKER === 'true';
 // Check if we're running in CI
 const isCI = process.env.CI === 'true';
 
+// Helper function to set up database URL for local PostgreSQL
+function setupDatabaseUrl() {
+  if (!process.env.DATABASE_URL) {
+    process.env.DATABASE_URL = 'postgres://postgres:postgres@localhost:5432/bun_badges_test';
+    console.log(`Set DATABASE_URL to ${process.env.DATABASE_URL}`);
+    console.log('Make sure your local PostgreSQL is running and has the test database created.');
+  }
+}
+
 // Check if Docker Compose is available
 function isDockerComposeAvailable() {
   try {
+    // In CI or when SKIP_DOCKER is set, don't use Docker Compose
     if (isCI || skipDocker) {
+      console.log('CI or SKIP_DOCKER detected, skipping Docker Compose');
       return false;
     }
     execSync('docker-compose --version', { stdio: 'ignore' });
     return true;
   } catch (error) {
+    console.log('Docker Compose not available, using direct test command');
     return false;
   }
 }
@@ -74,10 +86,8 @@ function runTests() {
       }
 
       // Set database URL for local PostgreSQL if not already set
-      if ((testType === 'integration' || testType === 'e2e' || testType === 'file') && !process.env.DATABASE_URL) {
-        process.env.DATABASE_URL = 'postgres://postgres:postgres@localhost:5432/bun_badges_test';
-        console.log(`Set DATABASE_URL to ${process.env.DATABASE_URL}`);
-        console.log('Make sure your local PostgreSQL is running and has the test database created.');
+      if (testType === 'integration' || testType === 'e2e' || testType === 'file') {
+        setupDatabaseUrl();
       }
 
       // Run the appropriate test command directly
