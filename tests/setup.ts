@@ -88,19 +88,19 @@ if (process.env.DATABASE_URL) {
 // Create a shared poolEnd function that will be called at the very end
 let poolEnd: (() => Promise<void>) | undefined;
 
-// Determine if we're running integration or e2e tests that need DB
+// Track whether the pool has been closed
+let poolClosed = false;
+
+// Determine test type based on environment variables and command line arguments
 const isIntegrationTest =
-  process.env.INTEGRATION_TEST === "true" || // Check environment variable first
+  process.env.INTEGRATION_TEST === "true" ||
   process.argv.some(
     (arg) => arg.includes("integration") || arg.includes("tests/integration"),
   );
 
 const isE2ETest =
-  process.env.E2E_TEST === "true" || // Check environment variable first
+  process.env.E2E_TEST === "true" ||
   process.argv.some((arg) => arg.includes("e2e") || arg.includes("tests/e2e"));
-
-// Track whether the pool has been closed
-let poolClosed = false;
 
 // Determine if we need a database connection for these tests
 const needsDatabase = isIntegrationTest || isE2ETest;
@@ -207,43 +207,56 @@ mock.module("drizzle-orm/pg-core", () => {
   };
 });
 
+/**
+ * Database Configuration
+ *
+ * This section handles database connections for different test types:
+ * - Unit tests: Use mock database
+ * - Integration/E2E tests: Use real database connection
+ */
+
+// Create mock database objects for unit tests
+function createMockDatabase() {
+  const mockPool = {
+    query: (() =>
+      Promise.resolve({
+        rows: [{ test: 1, one: 1, drizzle_test: 1 }],
+      })) as Mock<any>,
+    connect: (() =>
+      Promise.resolve({
+        query: (() => Promise.resolve({ rows: [{ test: 1 }] })) as Mock<any>,
+        release: (() => {}) as Mock<any>,
+      })) as Mock<any>,
+    end: (() => Promise.resolve()) as Mock<any>,
+  };
+
+  const mockDb = {
+    execute: (() => Promise.resolve([{ drizzle_test: 1 }])) as Mock<any>,
+  };
+
+  // Set up the pool end function
+  poolEnd = () => Promise.resolve();
+
+  return {
+    db: mockDb,
+    dbPool: mockPool,
+    schema: {},
+  };
+}
+
 // Create a modified version of the db/config module
 mock.module("../src/db/config", () => {
   if (!needsDatabase) {
-    // Mock DB for unit tests
-    const mockPool = {
-      query: (() =>
-        Promise.resolve({
-          rows: [{ test: 1, one: 1, drizzle_test: 1 }],
-        })) as Mock<any>,
-      connect: (() =>
-        Promise.resolve({
-          query: (() => Promise.resolve({ rows: [{ test: 1 }] })) as Mock<any>,
-          release: (() => {}) as Mock<any>,
-        })) as Mock<any>,
-      end: (() => Promise.resolve()) as Mock<any>,
-    };
-
-    // Create mock db
-    const mockDb = {
-      execute: (() => Promise.resolve([{ drizzle_test: 1 }])) as Mock<any>,
-    };
-
-    // Set up the pool end function
-    poolEnd = () => Promise.resolve();
-
-    return {
-      db: mockDb,
-      dbPool: mockPool,
-      schema: {},
-    };
+    // For unit tests, use mock database
+    return createMockDatabase();
   } else {
-    // Setup real DB connection for integration/E2E tests (connecting to Docker service)
+    // For integration/E2E tests, use real database connection
     console.log(
       "🔄 Integration/E2E: Setting up real database connection module...",
     );
+
     try {
-      // Dynamically import the real config to avoid issues with top-level awaits or mocks
+      // Dynamically import the real config
       const { db, dbPool, schema } = require("../src/db/config.js");
 
       // Set up the pool end function
@@ -259,57 +272,33 @@ mock.module("../src/db/config", () => {
       };
 
       console.log("✅ Database module configured for integration/E2E tests.");
-
-      return {
-        db,
-        dbPool,
-        schema,
-      };
+      return { db, dbPool, schema };
     } catch (err) {
       console.error("❌ Error setting up real database module:", err);
       console.warn("⚠️ Using mock database as fallback");
 
       // Provide mock implementation as fallback
-      const mockPool = {
-        query: (() =>
-          Promise.resolve({
-            rows: [{ test: 1, one: 1, drizzle_test: 1 }],
-          })) as Mock<any>,
-        connect: (() =>
-          Promise.resolve({
-            query: (() =>
-              Promise.resolve({ rows: [{ test: 1 }] })) as Mock<any>,
-            release: (() => {}) as Mock<any>,
-          })) as Mock<any>,
-        end: (() => Promise.resolve()) as Mock<any>,
-      };
-
-      // Create mock db
-      const mockDb = {
-        execute: (() => Promise.resolve([{ drizzle_test: 1 }])) as Mock<any>,
-      };
-
-      // Set up the pool end function
-      poolEnd = () => Promise.resolve();
-
-      return {
-        db: mockDb,
-        dbPool: mockPool,
-        schema: {},
-      };
+      return createMockDatabase();
     }
   }
 });
+
+/**
+ * Cleanup Handlers
+ *
+ * These handlers ensure database connections are properly closed when tests complete
+ * or when the process is terminated.
+ */
 
 // When all tests complete, close the database pool
 process.on("exit", () => {
   if (poolEnd) {
     // We can't use async here, but that's okay for cleanup
     try {
-      console.log("Cleaning up database connections...");
+      console.log("🧹 Cleaning up database connections...");
       poolEnd();
     } catch (e) {
-      console.error("Error cleaning up database connections:", e);
+      console.error("❌ Error cleaning up database connections:", e);
     }
   }
 });
@@ -318,13 +307,32 @@ process.on("exit", () => {
 process.on("SIGINT", () => {
   if (poolEnd) {
     try {
-      poolEnd().then(() => process.exit(0));
+      console.log("🚫 Process interrupted, cleaning up...");
+      poolEnd().then(() => {
+        console.log("✅ Cleanup complete, exiting.");
+        process.exit(0);
+      });
     } catch (e) {
-      console.error("Error cleaning up database connections:", e);
+      console.error("❌ Error cleaning up database connections:", e);
       process.exit(1);
     }
   } else {
     process.exit(0);
+  }
+});
+
+// Handle uncaught exceptions
+process.on("uncaughtException", (error) => {
+  console.error("❌ Uncaught exception:", error);
+  if (poolEnd) {
+    try {
+      poolEnd().then(() => process.exit(1));
+    } catch (e) {
+      console.error("❌ Error cleaning up database connections:", e);
+      process.exit(1);
+    }
+  } else {
+    process.exit(1);
   }
 });
 

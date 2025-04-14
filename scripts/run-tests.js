@@ -1,19 +1,19 @@
 #!/usr/bin/env node
 
 /**
- * Test Runner Script
+ * Simplified Test Runner Script
  *
- * This script provides a unified way to run tests in both local and CI environments.
- * It detects whether Docker Compose is available and uses the appropriate test command.
+ * This script provides a unified way to run tests in both local and Docker environments.
+ * It automatically selects the appropriate test command based on the test type.
  *
  * Usage:
  *   node scripts/run-tests.js [test-type]
  *
  * Where test-type is one of:
- *   - unit
- *   - integration
- *   - e2e
- *   - file
+ *   - unit: Run unit tests (no database required)
+ *   - integration: Run integration tests (requires database)
+ *   - e2e: Run end-to-end tests (requires database)
+ *   - file: Run a specific test file (requires database)
  */
 
 import { execSync } from 'child_process';
@@ -25,21 +25,33 @@ if (!testType) {
   process.exit(1);
 }
 
+// Check if Docker should be skipped
+const skipDocker = process.env.SKIP_DOCKER === 'true';
+
 // Check if we're running in CI
 const isCI = process.env.CI === 'true';
+
+// Helper function to set up database URL for local PostgreSQL
+function setupDatabaseUrl() {
+  if (!process.env.DATABASE_URL) {
+    process.env.DATABASE_URL = 'postgres://postgres:postgres@localhost:5432/bun_badges_test';
+    console.log(`Set DATABASE_URL to ${process.env.DATABASE_URL}`);
+    console.log('Make sure your local PostgreSQL is running and has the test database created.');
+  }
+}
 
 // Check if Docker Compose is available
 function isDockerComposeAvailable() {
   try {
-    if (isCI) {
-      // In CI, we don't want to use Docker Compose
+    // In CI or when SKIP_DOCKER is set, don't use Docker Compose
+    if (isCI || skipDocker) {
+      console.log('CI or SKIP_DOCKER detected, skipping Docker Compose');
       return false;
     }
-
-    // Check if docker-compose is available
     execSync('docker-compose --version', { stdio: 'ignore' });
     return true;
   } catch (error) {
+    console.log('Docker Compose not available, using direct test command');
     return false;
   }
 }
@@ -48,65 +60,45 @@ function isDockerComposeAvailable() {
 function runTests() {
   console.log(`Running ${testType} tests...`);
 
-  try {
-    // Set environment variables
-    process.env.NODE_ENV = 'test';
+  // Set environment variables
+  process.env.NODE_ENV = 'test';
 
+  try {
     // For unit tests, never use Docker
     if (testType === 'unit') {
       console.log('Running unit tests directly (no Docker needed)');
-      execSync('bun test tests/unit/**/*.test.ts', { stdio: 'inherit' });
+      try {
+        execSync('bun test tests/unit/**/*.test.ts', { stdio: 'inherit' });
+      } catch (error) {
+        console.error('Failed to run unit tests:', error.message);
+        process.exit(error.status || 1);
+      }
     }
-    // For integration and e2e tests, use Docker if available and not explicitly skipped
-    else if ((testType === 'integration' || testType === 'e2e') && isDockerComposeAvailable() && process.env.SKIP_DOCKER !== 'true') {
+    // For integration and e2e tests, use Docker if available
+    else if ((testType === 'integration' || testType === 'e2e') && isDockerComposeAvailable()) {
       console.log(`Using Docker Compose for ${testType} tests`);
-      process.env.INTEGRATION_TEST = testType === 'integration' ? 'true' : undefined;
-      process.env.E2E_TEST = testType === 'e2e' ? 'true' : undefined;
       try {
         execSync(`npm run test:${testType}:docker`, { stdio: 'inherit' });
       } catch (error) {
-        console.error(`Error running ${testType} tests with Docker. Falling back to direct execution.`);
-        console.error(`If Docker is not running, you can set SKIP_DOCKER=true to skip Docker checks.`);
-
-        // Set environment variables for direct execution
-        process.env.INTEGRATION_TEST = testType === 'integration' ? 'true' : undefined;
-        process.env.E2E_TEST = testType === 'e2e' ? 'true' : undefined;
-
-        // Set database URL for local PostgreSQL if not already set
-        if (!process.env.DATABASE_URL) {
-          process.env.DATABASE_URL = 'postgres://postgres:postgres@localhost:5432/bun_badges_test';
-          console.log(`Set DATABASE_URL to ${process.env.DATABASE_URL}`);
-          console.log('Make sure your local PostgreSQL is running and has the test database created.');
-        }
-
-        // Run the appropriate test command directly
-        const testCommand = testType === 'integration'
-          ? 'bun test tests/integration/**/*.test.ts'
-          : 'bun test ./tests/e2e/index.ts';
-
-        execSync(testCommand, { stdio: 'inherit' });
+        console.error(`Failed to run ${testType} tests using Docker Compose:`, error.message);
+        console.error('Please ensure Docker Compose is installed and configured correctly.');
+        process.exit(error.status || 1);
       }
     }
     // Direct command for all other cases
     else {
       console.log(`Using direct test command for ${testType} tests (no Docker)`);
 
+      // Set appropriate environment variables
       if (testType === 'integration') {
         process.env.INTEGRATION_TEST = 'true';
-        // Set database URL for local PostgreSQL if not already set
-        if (!process.env.DATABASE_URL) {
-          process.env.DATABASE_URL = 'postgres://postgres:postgres@localhost:5432/bun_badges_test';
-          console.log(`Set DATABASE_URL to ${process.env.DATABASE_URL}`);
-          console.log('Make sure your local PostgreSQL is running and has the test database created.');
-        }
       } else if (testType === 'e2e') {
         process.env.E2E_TEST = 'true';
-        // Set database URL for local PostgreSQL if not already set
-        if (!process.env.DATABASE_URL) {
-          process.env.DATABASE_URL = 'postgres://postgres:postgres@localhost:5432/bun_badges_test';
-          console.log(`Set DATABASE_URL to ${process.env.DATABASE_URL}`);
-          console.log('Make sure your local PostgreSQL is running and has the test database created.');
-        }
+      }
+
+      // Set database URL for local PostgreSQL if not already set
+      if (testType === 'integration' || testType === 'e2e' || testType === 'file') {
+        setupDatabaseUrl();
       }
 
       // Run the appropriate test command directly
@@ -126,7 +118,12 @@ function runTests() {
           process.exit(1);
       }
 
-      execSync(testCommand, { stdio: 'inherit' });
+      try {
+        execSync(testCommand, { stdio: 'inherit' });
+      } catch (error) {
+        console.error(`Failed to run ${testType} tests directly:`, error.message);
+        process.exit(error.status || 1);
+      }
     }
 
     console.log(`${testType} tests completed successfully`);
