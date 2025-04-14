@@ -80,6 +80,7 @@ export class KeyManagementController {
 
   /**
    * Create a new key
+   *
    * @param c Hono context
    * @returns Created key
    */
