@@ -67,12 +67,23 @@ function runTests() {
     // For unit tests, never use Docker
     if (testType === 'unit') {
       console.log('Running unit tests directly (no Docker needed)');
-      execSync('bun test tests/unit/**/*.test.ts', { stdio: 'inherit' });
+      try {
+        execSync('bun test tests/unit/**/*.test.ts', { stdio: 'inherit' });
+      } catch (error) {
+        console.error('Failed to run unit tests:', error.message);
+        process.exit(error.status || 1);
+      }
     }
     // For integration and e2e tests, use Docker if available
     else if ((testType === 'integration' || testType === 'e2e') && isDockerComposeAvailable()) {
       console.log(`Using Docker Compose for ${testType} tests`);
-      execSync(`npm run test:${testType}:docker`, { stdio: 'inherit' });
+      try {
+        execSync(`npm run test:${testType}:docker`, { stdio: 'inherit' });
+      } catch (error) {
+        console.error(`Failed to run ${testType} tests using Docker Compose:`, error.message);
+        console.error('Please ensure Docker Compose is installed and configured correctly.');
+        process.exit(error.status || 1);
+      }
     }
     // Direct command for all other cases
     else {
@@ -107,7 +118,12 @@ function runTests() {
           process.exit(1);
       }
 
-      execSync(testCommand, { stdio: 'inherit' });
+      try {
+        execSync(testCommand, { stdio: 'inherit' });
+      } catch (error) {
+        console.error(`Failed to run ${testType} tests directly:`, error.message);
+        process.exit(error.status || 1);
+      }
     }
 
     console.log(`${testType} tests completed successfully`);
