@@ -4,13 +4,17 @@
  * This service handles secure key management for Open Badges 3.0 implementation.
  * It provides functionality for loading, storing, and rotating cryptographic keys
  * used for signing and verifying credentials.
+ *
+ * This implementation uses a database for key storage and management.
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
-import { join } from "path";
-import * as crypto from "crypto";
-import { env } from "../utils/env";
 import logger from "../utils/logger";
+import { KeysService, type Key } from "./keys.service";
+import { KeyManagementService as KeyService } from "./key.service";
+import {
+  executeWithErrorHandling,
+  unwrapResult,
+} from "../utils/error-handling";
 
 /**
  * Key types supported by the service
@@ -47,121 +51,206 @@ export interface KeyPair {
  * Key Management Service
  */
 export class KeyManagementService {
-  private keysDir: string;
+  private keysService: KeysService;
+  private keyService: KeyService;
   private keysCache: Map<string, KeyPair> = new Map();
 
   /**
    * Constructor
-   * @param keysDir Directory to store keys
    */
-  constructor(keysDir?: string) {
-    this.keysDir = keysDir || env.KEYS_DIR || join(process.cwd(), "keys");
+  constructor() {
+    this.keysService = new KeysService();
+    this.keyService = new KeyService();
 
-    // Ensure keys directory exists
-    if (!existsSync(this.keysDir)) {
-      try {
-        mkdirSync(this.keysDir, { recursive: true });
-      } catch (error) {
-        logger.error("Failed to create keys directory", { error });
-        throw new Error("Failed to create keys directory");
-      }
-    }
-
-    // Load existing keys
-    this.loadKeys();
+    // Note: Keys will be loaded via the initialize method
   }
 
   /**
-   * Load keys from the keys directory
+   * Initialize the service
+   * This must be called before using any other methods
    */
-  private loadKeys(): void {
-    try {
-      // In a real implementation, we would load keys from a secure storage
-      // For now, we'll just check if we have a default key and create one if not
-      const defaultKeyPath = join(this.keysDir, "default-signing-key.json");
+  public async initialize(): Promise<void> {
+    const result = await executeWithErrorHandling(async () => {
+      await this.loadKeys();
+    }, "Failed to initialize key management service");
 
-      if (!existsSync(defaultKeyPath)) {
-        logger.info("Default signing key not found, generating a new one");
-        this.generateKey(
-          KeyType.SIGNING,
-          KeyAlgorithm.RS256,
-          "default-signing-key",
-        );
-      } else {
-        // Load the default key
-        const keyData = readFileSync(defaultKeyPath, "utf8");
-        const keyPair = JSON.parse(keyData) as KeyPair;
-        this.keysCache.set(keyPair.id, keyPair);
-        logger.info("Loaded default signing key", { keyId: keyPair.id });
-      }
-    } catch (error) {
-      logger.error("Failed to load keys", { error });
-      throw new Error("Failed to load keys");
+    if (!result.success) {
+      throw result.error;
     }
+  }
+
+  /**
+   * Load keys from the database
+   */
+  private async loadKeys(): Promise<void> {
+    // Clear the cache
+    this.clearCache();
+
+    // Load all active signing keys
+    const signingKeys = await this.keysService.listKeysByType(KeyType.SIGNING);
+
+    // Add keys to cache
+    for (const key of signingKeys) {
+      this.updateCache(key);
+    }
+
+    // Check if we have a default signing key
+    const defaultKeys = signingKeys.filter(
+      (key) => key.name === "default-signing-key",
+    );
+
+    if (defaultKeys.length === 0) {
+      logger.info("Default signing key not found, generating a new one");
+      await this.generateKey(
+        KeyType.SIGNING,
+        KeyAlgorithm.RS256,
+        "default-signing-key",
+      );
+    } else {
+      logger.info("Loaded default signing key", { keyId: defaultKeys[0].id });
+    }
+  }
+
+  /**
+   * Clear the key cache
+   */
+  private clearCache(): void {
+    this.keysCache.clear();
+  }
+
+  /**
+   * Update the key cache with a key
+   * @param key The key to update in the cache
+   */
+  private updateCache(key: Key): void {
+    const keyPair = this.dbKeyToKeyPair(key);
+    this.keysCache.set(key.id, keyPair);
+  }
+
+  /**
+   * Get a key from the cache or fall back to the database
+   * @param id Key ID
+   * @returns Key pair or undefined if not found
+   */
+  private async getCachedKey(id: string): Promise<KeyPair | undefined> {
+    // Check cache first
+    if (this.keysCache.has(id)) {
+      return this.keysCache.get(id);
+    }
+
+    // If not in cache, get from database
+    const key = await this.keysService.getKeyById(id);
+
+    if (!key) {
+      return undefined;
+    }
+
+    // Update cache
+    this.updateCache(key);
+
+    return this.keysCache.get(id);
+  }
+
+  /**
+   * Handle private key encryption/decryption based on key type
+   * @param privateKey The private key to handle
+   * @param type The key type
+   * @param encrypt Whether to encrypt or decrypt the key
+   * @returns The handled private key
+   */
+  private handlePrivateKey(
+    privateKey: string,
+    type: KeyType,
+    encrypt: boolean,
+  ): string {
+    if (!privateKey) {
+      return "";
+    }
+
+    if (type !== KeyType.SIGNING) {
+      return privateKey;
+    }
+
+    return encrypt
+      ? this.keyService.encryptPrivateKey(privateKey)
+      : this.keyService.decryptPrivateKey(privateKey);
+  }
+
+  /**
+   * Convert a database key to a key pair
+   * @param key Database key
+   * @returns Key pair
+   */
+  private dbKeyToKeyPair(key: Key): KeyPair {
+    return {
+      id: key.id,
+      type: key.type as KeyType,
+      algorithm: key.algorithm as KeyAlgorithm,
+      publicKey: key.publicKey,
+      privateKey: key.privateKey || "",
+      createdAt: key.createdAt.toISOString(),
+      expiresAt: key.expiresAt?.toISOString(),
+      isRevoked: !key.isActive || !!key.revokedAt,
+    };
   }
 
   /**
    * Generate a new key pair
    * @param type Key type
    * @param algorithm Key algorithm
-   * @param id Optional key ID
+   * @param name Optional key name
    * @returns Key pair
    */
   async generateKey(
     type: KeyType,
     algorithm: KeyAlgorithm,
-    id?: string,
+    name?: string,
   ): Promise<KeyPair> {
-    try {
-      // Generate a unique ID if not provided
-      const keyId = id || `${type}-${algorithm}-${Date.now()}`;
+    const result = await executeWithErrorHandling(
+      async () => {
+        logger.info("Generating new key pair", { type, algorithm, name });
 
-      // Generate key pair based on algorithm
-      let publicKey: string;
-      let privateKey: string;
+        // Generate key pair based on algorithm
+        // Use the KeyService for all key generation to ensure compatibility with Bun
+        // This handles the differences in crypto implementation between Node.js and Bun
+        const generatedKeyPair = this.keyService.generateKeyPair();
+        const publicKey = generatedKeyPair.publicKey;
+        const privateKey = generatedKeyPair.privateKey;
 
-      // Generate key pair using Node.js crypto module
-      const { publicKey: pubKey, privateKey: privKey } =
-        crypto.generateKeyPairSync("rsa", {
-          modulusLength: 2048,
-          publicKeyEncoding: {
-            type: "spki",
-            format: "pem",
-          },
-          privateKeyEncoding: {
-            type: "pkcs8",
-            format: "pem",
-          },
+        // Encrypt the private key if needed
+        const encryptedPrivateKey = this.handlePrivateKey(
+          privateKey,
+          type,
+          true,
+        );
+
+        // Create the key in the database
+        const key = await this.keysService.createKey({
+          type,
+          algorithm,
+          publicKey,
+          privateKey: encryptedPrivateKey,
+          name,
+          description: `${type} key using ${algorithm} algorithm`,
+          version: "1.0.0",
         });
 
-      publicKey = pubKey;
-      privateKey = privKey;
+        // Update cache
+        this.updateCache(key);
 
-      // Create key pair object
-      const newKeyPair: KeyPair = {
-        id: keyId,
-        type,
-        algorithm,
-        publicKey: publicKey,
-        privateKey: privateKey,
-        createdAt: new Date().toISOString(),
-        isRevoked: false,
-      };
+        logger.info("Generated new key pair", {
+          keyId: key.id,
+          type,
+          algorithm,
+        });
 
-      // Save key pair to file
-      const keyPath = join(this.keysDir, `${keyId}.json`);
-      writeFileSync(keyPath, JSON.stringify(newKeyPair, null, 2));
+        return this.keysCache.get(key.id)!;
+      },
+      "Failed to generate key pair",
+      { type, algorithm, name },
+    );
 
-      // Add to cache
-      this.keysCache.set(keyId, newKeyPair);
-
-      logger.info("Generated new key pair", { keyId, type, algorithm });
-
-      return newKeyPair;
-    } catch (error) {
-      logger.error("Failed to generate key pair", { error, type, algorithm });
-      throw new Error("Failed to generate key pair");
-    }
+    return unwrapResult(result);
   }
 
   /**
@@ -169,27 +258,58 @@ export class KeyManagementService {
    * @param id Key ID
    * @returns Key pair
    */
-  getKey(id: string): KeyPair | undefined {
-    return this.keysCache.get(id);
+  async getKey(id: string): Promise<KeyPair | undefined> {
+    const result = await executeWithErrorHandling(
+      async () => {
+        return this.getCachedKey(id);
+      },
+      "Failed to get key",
+      { keyId: id },
+    );
+
+    return result.success ? result.data : undefined;
   }
 
   /**
    * Get the default signing key
    * @returns Default signing key
    */
-  getDefaultSigningKey(): KeyPair | undefined {
-    // Find the default signing key in the cache
-    for (const [_, keyPair] of this.keysCache.entries()) {
-      if (
-        keyPair.type === KeyType.SIGNING &&
-        keyPair.id === "default-signing-key" &&
-        !keyPair.isRevoked
-      ) {
-        return keyPair;
+  async getDefaultSigningKey(): Promise<KeyPair | undefined> {
+    const result = await executeWithErrorHandling(async () => {
+      // Find the default signing key in the cache
+      for (const [_, keyPair] of this.keysCache.entries()) {
+        if (keyPair.type === KeyType.SIGNING && !keyPair.isRevoked) {
+          // Check if this is the default key by name
+          const key = await this.keysService.getKeyById(keyPair.id);
+          if (key && key.name === "default-signing-key") {
+            return keyPair;
+          }
+        }
       }
-    }
 
-    return undefined;
+      // If not found in cache, query the database
+      const keys = await this.keysService.listKeysByType(KeyType.SIGNING);
+      const defaultKey = keys.find(
+        (key) => key.name === "default-signing-key" && key.isActive,
+      );
+
+      if (!defaultKey) {
+        // Generate a new default key if none exists
+        logger.info("Default signing key not found, generating a new one");
+        return await this.generateKey(
+          KeyType.SIGNING,
+          KeyAlgorithm.RS256,
+          "default-signing-key",
+        );
+      }
+
+      // Update cache
+      this.updateCache(defaultKey);
+
+      return this.keysCache.get(defaultKey.id);
+    }, "Failed to get default signing key");
+
+    return result.success ? result.data : undefined;
   }
 
   /**
@@ -198,35 +318,33 @@ export class KeyManagementService {
    * @returns New key pair
    */
   async rotateKey(id: string): Promise<KeyPair> {
-    try {
-      // Get the existing key
-      const existingKey = this.keysCache.get(id);
+    const result = await executeWithErrorHandling(
+      async () => {
+        logger.info("Rotating key", { keyId: id });
 
-      if (!existingKey) {
-        throw new Error(`Key not found: ${id}`);
-      }
+        // Get the existing key
+        const key = await this.keysService.getKeyById(id);
 
-      // Mark the existing key as revoked
-      existingKey.isRevoked = true;
+        if (!key) {
+          throw new Error(`Key not found: ${id}`);
+        }
 
-      // Save the updated key
-      const keyPath = join(this.keysDir, `${id}.json`);
-      writeFileSync(keyPath, JSON.stringify(existingKey, null, 2));
+        // Use the KeysService to rotate the key
+        const newKey = await this.keysService.rotateKey(id);
 
-      // Generate a new key with the same type and algorithm
-      const newKey = await this.generateKey(
-        existingKey.type,
-        existingKey.algorithm,
-        `${id}-rotated-${Date.now()}`,
-      );
+        // Update cache
+        this.keysCache.delete(id); // Remove old key from cache
+        this.updateCache(newKey); // Add new key to cache
 
-      logger.info("Rotated key", { oldKeyId: id, newKeyId: newKey.id });
+        logger.info("Rotated key", { oldKeyId: id, newKeyId: newKey.id });
 
-      return newKey;
-    } catch (error) {
-      logger.error("Failed to rotate key", { error, keyId: id });
-      throw new Error("Failed to rotate key");
-    }
+        return this.keysCache.get(newKey.id)!;
+      },
+      "Failed to rotate key",
+      { keyId: id },
+    );
+
+    return unwrapResult(result);
   }
 
   /**
@@ -235,7 +353,7 @@ export class KeyManagementService {
    * @param algorithm Key algorithm
    * @param publicKeyPem Public key in PEM format
    * @param privateKeyPem Private key in PEM format
-   * @param id Optional key ID
+   * @param name Optional key name
    * @returns Key pair
    */
   async importKey(
@@ -243,37 +361,42 @@ export class KeyManagementService {
     algorithm: KeyAlgorithm,
     publicKeyPem: string,
     privateKeyPem: string,
-    id?: string,
+    name?: string,
   ): Promise<KeyPair> {
-    try {
-      // Generate a unique ID if not provided
-      const keyId = id || `${type}-${algorithm}-imported-${Date.now()}`;
+    const result = await executeWithErrorHandling(
+      async () => {
+        logger.info("Importing key pair", { type, algorithm, name });
 
-      // Create key pair object
-      const keyPair: KeyPair = {
-        id: keyId,
-        type,
-        algorithm,
-        publicKey: publicKeyPem,
-        privateKey: privateKeyPem,
-        createdAt: new Date().toISOString(),
-        isRevoked: false,
-      };
+        // Encrypt the private key if needed
+        const encryptedPrivateKey = this.handlePrivateKey(
+          privateKeyPem,
+          type,
+          true,
+        );
 
-      // Save key pair to file
-      const keyPath = join(this.keysDir, `${keyId}.json`);
-      writeFileSync(keyPath, JSON.stringify(keyPair, null, 2));
+        // Create the key in the database
+        const key = await this.keysService.createKey({
+          type,
+          algorithm,
+          publicKey: publicKeyPem,
+          privateKey: encryptedPrivateKey,
+          name: name || `imported-${type}-${algorithm}-${Date.now()}`,
+          description: `Imported ${type} key using ${algorithm} algorithm`,
+          version: "1.0.0",
+        });
 
-      // Add to cache
-      this.keysCache.set(keyId, keyPair);
+        // Update cache
+        this.updateCache(key);
 
-      logger.info("Imported key pair", { keyId, type, algorithm });
+        logger.info("Imported key pair", { keyId: key.id, type, algorithm });
 
-      return keyPair;
-    } catch (error) {
-      logger.error("Failed to import key pair", { error, type, algorithm });
-      throw new Error("Failed to import key pair");
-    }
+        return this.keysCache.get(key.id)!;
+      },
+      "Failed to import key pair",
+      { type, algorithm, name },
+    );
+
+    return unwrapResult(result);
   }
 
   /**
@@ -281,30 +404,64 @@ export class KeyManagementService {
    * @param id Key ID
    * @returns Key pair in PEM format
    */
-  exportKey(id: string): { publicKey: string; privateKey: string } | undefined {
-    try {
-      const keyPair = this.keysCache.get(id);
+  async exportKey(
+    id: string,
+  ): Promise<{ publicKey: string; privateKey: string } | undefined> {
+    const result = await executeWithErrorHandling(
+      async () => {
+        // Get the key from database
+        const key = await this.keysService.getKeyById(id);
 
-      if (!keyPair) {
-        return undefined;
-      }
+        if (!key) {
+          return undefined;
+        }
 
-      return {
-        publicKey: keyPair.publicKey,
-        privateKey: keyPair.privateKey,
-      };
-    } catch (error) {
-      logger.error("Failed to export key pair", { error, keyId: id });
-      throw new Error("Failed to export key pair");
-    }
+        // Decrypt the private key if needed
+        const privateKey = this.handlePrivateKey(
+          key.privateKey || "",
+          key.type as KeyType,
+          false,
+        );
+
+        return {
+          publicKey: key.publicKey,
+          privateKey,
+        };
+      },
+      "Failed to export key pair",
+      { keyId: id },
+    );
+
+    return result.success ? result.data : undefined;
   }
 
   /**
    * List all keys
    * @returns List of keys
    */
-  listKeys(): KeyPair[] {
-    return Array.from(this.keysCache.values());
+  async listKeys(): Promise<KeyPair[]> {
+    const result = await executeWithErrorHandling(async () => {
+      // Get all keys from database
+      const keys = await this.keysService.listKeysByType(KeyType.SIGNING, true);
+      const verificationKeys = await this.keysService.listKeysByType(
+        KeyType.VERIFICATION,
+        true,
+      );
+
+      // Combine all keys
+      const allKeys = [...keys, ...verificationKeys];
+
+      // Clear cache and update with all keys
+      this.clearCache();
+      for (const key of allKeys) {
+        this.updateCache(key);
+      }
+
+      // Return all key pairs from cache
+      return Array.from(this.keysCache.values());
+    }, "Failed to list keys");
+
+    return unwrapResult(result);
   }
 
   /**
@@ -312,44 +469,49 @@ export class KeyManagementService {
    * @param id Key ID
    * @returns True if the key was deleted
    */
-  deleteKey(id: string): boolean {
-    try {
-      // Get the existing key
-      const existingKey = this.keysCache.get(id);
+  async deleteKey(id: string): Promise<boolean> {
+    const result = await executeWithErrorHandling(
+      async () => {
+        // Get the key from database
+        const key = await this.keysService.getKeyById(id);
 
-      if (!existingKey) {
-        return false;
-      }
+        if (!key) {
+          return false;
+        }
 
-      // Remove from cache
-      this.keysCache.delete(id);
+        // Revoke the key
+        await this.keysService.revokeKey(id, "Key deleted");
 
-      // Delete the key file
-      const keyPath = join(this.keysDir, `${id}.json`);
-      if (existsSync(keyPath)) {
-        writeFileSync(
-          keyPath,
-          JSON.stringify(
-            {
-              ...existingKey,
-              isRevoked: true,
-              deletedAt: new Date().toISOString(),
-            },
-            null,
-            2,
-          ),
-        );
-      }
+        // Remove from cache
+        this.keysCache.delete(id);
 
-      logger.info("Deleted key", { keyId: id });
+        logger.info("Deleted key", { keyId: id });
 
-      return true;
-    } catch (error) {
-      logger.error("Failed to delete key", { error, keyId: id });
-      throw new Error("Failed to delete key");
-    }
+        return true;
+      },
+      "Failed to delete key",
+      { keyId: id },
+    );
+
+    return result.success ? result.data : false;
   }
 }
 
-// Export singleton instance
-export const keyManagementService = new KeyManagementService();
+// Create singleton instance
+const keyManagementService = new KeyManagementService();
+
+// Initialize the service
+// This is an immediately invoked async function to initialize the service
+// It will run when the module is first imported
+(async () => {
+  try {
+    logger.info("Initializing KeyManagementService...");
+    await keyManagementService.initialize();
+    logger.info("KeyManagementService initialized successfully");
+  } catch (error) {
+    logger.error("Failed to initialize KeyManagementService", { error });
+  }
+})();
+
+// Export the singleton instance
+export { keyManagementService };

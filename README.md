@@ -195,7 +195,7 @@ src/
 ├── services/     # Business logic
 ├── models/       # Data models
 ├── middleware/   # Custom middleware
-├── utils/        # Helper functions
+├── utils/        # Helper functions - see [Utils Documentation](src/utils/README.md)
 └── __tests__/    # Test directories - see Testing section for details
 ```
 

@@ -6,9 +6,20 @@
  * Open Badges 3.0 specification.
  */
 
-import * as crypto from "crypto";
 import { keyManagementService } from "./key-management.service";
 import logger from "../utils/logger";
+import {
+  executeWithErrorHandling,
+  unwrapResult,
+} from "../utils/error-handling";
+import {
+  encodeBase64Url,
+  decodeBase64Url,
+  splitJwt,
+  createJwt,
+  getCurrentTimestamp,
+} from "../utils/jwt";
+import { getJwtAlgorithm, signData, verifySignature } from "../utils/crypto";
 
 /**
  * Credential Signing Service
@@ -24,55 +35,59 @@ export class CredentialSigningService {
     payload: Record<string, unknown>,
     keyId?: string,
   ): Promise<string> {
-    try {
+    const result = await executeWithErrorHandling(async () => {
       // Get the signing key
       const signingKey = keyId
-        ? keyManagementService.getKey(keyId)
-        : keyManagementService.getDefaultSigningKey();
+        ? await keyManagementService.getKey(keyId)
+        : await keyManagementService.getDefaultSigningKey();
 
       if (!signingKey) {
         throw new Error("Signing key not found");
       }
 
       // Create JWT header and payload
+      const alg = getJwtAlgorithm(signingKey.algorithm);
+
       const header = {
-        alg: "RS256",
+        alg,
         kid: signingKey.id,
         typ: "JWT",
       };
 
       // Add issuedAt and expiration to payload
-      const now = Math.floor(Date.now() / 1000);
+      const now = getCurrentTimestamp();
       const enhancedPayload = {
         ...payload,
         iat: now,
         exp: now + 3600, // 1 hour
       };
 
-      // Combine header and payload
-      const headerBase64 = Buffer.from(JSON.stringify(header)).toString(
-        "base64url",
-      );
-      const payloadBase64 = Buffer.from(
-        JSON.stringify(enhancedPayload),
-      ).toString("base64url");
+      // Encode header and payload
+      const headerBase64 = encodeBase64Url(header);
+      const payloadBase64 = encodeBase64Url(enhancedPayload);
       const dataToSign = `${headerBase64}.${payloadBase64}`;
 
+      // Make sure we have the private key
+      if (!signingKey.privateKey) {
+        throw new Error("Private key not available for signing");
+      }
+
       // Sign the data
-      const signer = crypto.createSign("RSA-SHA256");
-      signer.update(dataToSign);
-      const signature = signer.sign(signingKey.privateKey, "base64url");
+      const signature = signData(
+        dataToSign,
+        signingKey.privateKey,
+        signingKey.algorithm,
+      );
 
       // Create the JWT
-      const jwt = `${dataToSign}.${signature}`;
+      const jwt = createJwt(headerBase64, payloadBase64, signature);
 
       logger.info("Signed credential JWT", { keyId: signingKey.id });
 
       return jwt;
-    } catch (error) {
-      logger.error("Failed to sign credential JWT", { error });
-      throw new Error("Failed to sign credential JWT");
-    }
+    }, "Failed to sign credential JWT");
+
+    return unwrapResult(result);
   }
 
   /**
@@ -81,18 +96,17 @@ export class CredentialSigningService {
    * @returns Verified payload
    */
   async verifyCredentialJwt(jwt: string): Promise<Record<string, unknown>> {
-    try {
+    const result = await executeWithErrorHandling(async () => {
       // Split the JWT into parts
-      const [headerBase64, payloadBase64, signatureBase64] = jwt.split(".");
+      const [headerBase64, payloadBase64, signatureBase64] = splitJwt(jwt);
 
       // Decode the header to get the key ID
-      const headerJson = Buffer.from(headerBase64, "base64url").toString(
-        "utf8",
+      const header = decodeBase64Url<{ kid: string; alg: string }>(
+        headerBase64,
       );
-      const header = JSON.parse(headerJson);
 
       // Get the key
-      const key = keyManagementService.getKey(header.kid);
+      const key = await keyManagementService.getKey(header.kid);
 
       if (!key) {
         throw new Error(`Key not found: ${header.kid}`);
@@ -100,12 +114,11 @@ export class CredentialSigningService {
 
       // Verify the signature
       const dataToVerify = `${headerBase64}.${payloadBase64}`;
-      const verifier = crypto.createVerify("RSA-SHA256");
-      verifier.update(dataToVerify);
-      const isValid = verifier.verify(
-        key.publicKey,
+      const isValid = verifySignature(
+        dataToVerify,
         signatureBase64,
-        "base64url",
+        key.publicKey,
+        key.algorithm,
       );
 
       if (!isValid) {
@@ -113,23 +126,20 @@ export class CredentialSigningService {
       }
 
       // Decode the payload
-      const payload = JSON.parse(
-        Buffer.from(payloadBase64, "base64url").toString("utf8"),
-      );
+      const payload = decodeBase64Url<Record<string, unknown>>(payloadBase64);
 
       // Check expiration
-      const now = Math.floor(Date.now() / 1000);
-      if (payload.exp && payload.exp < now) {
+      const now = getCurrentTimestamp();
+      if (payload.exp && typeof payload.exp === "number" && payload.exp < now) {
         throw new Error("Token expired");
       }
 
       logger.info("Verified credential JWT", { keyId: key.id });
 
-      return payload as Record<string, unknown>;
-    } catch (error) {
-      logger.error("Failed to verify credential JWT", { error });
-      throw new Error("Failed to verify credential JWT");
-    }
+      return payload;
+    }, "Failed to verify credential JWT");
+
+    return unwrapResult(result);
   }
 
   /**
@@ -142,11 +152,11 @@ export class CredentialSigningService {
     credential: Record<string, unknown>,
     keyId?: string,
   ): Promise<Record<string, unknown>> {
-    try {
+    const result = await executeWithErrorHandling(async () => {
       // Get the signing key
       const signingKey = keyId
-        ? keyManagementService.getKey(keyId)
-        : keyManagementService.getDefaultSigningKey();
+        ? await keyManagementService.getKey(keyId)
+        : await keyManagementService.getDefaultSigningKey();
 
       if (!signingKey) {
         throw new Error("Signing key not found");
@@ -173,12 +183,9 @@ export class CredentialSigningService {
       });
 
       return signedCredential;
-    } catch (error) {
-      logger.error("Failed to sign credential with Linked Data Signature", {
-        error,
-      });
-      throw new Error("Failed to sign credential with Linked Data Signature");
-    }
+    }, "Failed to sign credential with Linked Data Signature");
+
+    return unwrapResult(result);
   }
 
   /**
@@ -189,7 +196,7 @@ export class CredentialSigningService {
   async verifyCredentialLd(
     credential: Record<string, unknown>,
   ): Promise<boolean> {
-    try {
+    const result = await executeWithErrorHandling(async () => {
       // In a real implementation, we would use a proper Linked Data Signatures library
       // For now, we'll just check if the proof exists
       const proof = credential.proof as Record<string, unknown>;
@@ -203,7 +210,7 @@ export class CredentialSigningService {
       const keyId = verificationMethod.split("#")[1];
 
       // Get the key
-      const key = keyManagementService.getKey(keyId);
+      const key = await keyManagementService.getKey(keyId);
 
       if (!key) {
         throw new Error(`Key not found: ${keyId}`);
@@ -214,12 +221,9 @@ export class CredentialSigningService {
       logger.info("Verified credential with Linked Data Signature", { keyId });
 
       return true;
-    } catch (error) {
-      logger.error("Failed to verify credential with Linked Data Signature", {
-        error,
-      });
-      throw new Error("Failed to verify credential with Linked Data Signature");
-    }
+    }, "Failed to verify credential with Linked Data Signature");
+
+    return unwrapResult(result);
   }
 }
 
